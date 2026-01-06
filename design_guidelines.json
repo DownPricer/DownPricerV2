@@ -1,0 +1,154 @@
+{
+  "identity": {
+    "name": "DownPricer",
+    "persona": "E1 - The Anti-AI Designer",
+    "core_philosophy": "Fusion of raw marketplace urgency and sterile enterprise precision. Two worlds, one app.",
+    "themes": {
+      "marketplace": "Dark, High-Contrast, Neon-Accents (Orange/Red), Mobile-First, 'Streetwear/Drop' Aesthetic",
+      "admin": "Light, Clean, Dense, Information-First, 'Fintech/SaaS' Aesthetic"
+    }
+  },
+  "typography": {
+    "fonts": {
+      "marketplace_headings": {
+        "family": "Outfit",
+        "weights": ["700", "900"],
+        "usage": "Product titles, prices, promo banners. Tight tracking."
+      },
+      "admin_headings": {
+        "family": "Inter",
+        "weights": ["600"],
+        "usage": "Dashboard widgets, table headers. Normal tracking."
+      },
+      "body": {
+        "family": "Inter",
+        "weights": ["400", "500"],
+        "usage": "All body text, descriptions, inputs."
+      }
+    },
+    "rules": [
+      "MARKETPLACE: Headings must be uppercase or tight-tracking for impact.",
+      "ADMIN: Headings must be sentence case and highly legible.",
+      "PRICES: Use 'Outfit' font, weight 700, tracking-tight. Example: text-3xl font-bold tracking-tight text-orange-500."
+    ]
+  },
+  "colors": {
+    "marketplace_theme": {
+      "background": "#09090b",
+      "surface": "#18181b",
+      "surface_highlight": "#27272a",
+      "border": "#27272a",
+      "text_primary": "#fafafa",
+      "text_secondary": "#a1a1aa",
+      "accent_primary": "#f97316",
+      "accent_secondary": "#ef4444",
+      "status_success": "#22c55e",
+      "status_warning": "#f59e0b",
+      "status_error": "#ef4444"
+    },
+    "admin_theme": {
+      "background": "#f8fafc",
+      "surface": "#ffffff",
+      "surface_highlight": "#f1f5f9",
+      "border": "#e2e8f0",
+      "text_primary": "#0f172a",
+      "text_secondary": "#64748b",
+      "accent_primary": "#0f172a",
+      "accent_secondary": "#3b82f6",
+      "status_success": "#10b981",
+      "status_warning": "#f59e0b",
+      "status_error": "#ef4444"
+    },
+    "usage_rules": [
+      "MARKETPLACE: Use Orange (#f97316) for 'Buy', 'Bid', 'Action' buttons.",
+      "MARKETPLACE: Use Red (#ef4444) for 'Price Drop', 'Alerts', 'Urgent'.",
+      "ADMIN: Use Blue (#3b82f6) for links and primary actions.",
+      "ADMIN: Use Slate-900 (#0f172a) for navigation and headers.",
+      "NEVER use gradients for backgrounds. Use solid colors or subtle noise textures."
+    ]
+  },
+  "layout": {
+    "spacing_system": {
+      "base": "4px",
+      "scale": ["p-1", "p-2", "p-4", "p-6", "p-8", "p-12", "p-16", "p-24"],
+      "philosophy": "Marketplace uses generous padding (p-6, p-8) for touch targets. Admin uses tight padding (p-2, p-4) for data density."
+    },
+    "grids": {
+      "marketplace_listing": "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6. Mobile: grid-cols-2 gap-3.",
+      "admin_dashboard": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4. Dense layout.",
+      "bento_grid": "Use for 'Featured' or 'Categories'. Mix col-span-2 and row-span-2 items."
+    },
+    "containers": {
+      "mobile_max_width": "w-full",
+      "desktop_max_width": "max-w-7xl mx-auto",
+      "admin_sidebar_width": "w-64"
+    }
+  },
+  "components": {
+    "buttons": {
+      "marketplace_primary": "bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-full px-6 py-3 shadow-[0_0_15px_rgba(249,115,22,0.4)] transition-transform active:scale-95",
+      "admin_primary": "bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-md px-4 py-2 shadow-sm",
+      "ghost": "hover:bg-accent hover:text-accent-foreground"
+    },
+    "cards": {
+      "marketplace_product": "bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden hover:border-orange-500/50 transition-colors group relative",
+      "admin_widget": "bg-white border border-slate-200 rounded-lg shadow-sm p-4"
+    },
+    "inputs": {
+      "style": "bg-background border-input ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+      "marketplace_variant": "bg-zinc-900 border-zinc-700 focus:border-orange-500 rounded-lg h-12",
+      "admin_variant": "bg-white border-slate-300 focus:border-blue-500 rounded-md h-9 text-sm"
+    },
+    "badges": {
+      "status_pending": "bg-orange-100 text-orange-800 border-orange-200 (Admin) / bg-orange-500/20 text-orange-400 border-orange-500/50 (Marketplace)",
+      "status_success": "bg-green-100 text-green-800 border-green-200 (Admin) / bg-green-500/20 text-green-400 border-green-500/50 (Marketplace)",
+      "status_error": "bg-red-100 text-red-800 border-red-200 (Admin) / bg-red-500/20 text-red-400 border-red-500/50 (Marketplace)"
+    }
+  },
+  "visual_enhancers": {
+    "glassmorphism": "backdrop-blur-xl bg-black/40 border-white/10 (Marketplace Headers/Modals)",
+    "shadows": {
+      "neon_glow": "shadow-[0_0_20px_rgba(249,115,22,0.3)]",
+      "subtle_lift": "shadow-lg shadow-slate-200/50"
+    },
+    "textures": "Use subtle noise overlay on Marketplace backgrounds to avoid 'flat digital' look."
+  },
+  "image_urls": {
+    "hero_backgrounds": [
+      {
+        "url": "https://images.unsplash.com/photo-1737651704014-ed9e926333cf?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTk1ODF8MHwxfHNlYXJjaHwxfHxzbmVha2VycyUyMGRhcmslMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc2NTcyOTMzM3ww&ixlib=rb-4.1.0&q=85",
+        "category": "marketplace_hero",
+        "description": "Dark mode sneakers, high contrast, perfect for 'Price Drop' hero."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1761005654036-ffe7410d5d2a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzF8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBlbGVjdHJvbmljcyUyMGRhcmslMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc2NTcyOTMzNXww&ixlib=rb-4.1.0&q=85",
+        "category": "electronics_promo",
+        "description": "Red illuminated headphones, fits the 'Alert/Red' theme."
+      }
+    ],
+    "admin_visuals": [
+      {
+        "url": "https://images.unsplash.com/photo-1661169398420-e8d229fb39f4?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzd8MHwxfHNlYXJjaHwyfHxtaW5pbWFsaXN0JTIwb2ZmaWNlJTIwZGVzayUyMHdoaXRlfGVufDB8fHx8MTc2NTcyOTMzN3ww&ixlib=rb-4.1.0&q=85",
+        "category": "admin_login_bg",
+        "description": "Clean, white, minimalist office. Good for Admin Login side panel."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1762279389083-abf71f22d338?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzB8MHwxfHNlYXJjaHwyfHxhYnN0cmFjdCUyMGJsdWUlMjBkYXRhJTIwdmlzdWFsaXphdGlvbnxlbnwwfHx8fDE3NjU3MjkzMzh8MA&ixlib=rb-4.1.0&q=85",
+        "category": "data_visualization",
+        "description": "Abstract blue data lines. Good for 'S-Plan' or 'Analytics' promo cards."
+      }
+    ]
+  },
+  "instructions_to_main_agent": {
+    "theme_implementation": "You MUST implement a route-based theme switcher. If path starts with '/admin' or '/seller' or '/s-plan', use the ADMIN THEME (Light). If path is public or '/client', use the MARKETPLACE THEME (Dark). You can achieve this by adding a 'dark' class to a wrapper div for marketplace routes, and removing it for admin routes.",
+    "mobile_first": "Always write mobile styles first (e.g., 'grid-cols-1') and then add breakpoints ('md:grid-cols-3').",
+    "performance": "Use 'loading=\"lazy\"' on all images. Use 'next/image' or optimized 'img' tags with width/height.",
+    "accessibility": "Ensure all text has sufficient contrast. Orange on White is tricky - check APCA. Use darker orange for text, brighter for backgrounds.",
+    "testing": "Add 'data-testid' to every interactive element. Format: 'page-section-element-action'. Example: 'login-form-email-input', 'product-card-buy-button'."
+  },
+  "universal_guidelines": {
+    "do_not_use": ["Gradients for text", "Generic 'Bootstrap' look", "Default HTML inputs (always use Shadcn/Tailwind)", "Heavy animations on mobile"],
+    "must_use": ["Sonner for toasts", "Lucide-React for icons", "Tailwind animate-pulse for loading states"],
+    "component_reuse": "Check /app/frontend/src/components/ui before creating new ones. Customize them via props or className, do not duplicate logic."
+  }
+}
