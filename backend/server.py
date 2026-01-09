@@ -27,6 +27,10 @@ from billing_provider import get_billing_provider
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
+
 # Vérification des variables d'environnement obligatoires
 mongo_url = os.environ.get('MONGO_URL')
 if not mongo_url:
@@ -72,8 +76,6 @@ except Exception as e:
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
 # Chemin relatif au répertoire backend pour les uploads
 UPLOAD_DIR = Path(ROOT_DIR / "uploads")
