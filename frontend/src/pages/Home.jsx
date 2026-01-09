@@ -6,6 +6,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import api from '../utils/api';
+import { resolveImageUrl } from '../utils/images';
 
 export const Home = () => {
   const navigate = useNavigate();
@@ -120,18 +121,32 @@ export const Home = () => {
                   data-testid={`article-card-${article.id}`}
                 >
                   <div className="relative aspect-square overflow-hidden bg-zinc-800">
-                    {article.photos && article.photos.length > 0 ? (
-                      <img
-                        src={article.photos[0]}
-                        alt={article.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-zinc-600">
-                        Pas d'image
-                      </div>
-                    )}
+                    {(() => {
+                      const imageUrl = resolveImageUrl(article.photos?.[0]);
+                      if (!imageUrl) {
+                        return (
+                          <div className="w-full h-full flex items-center justify-center text-zinc-600">
+                            Pas d'image
+                          </div>
+                        );
+                      }
+                      return (
+                        <img
+                          src={imageUrl}
+                          alt={article.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          loading="lazy"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            const placeholder = e.target.parentElement.querySelector('.img-placeholder');
+                            if (placeholder) placeholder.style.display = 'flex';
+                          }}
+                        />
+                      );
+                    })()}
+                    <div className="w-full h-full hidden items-center justify-center text-zinc-600 img-placeholder">
+                      Pas d'image
+                    </div>
                     {article.from_minisite && (
                       <Badge className="absolute top-2 left-2 bg-blue-600 text-white border-none text-xs">
                         🏪 Partenaire

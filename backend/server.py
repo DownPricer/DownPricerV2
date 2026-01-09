@@ -80,8 +80,9 @@ api_router = APIRouter(prefix="/api")
 # Chemin relatif au répertoire backend pour les uploads
 UPLOAD_DIR = Path(ROOT_DIR / "uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
-# Monte les uploads sous /api/uploads pour être accessible via l'ingress Kubernetes
-app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+# En production, Nginx sert directement /api/uploads/, pas besoin de monter ici
+# En dev local uniquement, on peut monter pour tester
+# app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 async def get_billing_mode() -> str:
     setting = await db.settings.find_one({"key": "billing_mode"}, {"_id": 0})
@@ -179,9 +180,9 @@ async def upload_image(file: UploadFile = File(...), current_user = Depends(get_
         # Sauvegarder en WebP avec qualité optimisée
         image.save(file_path, "WEBP", quality=75, method=4)
         
-        # Utiliser l'URL publique du backend pour les images accessibles de l'extérieur
-        backend_url = os.environ.get('BACKEND_PUBLIC_URL', os.environ.get('REACT_APP_BACKEND_URL', 'http://localhost:8001'))
-        image_url = f"{backend_url}/api/uploads/{unique_filename}"
+        # Retourner une URL relative pour que Nginx serve directement les fichiers
+        # Le frontend résoudra cette URL relative par rapport au domaine actuel
+        image_url = f"/api/uploads/{unique_filename}"
         
         return {"success": True, "url": image_url, "filename": unique_filename}
     

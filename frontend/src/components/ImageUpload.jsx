@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Upload, Link as LinkIcon, X, Loader2, ImageIcon } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'sonner';
+import { resolveImageUrl } from '../utils/images';
 
 export const ImageUpload = ({ 
   images = [], 
@@ -88,10 +89,10 @@ export const ImageUpload = ({
     const [imgError, setImgError] = useState(false);
     const [imgLoading, setImgLoading] = useState(true);
 
-    // Log pour debug
-    console.log(`ImagePreview: Loading image ${index}:`, url);
+    // Résoudre l'URL de l'image
+    const resolvedUrl = resolveImageUrl(url);
 
-    if (imgError) {
+    if (!resolvedUrl || imgError) {
       return (
         <div className="w-full h-24 flex items-center justify-center bg-red-900/30 rounded-lg border border-red-600">
           <div className="flex flex-col items-center text-red-400 text-xs">
@@ -110,16 +111,16 @@ export const ImageUpload = ({
           </div>
         )}
         <img
-          src={url}
+          src={resolvedUrl}
           alt={`Image ${index + 1}`}
           className={`w-full h-24 object-cover rounded-lg border-2 border-green-500 ${imgLoading ? 'opacity-0' : 'opacity-100'}`}
           onError={(e) => {
-            console.error(`ImagePreview: Error loading image ${index}:`, url, e);
+            console.error(`ImagePreview: Error loading image ${index}:`, resolvedUrl, e);
             setImgError(true);
             setImgLoading(false);
           }}
           onLoad={() => {
-            console.log(`ImagePreview: Loaded image ${index}:`, url);
+            console.log(`ImagePreview: Loaded image ${index}:`, resolvedUrl);
             setImgLoading(false);
           }}
         />

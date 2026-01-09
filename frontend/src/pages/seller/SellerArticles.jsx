@@ -6,6 +6,7 @@ import { Badge } from '../../components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
 import { toast } from 'sonner';
+import { resolveImageUrl } from '../../utils/images';
 
 export const SellerArticles = () => {
   const navigate = useNavigate();
@@ -68,11 +69,13 @@ export const SellerArticles = () => {
                 <Card key={article.id} className="bg-zinc-900 border-zinc-800 hover:border-orange-500/50 transition-colors cursor-pointer" onClick={() => navigate(`/seller/article/${article.id}`)}>
                   <CardContent className="p-4">
                     <div className="aspect-square bg-zinc-800 rounded-lg overflow-hidden mb-3">
-                      {article.photos && article.photos.length > 0 ? (
-                        <img src={article.photos[0]} alt={article.name} className="w-full h-full object-cover" loading="lazy" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-zinc-600">Pas d'image</div>
-                      )}
+                      {(() => {
+                        const imageUrl = resolveImageUrl(article.photos?.[0]);
+                        if (!imageUrl) {
+                          return <div className="w-full h-full flex items-center justify-center text-zinc-600">Pas d'image</div>;
+                        }
+                        return <img src={imageUrl} alt={article.name} className="w-full h-full object-cover" loading="lazy" onError={(e) => e.target.style.display = 'none'} />;
+                      })()}
                     </div>
                     <h3 className="font-semibold text-white mb-1 line-clamp-1">{article.name}</h3>
                     <p className="text-sm text-zinc-400 line-clamp-2 mb-3">{article.description}</p>

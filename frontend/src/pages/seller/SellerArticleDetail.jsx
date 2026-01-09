@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../componen
 import { Download, AlertTriangle } from 'lucide-react';
 import api from '../../utils/api';
 import { toast } from 'sonner';
+import { resolveImageUrl } from '../../utils/images';
 
 export const SellerArticleDetail = () => {
   const { id } = useParams();
@@ -117,18 +118,32 @@ export const SellerArticleDetail = () => {
         <div className="grid md:grid-cols-2 gap-8">
           <div>
             <div className="relative aspect-square bg-zinc-900 rounded-xl overflow-hidden mb-4">
-              {article.photos && article.photos.length > 0 ? (
-                <img
-                  src={article.photos[currentPhotoIndex]}
-                  alt={article.name}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-zinc-600">
-                  Pas d'image disponible
-                </div>
-              )}
+              {(() => {
+                const imageUrl = resolveImageUrl(article.photos?.[currentPhotoIndex]);
+                if (!imageUrl) {
+                  return (
+                    <div className="w-full h-full flex items-center justify-center text-zinc-600">
+                      Pas d'image disponible
+                    </div>
+                  );
+                }
+                return (
+                  <img
+                    src={imageUrl}
+                    alt={article.name}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      const placeholder = e.target.parentElement.querySelector('.img-placeholder');
+                      if (placeholder) placeholder.style.display = 'flex';
+                    }}
+                  />
+                );
+              })()}
+              <div className="w-full h-full hidden items-center justify-center text-zinc-600 img-placeholder">
+                Pas d'image disponible
+              </div>
               {discount > 0 && (
                 <Badge className="absolute top-4 right-4 bg-red-500 text-white text-lg font-bold px-4 py-2">
                   -{discount}%
@@ -146,7 +161,22 @@ export const SellerArticleDetail = () => {
                       index === currentPhotoIndex ? 'border-orange-500' : 'border-zinc-800'
                     }`}
                   >
-                    <img src={photo} alt={`${article.name} ${index + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                    {(() => {
+                      const thumbUrl = resolveImageUrl(photo);
+                      return thumbUrl ? (
+                        <img 
+                          src={thumbUrl} 
+                          alt={`${article.name} ${index + 1}`} 
+                          className="w-full h-full object-cover" 
+                          loading="lazy"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-zinc-800 text-zinc-600 text-xs">Image</div>
+                      );
+                    })()}
                   </button>
                 ))}
               </div>

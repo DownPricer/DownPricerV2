@@ -11,6 +11,7 @@ import api from '../utils/api';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { resolveImageUrl } from '../utils/images';
 
 export const MesDemandes = () => {
   const navigate = useNavigate();
@@ -115,11 +116,13 @@ export const MesDemandes = () => {
                 <CardContent className="p-4">
                   <div className="flex gap-4">
                     <div className="flex-shrink-0 w-20 h-20 bg-zinc-800 rounded-lg overflow-hidden">
-                      {demande.photos && demande.photos.length > 0 ? (
-                        <img src={demande.photos[0]} alt={demande.name} className="w-full h-full object-cover" loading="lazy" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-zinc-600 text-xs">Pas de photo</div>
-                      )}
+                      {(() => {
+                        const imageUrl = resolveImageUrl(demande.photos?.[0]);
+                        if (!imageUrl) {
+                          return <div className="w-full h-full flex items-center justify-center text-zinc-600 text-xs">Pas de photo</div>;
+                        }
+                        return <img src={imageUrl} alt={demande.name} className="w-full h-full object-cover" loading="lazy" onError={(e) => e.target.style.display = 'none'} />;
+                      })()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-white truncate mb-1">{demande.name}</h3>

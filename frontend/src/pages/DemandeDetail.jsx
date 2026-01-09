@@ -9,6 +9,7 @@ import api from '../utils/api';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { resolveImageUrl } from '../utils/images';
 
 export const DemandeDetail = () => {
   const { id } = useParams();
@@ -97,11 +98,15 @@ export const DemandeDetail = () => {
 
           {demande.photos && demande.photos.length > 0 && (
             <div className="flex gap-2 overflow-x-auto">
-              {demande.photos.map((photo, index) => (
-                <div key={index} className="flex-shrink-0 w-32 h-32 rounded-lg overflow-hidden bg-zinc-800">
-                  <img src={photo} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" loading="lazy" />
-                </div>
-              ))}
+              {demande.photos.map((photo, index) => {
+                const imageUrl = resolveImageUrl(photo);
+                if (!imageUrl) return null;
+                return (
+                  <div key={index} className="flex-shrink-0 w-32 h-32 rounded-lg overflow-hidden bg-zinc-800">
+                    <img src={imageUrl} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" loading="lazy" onError={(e) => e.target.style.display = 'none'} />
+                  </div>
+                );
+              })}
             </div>
           )}
 

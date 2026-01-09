@@ -7,6 +7,7 @@ import { Badge } from '../../components/ui/badge';
 import { ArrowLeft, Package, DollarSign, Clock, CheckCircle, XCircle, Truck, AlertCircle } from 'lucide-react';
 import api from '../../utils/api';
 import { toast } from 'sonner';
+import { resolveImageUrl } from '../../utils/images';
 
 export const SellerVenteDetail = () => {
   const { id } = useParams();
@@ -110,14 +111,19 @@ export const SellerVenteDetail = () => {
               <CardTitle className="text-orange-500">Informations article</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {article.photos && article.photos.length > 0 && (
-                <img
-                  src={article.photos[0]}
-                  alt={article.name}
-                  className="w-full h-48 object-cover rounded-lg"
-                  loading="lazy"
-                />
-              )}
+              {(() => {
+                const imageUrl = resolveImageUrl(article.photos?.[0]);
+                if (!imageUrl) return null;
+                return (
+                  <img
+                    src={imageUrl}
+                    alt={article.name}
+                    className="w-full h-48 object-cover rounded-lg"
+                    loading="lazy"
+                    onError={(e) => e.target.style.display = 'none'}
+                  />
+                );
+              })()}
               <div>
                 <p className="text-sm text-zinc-400">Nom</p>
                 <p className="text-lg font-semibold">{article.name}</p>

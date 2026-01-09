@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { CheckCircle, XCircle, Truck } from 'lucide-react';
 import api from '../../utils/api';
 import { toast } from 'sonner';
+import { resolveImageUrl } from '../../utils/images';
 
 export const AdminVenteDetail = () => {
   const { id } = useParams();
@@ -208,11 +209,13 @@ export const AdminVenteDetail = () => {
                 {article ? (
                   <div className="flex gap-4">
                     <div className="w-32 h-32 bg-slate-100 rounded-lg overflow-hidden">
-                      {article.photos && article.photos[0] ? (
-                        <img src={article.photos[0]} alt={article.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-400">Pas de photo</div>
-                      )}
+                      {(() => {
+                        const imageUrl = resolveImageUrl(article.photos?.[0]);
+                        if (!imageUrl) {
+                          return <div className="w-full h-full flex items-center justify-center text-slate-400">Pas de photo</div>;
+                        }
+                        return <img src={imageUrl} alt={article.name} className="w-full h-full object-cover" onError={(e) => e.target.style.display = 'none'} />;
+                      })()}
                     </div>
                     <div className="flex-1">
                       <h3 className="font-semibold text-lg text-slate-900">{article.name}</h3>

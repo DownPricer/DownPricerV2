@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { resolveImageUrl } from '../utils/images';
 
 // Placeholder SVG encodé en base64 - image grise avec texte "Pas d'image"
 const PLACEHOLDER_SVG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiB2aWV3Qm94PSIwIDAgMjAwIDIwMCI+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9IiNlMmU4ZjAiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOTRhM2I4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+UGFzIGQnaW1hZ2U8L3RleHQ+PC9zdmc+";
@@ -14,12 +15,8 @@ export const SafeImage = ({
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Vérifier si l'URL est valide et utilisable
-  const isValidUrl = src && 
-    src.trim() !== '' &&
-    !src.includes('example.com') && 
-    !src.includes('localhost:8001') &&
-    (src.startsWith('http') || src.startsWith('data:') || src.startsWith('/api/'));
+  // Résoudre l'URL de l'image
+  const resolvedUrl = resolveImageUrl(src);
 
   const handleError = () => {
     console.warn('Image failed to load:', src);
@@ -32,7 +29,7 @@ export const SafeImage = ({
   };
 
   // Si pas d'URL valide ou erreur, afficher le placeholder
-  if (!isValidUrl || error) {
+  if (!resolvedUrl || error) {
     if (!showPlaceholder) return null;
     
     return (
@@ -61,7 +58,7 @@ export const SafeImage = ({
         />
       )}
       <img
-        src={src}
+        src={resolvedUrl}
         alt={alt}
         className={`${className} ${loading ? 'hidden' : ''}`}
         onError={handleError}
