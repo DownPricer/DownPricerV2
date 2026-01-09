@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../components/ui/accordion';
 import { getUser } from '../utils/auth';
-import axios from 'axios';
+import api from '../utils/api';
 
 export const FaireDemande = () => {
   const navigate = useNavigate();
@@ -19,7 +19,7 @@ export const FaireDemande = () => {
 
   const fetchSettings = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/settings/public`);
+      const response = await api.get('/settings/public');
       setSettings(response.data);
     } catch (error) {
       console.error('Erreur chargement paramètres:', error);

@@ -6,7 +6,6 @@ import { Badge } from '../../components/ui/badge';
 import { DollarSign, Package, TrendingUp, AlertCircle, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
-import axios from 'axios';
 import { toast } from 'sonner';
 import { SellerStatsGraph } from './SellerStatsGraph';
 
@@ -33,7 +32,7 @@ export const SellerDashboard = () => {
 
   const fetchSettings = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/settings/public`);
+      const response = await api.get('/settings/public');
       setSettings(response.data);
     } catch (error) {
       console.error('Erreur settings');

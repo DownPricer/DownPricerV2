@@ -5,7 +5,6 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Plus, Trash2 } from 'lucide-react';
-import axios from 'axios';
 import api from '../../utils/api';
 import { toast } from 'sonner';
 
@@ -21,7 +20,7 @@ export const AdminCategoriesPage = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/categories`);
+      const response = await api.get('/categories');
       setCategories(response.data);
     } catch (error) {
       toast.error('Erreur lors du chargement');

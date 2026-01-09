@@ -6,7 +6,7 @@ import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
 import { Checkbox } from '../components/ui/checkbox';
-import axios from 'axios';
+import api from '../utils/api';
 import { setToken, setUser } from '../utils/auth';
 import { toast } from 'sonner';
 
@@ -37,7 +37,7 @@ export const Signup = () => {
     setLoading(true);
 
     try {
-      const response = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/auth/signup`, formData);
+      const response = await api.post('/auth/signup', formData);
 
       setToken(response.data.token);
       setUser(response.data.user);

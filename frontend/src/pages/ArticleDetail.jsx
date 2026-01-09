@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Card, CardContent } from '../components/ui/card';
 import { ExternalLink } from 'lucide-react';
-import axios from 'axios';
+import api from '../utils/api';
 import { toast } from 'sonner';
 
 export const ArticleDetail = () => {
@@ -23,7 +23,7 @@ export const ArticleDetail = () => {
 
   const fetchArticle = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/articles/${id}`);
+      const response = await api.get(`/articles/${id}`);
       setArticle(response.data);
     } catch (error) {
       toast.error('Article non trouvé');
@@ -34,7 +34,7 @@ export const ArticleDetail = () => {
 
   const fetchSettings = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/settings/public`);
+      const response = await api.get('/settings/public');
       setSettings(response.data);
     } catch (error) {
       console.error('Erreur chargement paramètres:', error);

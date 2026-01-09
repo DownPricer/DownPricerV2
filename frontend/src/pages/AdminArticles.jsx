@@ -14,7 +14,6 @@ import { ImageUpload } from '../components/ImageUpload';
 import { SafeImage } from '../components/SafeImage';
 import api from '../utils/api';
 import { toast } from 'sonner';
-import axios from 'axios';
 
 export const AdminArticlesPage = () => {
   const navigate = useNavigate();
@@ -44,7 +43,7 @@ export const AdminArticlesPage = () => {
 
   const fetchArticles = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/articles?limit=100`);
+      const response = await api.get('/articles?limit=100');
       setArticles(response.data.articles);
     } catch (error) {
       toast.error('Erreur lors du chargement des articles');
@@ -54,7 +53,7 @@ export const AdminArticlesPage = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/categories`);
+      const response = await api.get('/categories');
       setCategories(response.data);
     } catch (error) {
       console.error('Erreur catégories');
