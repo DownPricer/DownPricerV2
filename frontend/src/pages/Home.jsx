@@ -6,7 +6,6 @@ import { Card, CardContent } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import api from '../utils/api';
-import axios from 'axios';
 
 export const Home = () => {
   const navigate = useNavigate();
@@ -25,7 +24,7 @@ export const Home = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/categories`);
+      const response = await api.get('/categories');
       setCategories(response.data);
     } catch (error) {
       console.error('Erreur chargement catégories:', error);
@@ -41,7 +40,7 @@ export const Home = () => {
       params.append('sort', sortBy);
       params.append('limit', '20');
 
-      const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/articles?${params}`);
+      const response = await api.get(`/articles?${params}`);
       setArticles(response.data.articles);
     } catch (error) {
       console.error('Erreur chargement articles:', error);

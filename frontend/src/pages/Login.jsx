@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
-import axios from 'axios';
+import api from '../utils/api';
 import { setToken, setUser } from '../utils/auth';
 import { toast } from 'sonner';
 
@@ -20,7 +20,7 @@ export const Login = () => {
     setLoading(true);
 
     try {
-      const response = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/auth/login`, {
+      const response = await api.post('/auth/login', {
         email,
         password
       });

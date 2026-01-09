@@ -25,8 +25,8 @@ services:
       - MONGO_URL=mongodb://mongo:27017
       - DB_NAME=downpricer
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-in-production}
-      - CORS_ORIGINS=${CORS_ORIGINS:-https://downpricer.com}
-      - BACKEND_PUBLIC_URL=${BACKEND_PUBLIC_URL:-https://downpricer.com}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://51.210.179.212}
+      - BACKEND_PUBLIC_URL=${BACKEND_PUBLIC_URL:-http://51.210.179.212}
       - ENV=production
     volumes:
       - uploads_data:/app/uploads
