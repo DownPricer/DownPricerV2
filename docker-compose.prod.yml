@@ -46,7 +46,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - REACT_APP_BACKEND_URL=/api
+        - REACT_APP_BACKEND_URL=
     image: downpricer-frontend:latest
     volumes:
       - frontend_build:/output

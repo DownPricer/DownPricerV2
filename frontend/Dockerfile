@@ -11,7 +11,8 @@ RUN if [ -f yarn.lock ]; then yarn install --frozen-lockfile; \
 COPY . .
 
 # Build de production
-ARG REACT_APP_BACKEND_URL=/api
+# Si REACT_APP_BACKEND_URL n'est pas fourni, laisser vide (le code utilisera '/api' par défaut)
+ARG REACT_APP_BACKEND_URL=
 ENV REACT_APP_BACKEND_URL=$REACT_APP_BACKEND_URL
 RUN npm run build
 
