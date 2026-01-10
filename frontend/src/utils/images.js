@@ -23,14 +23,14 @@ export const resolveImageUrl = (imageUrl) => {
     return trimmedUrl;
   }
 
-  // URL relative commençant par /api/uploads/ : retourner tel quel (sera résolu par le navigateur)
+  // URL relative commençant par /api/uploads/ : convertir en /uploads/ (standard)
   if (trimmedUrl.startsWith('/api/uploads/')) {
-    return trimmedUrl;
+    return trimmedUrl.replace('/api/uploads/', '/uploads/');
   }
 
-  // URL relative commençant par /uploads/ : convertir en /api/uploads/
+  // URL relative commençant par /uploads/ : retourner tel quel (standard)
   if (trimmedUrl.startsWith('/uploads/')) {
-    return trimmedUrl.replace('/uploads/', '/api/uploads/');
+    return trimmedUrl;
   }
 
   // URLs commençant par / : retourner tel quel
@@ -43,7 +43,7 @@ export const resolveImageUrl = (imageUrl) => {
     return null;
   }
 
-  // Si c'est juste un nom de fichier sans chemin, supposer que c'est dans /api/uploads/
+  // Si c'est juste un nom de fichier sans chemin, supposer que c'est dans /uploads/
   // Mais en général, le backend retourne toujours un chemin complet, donc ce cas est rare
   // On retourne null pour être sûr
   return null;

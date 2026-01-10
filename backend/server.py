@@ -180,9 +180,9 @@ async def upload_image(file: UploadFile = File(...), current_user = Depends(get_
         # Sauvegarder en WebP avec qualité optimisée
         image.save(file_path, "WEBP", quality=75, method=4)
         
-        # Retourner une URL relative pour que Nginx serve directement les fichiers
+        # Retourner une URL relative standard /uploads/ (Nginx servira directement)
         # Le frontend résoudra cette URL relative par rapport au domaine actuel
-        image_url = f"/api/uploads/{unique_filename}"
+        image_url = f"/uploads/{unique_filename}"
         
         return {"success": True, "url": image_url, "filename": unique_filename}
     
