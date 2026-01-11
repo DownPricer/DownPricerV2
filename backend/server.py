@@ -1399,6 +1399,7 @@ async def reject_sale(sale_id: str, data: dict, background_tasks: BackgroundTask
         
         if seller_email:
             subject = f"Votre vente a été refusée - {sale.get('article_name', '')}"
+            reason_html = f'<p><strong>Raison :</strong> {reason}</p>' if reason else "<p>Pour plus d'informations, veuillez nous contacter.</p>"
             html_body = f"""
             <html>
                 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
@@ -1406,7 +1407,7 @@ async def reject_sale(sale_id: str, data: dict, background_tasks: BackgroundTask
                         <h2 style="color: #dc2626;">Votre vente a été refusée</h2>
                         <p>Bonjour,</p>
                         <p>Votre vente de l'article "<strong>{sale.get('article_name', '')}</strong>" a été refusée par l'administration.</p>
-                        {f'<p><strong>Raison :</strong> {reason}</p>' if reason else '<p>Pour plus d\'informations, veuillez nous contacter.</p>'}
+                        {reason_html}
                         <p>Si vous avez des questions, n'hésitez pas à nous contacter.</p>
                         <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
                         <p style="color: #6b7280; font-size: 12px;">DownPricer - {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}</p>
