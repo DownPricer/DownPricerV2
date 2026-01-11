@@ -254,3 +254,4 @@ Après ces corrections, toutes les images uploadées doivent être accessibles v
 
 Et s'afficher correctement dans l'interface sans erreur 404.
 
+

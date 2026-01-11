@@ -6,7 +6,8 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { Settings, DollarSign, FileText, Link as LinkIcon, Save } from 'lucide-react';
+import { Settings, DollarSign, FileText, Link as LinkIcon, Save, Mail, Send } from 'lucide-react';
+import { Switch } from '../../components/ui/switch';
 import api from '../../utils/api';
 import { toast } from 'sonner';
 
@@ -45,6 +46,17 @@ export const AdminParametresRichesPage = () => {
     setSettings({ ...settings, [key]: value });
   };
 
+  const testEmail = async () => {
+    setSaving(true);
+    try {
+      const response = await api.post('/admin/email/test');
+      toast.success(response.data.message || 'Email de test envoyé avec succès');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erreur lors de l\'envoi de l\'email de test');
+    }
+    setSaving(false);
+  };
+
   if (loading) {
     return (
       <AdminLayout>
@@ -80,6 +92,10 @@ export const AdminParametresRichesPage = () => {
             <TabsTrigger value="liens">
               <LinkIcon className="h-4 w-4 mr-2" />
               Liens
+            </TabsTrigger>
+            <TabsTrigger value="email">
+              <Mail className="h-4 w-4 mr-2" />
+              Notifications email
             </TabsTrigger>
           </TabsList>
 
@@ -377,6 +393,83 @@ export const AdminParametresRichesPage = () => {
                   <Save className="h-4 w-4 mr-2" />
                   Enregistrer tous les liens
                 </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="email" className="mt-6 space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Notifications email</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label>Activer les notifications email</Label>
+                      <p className="text-xs text-slate-500">
+                        Active ou désactive toutes les notifications email (demandes, ventes, etc.)
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.email_notif_enabled === true || settings.email_notif_enabled === "true"}
+                      onCheckedChange={(checked) => {
+                        handleChange('email_notif_enabled', checked);
+                        handleSave('email_notif_enabled', checked);
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Email admin (notifications)</Label>
+                  <Input
+                    type="email"
+                    value={settings.admin_notif_email || ''}
+                    onChange={(e) => handleChange('admin_notif_email', e.target.value)}
+                    onBlur={(e) => handleSave('admin_notif_email', e.target.value)}
+                    placeholder="contact@downpricer.com"
+                  />
+                  <p className="text-xs text-slate-500">
+                    Email qui recevra les notifications admin (nouvelles ventes, demandes importantes, etc.)
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t border-slate-200">
+                  <div className="space-y-2">
+                    <Label>Test de configuration</Label>
+                    <p className="text-xs text-slate-500 mb-3">
+                      Envoie un email de test pour vérifier que la configuration SMTP est correcte.
+                      L'email sera envoyé à l'adresse admin configurée ci-dessus.
+                    </p>
+                    <Button
+                      onClick={testEmail}
+                      disabled={saving}
+                      variant="outline"
+                      className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                    >
+                      <Send className="h-4 w-4 mr-2" />
+                      Envoyer un email de test
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-200">
+                  <div className="bg-slate-50 p-4 rounded-lg">
+                    <h4 className="text-sm font-semibold text-slate-700 mb-2">Configuration SMTP</h4>
+                    <p className="text-xs text-slate-600 mb-2">
+                      Les paramètres SMTP (hôte, port, utilisateur, mot de passe) doivent être configurés dans les variables d'environnement du serveur.
+                    </p>
+                    <ul className="text-xs text-slate-600 space-y-1 list-disc list-inside">
+                      <li>SMTP_HOST (ex: smtp.mail.ovh.net)</li>
+                      <li>SMTP_PORT (587 pour STARTTLS, 465 pour SSL)</li>
+                      <li>SMTP_USER (noreply@downpricer.com)</li>
+                      <li>SMTP_PASS (mot de passe SMTP)</li>
+                      <li>SMTP_FROM (noreply@downpricer.com)</li>
+                      <li>SMTP_TLS_MODE (starttls ou ssl)</li>
+                    </ul>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

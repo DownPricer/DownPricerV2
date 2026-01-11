@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Body
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Body, BackgroundTasks
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
@@ -23,6 +23,7 @@ from models import (
 from auth import verify_password, get_password_hash, create_access_token
 from dependencies import get_current_user, require_roles
 from billing_provider import get_billing_provider
+from utils.mailer import get_email_config, send_email_sync
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -450,7 +451,7 @@ async def get_seller_articles(
     return articles
 
 @api_router.post("/seller/sales", dependencies=[Depends(require_roles([UserRole.SELLER, UserRole.ADMIN]))])
-async def create_seller_sale(sale_data: SellerSaleCreate, current_user = Depends(get_current_user)):
+async def create_seller_sale(sale_data: SellerSaleCreate, current_user = Depends(get_current_user), background_tasks: BackgroundTasks = BackgroundTasks()):
     user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0})
     article = await db.articles.find_one({"id": sale_data.article_id}, {"_id": 0})
     
@@ -488,6 +489,33 @@ async def create_seller_sale(sale_data: SellerSaleCreate, current_user = Depends
         {"id": sale_data.article_id},
         {"$set": {"stock": new_stock}}
     )
+    
+    # Envoyer email à l'admin
+    config = await get_email_config(db)
+    admin_email = config.get("admin_email")
+    if admin_email and config.get("enabled"):
+        subject = f"Nouvelle vente à valider - {article['name']}"
+        html_body = f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <h2 style="color: #2563eb;">Nouvelle vente à valider</h2>
+                    <p>Une nouvelle vente nécessite votre validation.</p>
+                    <ul>
+                        <li><strong>Article :</strong> {article['name']}</li>
+                        <li><strong>Prix de vente :</strong> {sale_data.sale_price}€</li>
+                        <li><strong>Bénéfice :</strong> {profit}€</li>
+                        <li><strong>Vendeur :</strong> {user_doc.get('first_name', '')} {user_doc.get('last_name', '')} ({current_user.email})</li>
+                    </ul>
+                    <p>ID de la vente : {sale_id}</p>
+                    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+                    <p style="color: #6b7280; font-size: 12px;">DownPricer - {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}</p>
+                </div>
+            </body>
+        </html>
+        """
+        text_body = f"Nouvelle vente à valider : {article['name']} - {sale_data.sale_price}€ (Bénéfice: {profit}€) - Vendeur: {current_user.email}"
+        background_tasks.add_task(send_email_sync, config, admin_email, subject, html_body, text_body)
     
     return {"success": True, "message": "Vente enregistrée. Elle sera validée par DownPricer.", "sale": SellerSale(**sale_doc)}
 
@@ -644,7 +672,7 @@ async def create_category(category_data: CategoryCreate):
 # ===== ROUTES ADMIN MANQUANTES =====
 
 @api_router.put("/admin/demandes/{demande_id}/status", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
-async def admin_update_demande_status(demande_id: str, data: dict):
+async def admin_update_demande_status(demande_id: str, data: dict, background_tasks: BackgroundTasks = BackgroundTasks()):
     new_status = data.get("status")
     reason = data.get("reason", "")
     
@@ -655,6 +683,11 @@ async def admin_update_demande_status(demande_id: str, data: dict):
         status_enum = DemandeStatus(new_status)
     except ValueError:
         raise HTTPException(status_code=400, detail="Statut invalide")
+    
+    # Récupérer la demande avant mise à jour
+    demande = await db.demandes.find_one({"id": demande_id}, {"_id": 0})
+    if not demande:
+        raise HTTPException(status_code=404, detail="Demande non trouvée")
     
     can_cancel = new_status not in [DemandeStatus.PURCHASE_LAUNCHED, DemandeStatus.COMPLETED, DemandeStatus.CANCELLED]
     
@@ -669,6 +702,65 @@ async def admin_update_demande_status(demande_id: str, data: dict):
     
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Demande non trouvée")
+    
+    # Envoyer des emails selon le nouveau statut
+    config = await get_email_config(db)
+    client = await db.users.find_one({"id": demande["client_id"]}, {"_id": 0})
+    client_email = client.get("email") if client else None
+    
+    if client_email and config.get("enabled"):
+        admin_email = config.get("admin_email")
+        
+        if new_status in [DemandeStatus.ACCEPTED, DemandeStatus.PROPOSAL_FOUND]:
+            # Email au client + admin
+            subject = f"Votre demande a été mise à jour - {demande.get('name', 'Demande')}"
+            html_body = f"""
+            <html>
+                <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <h2 style="color: #2563eb;">Votre demande a été mise à jour</h2>
+                        <p>Bonjour,</p>
+                        <p>Votre demande "<strong>{demande.get('name', '')}</strong>" est maintenant au statut : <strong>{new_status}</strong>.</p>
+                        <p>Vous pouvez consulter les détails de votre demande depuis votre espace client.</p>
+                        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+                        <p style="color: #6b7280; font-size: 12px;">DownPricer - {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}</p>
+                    </div>
+                </body>
+            </html>
+            """
+            text_body = f"Votre demande \"{demande.get('name', '')}\" est maintenant au statut : {new_status}."
+            background_tasks.add_task(send_email_sync, config, client_email, subject, html_body, text_body)
+            
+            if admin_email:
+                admin_subject = f"Demande mise à jour : {new_status} - {demande.get('name', '')}"
+                admin_body = f"La demande {demande_id} du client {client_email} est maintenant {new_status}."
+                background_tasks.add_task(send_email_sync, config, admin_email, admin_subject, admin_body, admin_body)
+        
+        elif new_status == DemandeStatus.CANCELLED:
+            # Email au client + admin avec raison
+            subject = f"Votre demande a été annulée - {demande.get('name', 'Demande')}"
+            html_body = f"""
+            <html>
+                <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <h2 style="color: #dc2626;">Votre demande a été annulée</h2>
+                        <p>Bonjour,</p>
+                        <p>Votre demande "<strong>{demande.get('name', '')}</strong>" a été annulée.</p>
+                        {f'<p><strong>Raison :</strong> {reason}</p>' if reason else ''}
+                        <p>Si vous avez des questions, n'hésitez pas à nous contacter.</p>
+                        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+                        <p style="color: #6b7280; font-size: 12px;">DownPricer - {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}</p>
+                    </div>
+                </body>
+            </html>
+            """
+            text_body = f"Votre demande \"{demande.get('name', '')}\" a été annulée.{' Raison : ' + reason if reason else ''}"
+            background_tasks.add_task(send_email_sync, config, client_email, subject, html_body, text_body)
+            
+            if admin_email:
+                admin_subject = f"Demande annulée - {demande.get('name', '')}"
+                admin_body = f"La demande {demande_id} du client {client_email} a été annulée.{' Raison : ' + reason if reason else ''}"
+                background_tasks.add_task(send_email_sync, config, admin_email, admin_subject, admin_body, admin_body)
     
     return {"success": True, "message": f"Statut mis à jour: {new_status}"}
 
@@ -703,6 +795,54 @@ async def admin_update_setting(key: str, data: dict):
         })
     
     return {"success": True, "message": f"Paramètre {key} mis à jour"}
+
+@api_router.post("/admin/email/test", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
+async def test_email(background_tasks: BackgroundTasks, current_user = Depends(get_current_user)):
+    """Envoie un email de test à l'admin configuré ou à l'utilisateur connecté"""
+    try:
+        config = await get_email_config(db)
+        
+        if not config.get("enabled", False):
+            raise HTTPException(status_code=400, detail="Notifications email désactivées. Activez-les dans les paramètres.")
+        
+        if not config.get("smtp_host") or not config.get("smtp_user") or not config.get("smtp_pass"):
+            raise HTTPException(status_code=500, detail="Configuration SMTP incomplète. Vérifiez les variables d'environnement.")
+        
+        # Utiliser l'email admin ou celui de l'utilisateur connecté
+        test_email_to = config.get("admin_email") or current_user.email
+        
+        if not test_email_to:
+            raise HTTPException(status_code=400, detail="Aucun email de destination configuré")
+        
+        subject = "Test de notification - DownPricer"
+        html_body = f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <h2 style="color: #2563eb;">Test de notification email</h2>
+                    <p>Ceci est un email de test pour vérifier la configuration SMTP de DownPricer.</p>
+                    <p>Si vous recevez cet email, la configuration est correcte ! ✅</p>
+                    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+                    <p style="color: #6b7280; font-size: 12px;">
+                        Email envoyé depuis DownPricer<br>
+                        {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}
+                    </p>
+                </div>
+            </body>
+        </html>
+        """
+        text_body = "Test de notification email - DownPricer\n\nCeci est un email de test pour vérifier la configuration SMTP.\nSi vous recevez cet email, la configuration est correcte !"
+        
+        # Envoyer en background
+        background_tasks.add_task(send_email_sync, config, test_email_to, subject, html_body, text_body)
+        
+        return {"success": True, "message": f"Email de test envoyé à {test_email_to}"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur lors de l'envoi de l'email de test: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'envoi de l'email: {str(e)}")
 
 @api_router.post("/admin/sales/{sale_id}/reject-payment", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
 async def admin_reject_payment(sale_id: str, data: dict):
@@ -1187,7 +1327,7 @@ async def get_sale_detail(sale_id: str):
     }
 
 @api_router.post("/admin/sales/{sale_id}/validate", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
-async def validate_sale(sale_id: str):
+async def validate_sale(sale_id: str, background_tasks: BackgroundTasks = BackgroundTasks()):
     sale = await db.seller_sales.find_one({"id": sale_id}, {"_id": 0})
     
     if not sale:
@@ -1201,10 +1341,40 @@ async def validate_sale(sale_id: str):
         {"$set": {"status": SaleStatus.PAYMENT_PENDING, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     
+    # Envoyer email au vendeur
+    config = await get_email_config(db)
+    if config.get("enabled"):
+        seller = await db.users.find_one({"id": sale["seller_id"]}, {"_id": 0})
+        seller_email = seller.get("email") if seller else None
+        
+        if seller_email:
+            subject = f"Votre vente a été validée - {sale.get('article_name', '')}"
+            html_body = f"""
+            <html>
+                <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <h2 style="color: #16a34a;">Votre vente a été validée !</h2>
+                        <p>Bonjour,</p>
+                        <p>Votre vente de l'article "<strong>{sale.get('article_name', '')}</strong>" a été validée par l'administration.</p>
+                        <ul>
+                            <li><strong>Prix de vente :</strong> {sale.get('sale_price', 0)}€</li>
+                            <li><strong>Bénéfice :</strong> {sale.get('profit', 0)}€</li>
+                        </ul>
+                        <p><strong>Prochaine étape :</strong> Vous devez maintenant effectuer le paiement.</p>
+                        <p>Vous pouvez consulter les détails de votre vente depuis votre espace vendeur.</p>
+                        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+                        <p style="color: #6b7280; font-size: 12px;">DownPricer - {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}</p>
+                    </div>
+                </body>
+            </html>
+            """
+            text_body = f"Votre vente de l'article \"{sale.get('article_name', '')}\" a été validée. Prix: {sale.get('sale_price', 0)}€, Bénéfice: {sale.get('profit', 0)}€. Prochaine étape: effectuer le paiement."
+            background_tasks.add_task(send_email_sync, config, seller_email, subject, html_body, text_body)
+    
     return {"success": True, "message": "Vente validée. Le vendeur doit maintenant effectuer le paiement."}
 
 @api_router.post("/admin/sales/{sale_id}/reject", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
-async def reject_sale(sale_id: str, data: dict):
+async def reject_sale(sale_id: str, data: dict, background_tasks: BackgroundTasks = BackgroundTasks()):
     reason = data.get("reason", "")
     
     sale = await db.seller_sales.find_one({"id": sale_id}, {"_id": 0})
@@ -1220,6 +1390,32 @@ async def reject_sale(sale_id: str, data: dict):
             "updated_at": datetime.now(timezone.utc).isoformat()
         }}
     )
+    
+    # Envoyer email au vendeur
+    config = await get_email_config(db)
+    if config.get("enabled"):
+        seller = await db.users.find_one({"id": sale["seller_id"]}, {"_id": 0})
+        seller_email = seller.get("email") if seller else None
+        
+        if seller_email:
+            subject = f"Votre vente a été refusée - {sale.get('article_name', '')}"
+            html_body = f"""
+            <html>
+                <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <h2 style="color: #dc2626;">Votre vente a été refusée</h2>
+                        <p>Bonjour,</p>
+                        <p>Votre vente de l'article "<strong>{sale.get('article_name', '')}</strong>" a été refusée par l'administration.</p>
+                        {f'<p><strong>Raison :</strong> {reason}</p>' if reason else '<p>Pour plus d\'informations, veuillez nous contacter.</p>'}
+                        <p>Si vous avez des questions, n'hésitez pas à nous contacter.</p>
+                        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+                        <p style="color: #6b7280; font-size: 12px;">DownPricer - {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}</p>
+                    </div>
+                </body>
+            </html>
+            """
+            text_body = f"Votre vente de l'article \"{sale.get('article_name', '')}\" a été refusée.{' Raison : ' + reason if reason else ''}"
+            background_tasks.add_task(send_email_sync, config, seller_email, subject, html_body, text_body)
     
     return {"success": True, "message": "Vente refusée"}
 
@@ -1376,7 +1572,9 @@ async def initialize_default_settings():
         {"key": "contact_phone", "value": ""},
         {"key": "contact_email", "value": "contact@downpricer.com"},
         {"key": "support_email", "value": "support@downpricer.com"},
-        {"key": "discord_invite_url", "value": ""}
+        {"key": "discord_invite_url", "value": ""},
+        {"key": "email_notif_enabled", "value": False},
+        {"key": "admin_notif_email", "value": "contact@downpricer.com"}
     ]
     
     for setting in default_settings:
