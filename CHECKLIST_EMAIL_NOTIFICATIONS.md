@@ -243,3 +243,4 @@ Après configuration, le système doit :
 - **Priorité DB** : Les settings de la DB ont priorité sur les variables d'environnement
 - **Fallback** : Si les settings DB n'existent pas, utilisation des env vars
 
+

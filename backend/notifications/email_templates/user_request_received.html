@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Votre demande a été reçue</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; margin: 0; padding: 0; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+        .email-header { background-color: #1a1a1a; color: #ffffff; padding: 30px 20px; text-align: center; }
+        .email-header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+        .email-body { padding: 30px 20px; }
+        .email-footer { background-color: #f9f9f9; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #e5e5e5; }
+        .email-footer a { color: #2563eb; text-decoration: none; }
+        .success-box { background-color: #d1fae5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        table td { padding: 10px; border-bottom: 1px solid #e5e5e5; }
+        table td:first-child { font-weight: 600; width: 40%; }
+        .button { display: inline-block; padding: 12px 24px; background-color: #ff5722; color: #ffffff; text-decoration: none; border-radius: 4px; margin: 20px 0; font-weight: 500; }
+        @media only screen and (max-width: 600px) { .email-body { padding: 20px 15px; } .email-header { padding: 20px 15px; } }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <h1>{{ brand_name }}</h1>
+        </div>
+        <div class="email-body">
+            <h2 style="color: #2563eb; margin-top: 0;">Votre demande a été reçue</h2>
+            <p>Bonjour,</p>
+            <div class="success-box">
+                <p style="margin: 0;"><strong>✓ Votre demande a été enregistrée avec succès !</strong></p>
+            </div>
+            <p>Nous avons bien reçu votre demande "<strong>{{ demande_name }}</strong>" et nous allons l'étudier dans les plus brefs délais.</p>
+            <table>
+                <tr><td>ID Demande</td><td>{{ demande_id }}</td></tr>
+                <tr><td>Prix maximum</td><td>{{ max_price }}€</td></tr>
+                <tr><td>Acompte</td><td>{{ deposit_amount }}€</td></tr>
+                <tr><td>Statut</td><td>{{ status }}</td></tr>
+            </table>
+            <p>Vous recevrez une notification par email dès que votre demande évoluera.</p>
+            <p><a href="{{ base_url }}/demandes/{{ demande_id }}" class="button">Voir ma demande</a></p>
+        </div>
+        <div class="email-footer">
+            <p><strong>{{ brand_name }}</strong><br>Pour toute question, contactez-nous à <a href="mailto:{{ support_email }}">{{ support_email }}</a></p>
+            <p style="margin-top: 15px; color: #999;">Cet email a été envoyé automatiquement. Merci de ne pas y répondre.</p>
+        </div>
+    </div>
+</body>
+</html>
+
+

@@ -155,3 +155,4 @@ SMTP_TLS_MODE=ssl
 - **Mot de passe** : Stocké uniquement dans `.env` sur le VPS (jamais dans Git)
 - **Activation** : Les notifications peuvent être activées/désactivées depuis l'admin sans redémarrer
 
+

@@ -24,6 +24,7 @@ from auth import verify_password, get_password_hash, create_access_token
 from dependencies import get_current_user, require_roles
 from billing_provider import get_billing_provider
 from utils.mailer import get_email_config, send_email_sync
+from notifications import EventType, notify_admin, notify_user
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -118,6 +119,26 @@ async def signup(user_data: UserCreate):
     await db.users.insert_one(user_doc)
     
     token = create_access_token(data={"sub": user_data.email, "roles": user_doc["roles"]})
+    
+    # Notification admin : nouvel utilisateur
+    try:
+        background_tasks = BackgroundTasks()
+        await notify_admin(
+            db,
+            EventType.ADMIN_NEW_USER,
+            {
+                "title": "Nouvel utilisateur enregistré",
+                "message": "Un nouvel utilisateur s'est inscrit sur la plateforme.",
+                "user_name": f"{user_data.first_name} {user_data.last_name}",
+                "user_email": user_data.email,
+                "created_at": user_doc["created_at"],
+                "details": f'<div class="info-box"><table><tr><td>Nom</td><td>{user_data.first_name} {user_data.last_name}</td></tr><tr><td>Email</td><td>{user_data.email}</td></tr><tr><td>Date</td><td>{user_doc["created_at"]}</td></tr></table></div>',
+                "action_button": f'<p style="text-align: center;"><a href="{{{{ base_url }}}}/admin/users" class="button">Voir les utilisateurs</a></p>'
+            },
+            background_tasks
+        )
+    except Exception as e:
+        logger.error(f"Erreur notification admin_new_user: {str(e)}")
     
     return {
         "token": token,
@@ -283,6 +304,50 @@ async def create_demande(demande_data: DemandeCreate, current_user = Depends(get
     }
     
     await db.demandes.insert_one(demande_doc)
+    
+    # Notifications : user (confirmation) + admin (nouvelle demande)
+    try:
+        await notify_user(
+            db,
+            EventType.USER_REQUEST_RECEIVED,
+            current_user.email,
+            {
+                "title": "Votre demande a été reçue",
+                "status_box": '<div class="success-box"><p style="margin: 0;"><strong>✓ Votre demande a été enregistrée avec succès !</strong></p></div>',
+                "message": f'Nous avons bien reçu votre demande "{demande_data.name}" et nous allons l\'étudier dans les plus brefs délais.',
+                "demande_id": demande_id,
+                "demande_name": demande_data.name,
+                "max_price": demande_data.max_price,
+                "deposit_amount": demande_doc["deposit_amount"],
+                "status": demande_doc["status"],
+                "details": f'<table><tr><td>ID Demande</td><td>{demande_id}</td></tr><tr><td>Prix maximum</td><td>{demande_data.max_price}€</td></tr><tr><td>Acompte</td><td>{demande_doc["deposit_amount"]}€</td></tr><tr><td>Statut</td><td>{demande_doc["status"]}</td></tr></table>',
+                "action_button": f'<p style="text-align: center;"><a href="{{{{ base_url }}}}/demandes/{demande_id}" class="button">Voir ma demande</a></p>'
+            },
+            background_tasks
+        )
+        
+        await notify_admin(
+            db,
+            EventType.ADMIN_NEW_CLIENT_REQUEST,
+            {
+                "title": "Nouvelle demande client",
+                "message": "Une nouvelle demande client a été créée et nécessite votre attention.",
+                "demande_id": demande_id,
+                "demande_name": demande_data.name,
+                "client_name": f"{user_doc.get('first_name', '')} {user_doc.get('last_name', '')}",
+                "client_email": current_user.email,
+                "max_price": demande_data.max_price,
+                "reference_price": demande_data.reference_price,
+                "deposit_amount": demande_doc["deposit_amount"],
+                "status": demande_doc["status"],
+                "description": demande_data.description if demande_data.description else "",
+                "details": f'<div class="info-box"><table><tr><td>ID Demande</td><td>{demande_id}</td></tr><tr><td>Nom</td><td>{demande_data.name}</td></tr><tr><td>Client</td><td>{user_doc.get("first_name", "")} {user_doc.get("last_name", "")} ({current_user.email})</td></tr><tr><td>Prix maximum</td><td>{demande_data.max_price}€</td></tr><tr><td>Prix de référence</td><td>{demande_data.reference_price}€</td></tr><tr><td>Acompte</td><td>{demande_doc["deposit_amount"]}€</td></tr><tr><td>Statut</td><td>{demande_doc["status"]}</td></tr></table></div>',
+                "action_button": f'<p style="text-align: center;"><a href="{{{{ base_url }}}}/admin/demandes/{demande_id}" class="button">Voir la demande</a></p>'
+            },
+            background_tasks
+        )
+    except Exception as e:
+        logger.error(f"Erreur notifications demande: {str(e)}")
     
     return Demande(**demande_doc)
 
@@ -490,32 +555,27 @@ async def create_seller_sale(sale_data: SellerSaleCreate, current_user = Depends
         {"$set": {"stock": new_stock}}
     )
     
-    # Envoyer email à l'admin
-    config = await get_email_config(db)
-    admin_email = config.get("admin_email")
-    if admin_email and config.get("enabled"):
-        subject = f"Nouvelle vente à valider - {article['name']}"
-        html_body = f"""
-        <html>
-            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <h2 style="color: #2563eb;">Nouvelle vente à valider</h2>
-                    <p>Une nouvelle vente nécessite votre validation.</p>
-                    <ul>
-                        <li><strong>Article :</strong> {article['name']}</li>
-                        <li><strong>Prix de vente :</strong> {sale_data.sale_price}€</li>
-                        <li><strong>Bénéfice :</strong> {profit}€</li>
-                        <li><strong>Vendeur :</strong> {user_doc.get('first_name', '')} {user_doc.get('last_name', '')} ({current_user.email})</li>
-                    </ul>
-                    <p>ID de la vente : {sale_id}</p>
-                    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-                    <p style="color: #6b7280; font-size: 12px;">DownPricer - {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}</p>
-                </div>
-            </body>
-        </html>
-        """
-        text_body = f"Nouvelle vente à valider : {article['name']} - {sale_data.sale_price}€ (Bénéfice: {profit}€) - Vendeur: {current_user.email}"
-        background_tasks.add_task(send_email_sync, config, admin_email, subject, html_body, text_body)
+    # Notification admin : nouvelle vente
+    try:
+        await notify_admin(
+            db,
+            EventType.ADMIN_NEW_SALE,
+            {
+                "title": "Nouvelle vente à valider",
+                "message": "Une nouvelle vente nécessite votre validation.",
+                "article_name": article['name'],
+                "sale_price": sale_data.sale_price,
+                "profit": profit,
+                "seller_name": f"{user_doc.get('first_name', '')} {user_doc.get('last_name', '')}",
+                "seller_email": current_user.email,
+                "sale_id": sale_id,
+                "details": f'<div class="info-box"><table><tr><td>Article</td><td>{article["name"]}</td></tr><tr><td>Prix de vente</td><td>{sale_data.sale_price}€</td></tr><tr><td>Bénéfice</td><td>{profit}€</td></tr><tr><td>Vendeur</td><td>{user_doc.get("first_name", "")} {user_doc.get("last_name", "")} ({current_user.email})</td></tr><tr><td>ID Vente</td><td>{sale_id}</td></tr></table></div>',
+                "action_button": f'<p style="text-align: center;"><a href="{{{{ base_url }}}}/admin/sales/{sale_id}" class="button">Voir la vente</a></p>'
+            },
+            background_tasks
+        )
+    except Exception as e:
+        logger.error(f"Erreur notification admin_new_sale: {str(e)}")
     
     return {"success": True, "message": "Vente enregistrée. Elle sera validée par DownPricer.", "sale": SellerSale(**sale_doc)}
 
@@ -703,64 +763,46 @@ async def admin_update_demande_status(demande_id: str, data: dict, background_ta
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Demande non trouvée")
     
-    # Envoyer des emails selon le nouveau statut
-    config = await get_email_config(db)
-    client = await db.users.find_one({"id": demande["client_id"]}, {"_id": 0})
-    client_email = client.get("email") if client else None
-    
-    if client_email and config.get("enabled"):
-        admin_email = config.get("admin_email")
+    # Notifications : user (changement statut) + admin si nécessaire
+    try:
+        client = await db.users.find_one({"id": demande["client_id"]}, {"_id": 0})
+        client_email = client.get("email") if client else None
         
-        if new_status in [DemandeStatus.ACCEPTED, DemandeStatus.PROPOSAL_FOUND]:
-            # Email au client + admin
-            subject = f"Votre demande a été mise à jour - {demande.get('name', 'Demande')}"
-            html_body = f"""
-            <html>
-                <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                        <h2 style="color: #2563eb;">Votre demande a été mise à jour</h2>
-                        <p>Bonjour,</p>
-                        <p>Votre demande "<strong>{demande.get('name', '')}</strong>" est maintenant au statut : <strong>{new_status}</strong>.</p>
-                        <p>Vous pouvez consulter les détails de votre demande depuis votre espace client.</p>
-                        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-                        <p style="color: #6b7280; font-size: 12px;">DownPricer - {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}</p>
-                    </div>
-                </body>
-            </html>
-            """
-            text_body = f"Votre demande \"{demande.get('name', '')}\" est maintenant au statut : {new_status}."
-            background_tasks.add_task(send_email_sync, config, client_email, subject, html_body, text_body)
+        if client_email:
+            # Déterminer le message et le status_box selon le statut
+            if new_status == DemandeStatus.CANCELLED:
+                status_box = '<div class="error-box"><p style="margin: 0;"><strong>❌ Votre demande a été annulée</strong></p></div>'
+                message = f'Votre demande "{demande.get("name", "")}" a été annulée.'
+                reason_msg = f'<p><strong>Raison :</strong> {reason}</p>' if reason else ''
+            elif new_status in [DemandeStatus.ACCEPTED, DemandeStatus.PROPOSAL_FOUND]:
+                status_box = '<div class="success-box"><p style="margin: 0;"><strong>✓ Nouveau statut : ' + new_status + '</strong></p></div>'
+                message = f'Votre demande "{demande.get("name", "")}" est maintenant au statut : <strong>{new_status}</strong>.'
+                reason_msg = ''
+            else:
+                status_box = '<div class="info-box"><p style="margin: 0;"><strong>Nouveau statut : ' + new_status + '</strong></p></div>'
+                message = f'Votre demande "{demande.get("name", "")}" a été mise à jour.'
+                reason_msg = ''
             
-            if admin_email:
-                admin_subject = f"Demande mise à jour : {new_status} - {demande.get('name', '')}"
-                admin_body = f"La demande {demande_id} du client {client_email} est maintenant {new_status}."
-                background_tasks.add_task(send_email_sync, config, admin_email, admin_subject, admin_body, admin_body)
-        
-        elif new_status == DemandeStatus.CANCELLED:
-            # Email au client + admin avec raison
-            subject = f"Votre demande a été annulée - {demande.get('name', 'Demande')}"
-            html_body = f"""
-            <html>
-                <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                        <h2 style="color: #dc2626;">Votre demande a été annulée</h2>
-                        <p>Bonjour,</p>
-                        <p>Votre demande "<strong>{demande.get('name', '')}</strong>" a été annulée.</p>
-                        {f'<p><strong>Raison :</strong> {reason}</p>' if reason else ''}
-                        <p>Si vous avez des questions, n'hésitez pas à nous contacter.</p>
-                        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-                        <p style="color: #6b7280; font-size: 12px;">DownPricer - {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}</p>
-                    </div>
-                </body>
-            </html>
-            """
-            text_body = f"Votre demande \"{demande.get('name', '')}\" a été annulée.{' Raison : ' + reason if reason else ''}"
-            background_tasks.add_task(send_email_sync, config, client_email, subject, html_body, text_body)
-            
-            if admin_email:
-                admin_subject = f"Demande annulée - {demande.get('name', '')}"
-                admin_body = f"La demande {demande_id} du client {client_email} a été annulée.{' Raison : ' + reason if reason else ''}"
-                background_tasks.add_task(send_email_sync, config, admin_email, admin_subject, admin_body, admin_body)
+            await notify_user(
+                db,
+                EventType.USER_REQUEST_STATUS_CHANGED,
+                client_email,
+                {
+                    "title": "Mise à jour de votre demande",
+                    "status_box": status_box,
+                    "message": message,
+                    "reason_message": reason_msg,
+                    "demande_id": demande_id,
+                    "demande_name": demande.get("name", ""),
+                    "status": new_status,
+                    "details": f'<table><tr><td>ID Demande</td><td>{demande_id}</td></tr><tr><td>Statut</td><td>{new_status}</td></tr></table>',
+                    "action_button": f'<p style="text-align: center;"><a href="{{{{ base_url }}}}/demandes/{demande_id}" class="button">Voir ma demande</a></p>',
+                    "footer_message": '<p>Si vous avez des questions, n\'hésitez pas à nous contacter.</p>' if new_status != DemandeStatus.CANCELLED else ''
+                },
+                background_tasks
+            )
+    except Exception as e:
+        logger.error(f"Erreur notification user_request_status_changed: {str(e)}")
     
     return {"success": True, "message": f"Statut mis à jour: {new_status}"}
 
@@ -795,6 +837,58 @@ async def admin_update_setting(key: str, data: dict):
         })
     
     return {"success": True, "message": f"Paramètre {key} mis à jour"}
+
+@api_router.post("/admin/notifications/test", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
+async def test_notifications(background_tasks: BackgroundTasks, current_user = Depends(get_current_user)):
+    """Envoie des emails de test (admin + user) pour vérifier la configuration"""
+    try:
+        config = await get_email_config(db)
+        
+        if not config.get("enabled", False):
+            raise HTTPException(status_code=400, detail="Notifications email désactivées. Activez-les dans les paramètres.")
+        
+        if not config.get("smtp_host") or not config.get("smtp_user") or not config.get("smtp_pass"):
+            raise HTTPException(status_code=500, detail="Configuration SMTP incomplète. Vérifiez les variables d'environnement.")
+        
+        # Test admin
+        admin_email = config.get("admin_email") or current_user.email
+        await notify_admin(
+            db,
+            EventType.ADMIN_NEW_USER,
+            {
+                "title": "Test de notification admin",
+                "message": "Ceci est un email de test pour vérifier la configuration SMTP de DownPricer.",
+                "user_name": "Test User",
+                "user_email": "test@example.com",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "details": '<div class="info-box"><p>Si vous recevez cet email, la configuration est correcte ! ✅</p></div>',
+                "action_button": ""
+            },
+            background_tasks
+        )
+        
+        # Test user
+        await notify_user(
+            db,
+            EventType.USER_REQUEST_RECEIVED,
+            current_user.email,
+            {
+                "title": "Test de notification utilisateur",
+                "status_box": '<div class="success-box"><p style="margin: 0;"><strong>✓ Email de test</strong></p></div>',
+                "message": "Ceci est un email de test pour vérifier la configuration SMTP de DownPricer.",
+                "details": '<div class="info-box"><p>Si vous recevez cet email, la configuration est correcte ! ✅</p></div>',
+                "action_button": ""
+            },
+            background_tasks
+        )
+        
+        return {"success": True, "message": f"Emails de test envoyés à {admin_email} (admin) et {current_user.email} (user)"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur lors de l'envoi des emails de test: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'envoi des emails: {str(e)}")
 
 @api_router.post("/admin/email/test", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
 async def test_email(background_tasks: BackgroundTasks, current_user = Depends(get_current_user)):
@@ -945,6 +1039,44 @@ async def create_minisite(site_data: MiniSiteCreate, current_user = Depends(get_
     if site_data.plan_id not in roles:
         roles.append(site_data.plan_id)
         await db.users.update_one({"id": user_doc["id"]}, {"$set": {"roles": roles}})
+    
+    # Notifications : user (mini-site créé) + admin (nouveau mini-site)
+    try:
+        await notify_user(
+            db,
+            EventType.USER_MINISITE_CREATED,
+            current_user.email,
+            {
+                "title": "Votre mini-site a été créé",
+                "status_box": '<div class="success-box"><p style="margin: 0;"><strong>✓ Votre mini-site a été créé avec succès !</strong></p></div>',
+                "message": f'Votre mini-site "<strong>{site_data.site_name}</strong>" est maintenant actif.',
+                "site_name": site_data.site_name,
+                "slug": site_data.slug,
+                "plan_id": site_data.plan_id,
+                "details": f'<table><tr><td>Nom du site</td><td>{site_data.site_name}</td></tr><tr><td>URL</td><td><a href="{{{{ base_url }}}}/{site_data.slug}">{{{{ base_url }}}}/{site_data.slug}</a></td></tr><tr><td>Plan</td><td>{site_data.plan_id}</td></tr></table>',
+                "action_button": f'<p style="text-align: center;"><a href="{{{{ base_url }}}}/minisites/my" class="button">Gérer mon mini-site</a></p>'
+            },
+            background_tasks
+        )
+        
+        await notify_admin(
+            db,
+            EventType.ADMIN_NEW_MINISITE,
+            {
+                "title": "Nouveau mini-site créé",
+                "message": "Un nouveau mini-site a été créé.",
+                "site_name": site_data.site_name,
+                "slug": site_data.slug,
+                "user_email": current_user.email,
+                "plan_id": site_data.plan_id,
+                "site_id": site_id,
+                "details": f'<div class="info-box"><table><tr><td>Nom du site</td><td>{site_data.site_name}</td></tr><tr><td>Slug</td><td>{site_data.slug}</td></tr><tr><td>Propriétaire</td><td>{current_user.email}</td></tr><tr><td>Plan</td><td>{site_data.plan_id}</td></tr><tr><td>ID Site</td><td>{site_id}</td></tr></table></div>',
+                "action_button": f'<p style="text-align: center;"><a href="{{{{ base_url }}}}/admin/minisites/{site_id}" class="button">Voir le mini-site</a></p>'
+            },
+            background_tasks
+        )
+    except Exception as e:
+        logger.error(f"Erreur notifications minisite_created: {str(e)}")
     
     return {"success": True, "minisite": MiniSite(**site_doc)}
 
@@ -1341,35 +1473,30 @@ async def validate_sale(sale_id: str, background_tasks: BackgroundTasks = Backgr
         {"$set": {"status": SaleStatus.PAYMENT_PENDING, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     
-    # Envoyer email au vendeur
-    config = await get_email_config(db)
-    if config.get("enabled"):
+    # Notification user : vente validée (paiement requis)
+    try:
         seller = await db.users.find_one({"id": sale["seller_id"]}, {"_id": 0})
         seller_email = seller.get("email") if seller else None
         
         if seller_email:
-            subject = f"Votre vente a été validée - {sale.get('article_name', '')}"
-            html_body = f"""
-            <html>
-                <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                        <h2 style="color: #16a34a;">Votre vente a été validée !</h2>
-                        <p>Bonjour,</p>
-                        <p>Votre vente de l'article "<strong>{sale.get('article_name', '')}</strong>" a été validée par l'administration.</p>
-                        <ul>
-                            <li><strong>Prix de vente :</strong> {sale.get('sale_price', 0)}€</li>
-                            <li><strong>Bénéfice :</strong> {sale.get('profit', 0)}€</li>
-                        </ul>
-                        <p><strong>Prochaine étape :</strong> Vous devez maintenant effectuer le paiement.</p>
-                        <p>Vous pouvez consulter les détails de votre vente depuis votre espace vendeur.</p>
-                        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-                        <p style="color: #6b7280; font-size: 12px;">DownPricer - {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}</p>
-                    </div>
-                </body>
-            </html>
-            """
-            text_body = f"Votre vente de l'article \"{sale.get('article_name', '')}\" a été validée. Prix: {sale.get('sale_price', 0)}€, Bénéfice: {sale.get('profit', 0)}€. Prochaine étape: effectuer le paiement."
-            background_tasks.add_task(send_email_sync, config, seller_email, subject, html_body, text_body)
+            await notify_user(
+                db,
+                EventType.USER_PAYMENT_REQUIRED,
+                seller_email,
+                {
+                    "title": "Paiement requis",
+                    "status_box": '<div class="warning-box"><p style="margin: 0;"><strong>⚠ Paiement requis</strong></p></div>',
+                    "message": "Votre vente a été validée. Vous devez maintenant effectuer le paiement.",
+                    "article_name": sale.get("article_name", ""),
+                    "sale_price": sale.get("sale_price", 0),
+                    "sale_id": sale_id,
+                    "details": f'<table><tr><td>Article</td><td>{sale.get("article_name", "")}</td></tr><tr><td>Prix de vente</td><td>{sale.get("sale_price", 0)}€</td></tr><tr><td>Bénéfice</td><td>{sale.get("profit", 0)}€</td></tr><tr><td>ID Vente</td><td>{sale_id}</td></tr></table>',
+                    "action_button": f'<p style="text-align: center;"><a href="{{{{ base_url }}}}/seller/sales/{sale_id}" class="button">Effectuer le paiement</a></p>'
+                },
+                background_tasks
+            )
+    except Exception as e:
+        logger.error(f"Erreur notification user_payment_required: {str(e)}")
     
     return {"success": True, "message": "Vente validée. Le vendeur doit maintenant effectuer le paiement."}
 
@@ -1391,37 +1518,37 @@ async def reject_sale(sale_id: str, data: dict, background_tasks: BackgroundTask
         }}
     )
     
-    # Envoyer email au vendeur
-    config = await get_email_config(db)
-    if config.get("enabled"):
+    # Notification user : vente refusée
+    try:
         seller = await db.users.find_one({"id": sale["seller_id"]}, {"_id": 0})
         seller_email = seller.get("email") if seller else None
         
         if seller_email:
-            subject = f"Votre vente a été refusée - {sale.get('article_name', '')}"
-            reason_html = f'<p><strong>Raison :</strong> {reason}</p>' if reason else "<p>Pour plus d'informations, veuillez nous contacter.</p>"
-            html_body = f"""
-            <html>
-                <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                        <h2 style="color: #dc2626;">Votre vente a été refusée</h2>
-                        <p>Bonjour,</p>
-                        <p>Votre vente de l'article "<strong>{sale.get('article_name', '')}</strong>" a été refusée par l'administration.</p>
-                        {reason_html}
-                        <p>Si vous avez des questions, n'hésitez pas à nous contacter.</p>
-                        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-                        <p style="color: #6b7280; font-size: 12px;">DownPricer - {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}</p>
-                    </div>
-                </body>
-            </html>
-            """
-            text_body = f"Votre vente de l'article \"{sale.get('article_name', '')}\" a été refusée.{' Raison : ' + reason if reason else ''}"
-            background_tasks.add_task(send_email_sync, config, seller_email, subject, html_body, text_body)
+            reason_html = f'<p><strong>Raison :</strong> {reason}</p>' if reason else '<p>Pour plus d\'informations, veuillez nous contacter.</p>'
+            await notify_user(
+                db,
+                EventType.USER_PAYMENT_REJECTED,
+                seller_email,
+                {
+                    "title": "Vente refusée",
+                    "status_box": '<div class="error-box"><p style="margin: 0;"><strong>❌ Votre vente a été refusée</strong></p></div>',
+                    "message": f'Votre vente de l\'article "{sale.get("article_name", "")}" a été refusée par l\'administration.',
+                    "reason_message": reason_html,
+                    "article_name": sale.get("article_name", ""),
+                    "sale_price": sale.get("sale_price", 0),
+                    "sale_id": sale_id,
+                    "details": f'<table><tr><td>Article</td><td>{sale.get("article_name", "")}</td></tr><tr><td>Prix de vente</td><td>{sale.get("sale_price", 0)}€</td></tr><tr><td>ID Vente</td><td>{sale_id}</td></tr></table>',
+                    "action_button": f'<p style="text-align: center;"><a href="{{{{ base_url }}}}/seller/sales/{sale_id}" class="button">Voir ma vente</a></p>'
+                },
+                background_tasks
+            )
+    except Exception as e:
+        logger.error(f"Erreur notification user_payment_rejected: {str(e)}")
     
     return {"success": True, "message": "Vente refusée"}
 
 @api_router.post("/seller/sales/{sale_id}/submit-payment", dependencies=[Depends(require_roles([UserRole.SELLER, UserRole.ADMIN]))])
-async def submit_payment_proof(sale_id: str, data: dict, current_user = Depends(get_current_user)):
+async def submit_payment_proof(sale_id: str, data: dict, current_user = Depends(get_current_user), background_tasks: BackgroundTasks = BackgroundTasks()):
     user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0})
     
     sale = await db.seller_sales.find_one({"id": sale_id}, {"_id": 0})
@@ -1449,10 +1576,32 @@ async def submit_payment_proof(sale_id: str, data: dict, current_user = Depends(
         }}
     )
     
+    # Notification admin : preuve de paiement soumise
+    try:
+        await notify_admin(
+            db,
+            EventType.ADMIN_PAYMENT_PROOF_SUBMITTED,
+            {
+                "title": "Preuve de paiement à valider",
+                "message": "Un vendeur a soumis une preuve de paiement.",
+                "article_name": sale.get("article_name", ""),
+                "sale_price": sale.get("sale_price", 0),
+                "seller_name": f"{user_doc.get('first_name', '')} {user_doc.get('last_name', '')}",
+                "seller_email": current_user.email,
+                "payment_method": data.get("method", ""),
+                "sale_id": sale_id,
+                "details": f'<div class="info-box"><table><tr><td>Article</td><td>{sale.get("article_name", "")}</td></tr><tr><td>Prix de vente</td><td>{sale.get("sale_price", 0)}€</td></tr><tr><td>Vendeur</td><td>{user_doc.get("first_name", "")} {user_doc.get("last_name", "")} ({current_user.email})</td></tr><tr><td>Méthode</td><td>{data.get("method", "")}</td></tr><tr><td>ID Vente</td><td>{sale_id}</td></tr></table></div>',
+                "action_button": f'<p style="text-align: center;"><a href="{{{{ base_url }}}}/admin/sales/{sale_id}" class="button">Voir la vente</a></p>'
+            },
+            background_tasks
+        )
+    except Exception as e:
+        logger.error(f"Erreur notification admin_payment_proof_submitted: {str(e)}")
+    
     return {"success": True, "message": "Preuve de paiement envoyée. En attente de validation admin."}
 
 @api_router.post("/admin/sales/{sale_id}/confirm-payment", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
-async def confirm_payment(sale_id: str):
+async def confirm_payment(sale_id: str, background_tasks: BackgroundTasks = BackgroundTasks()):
     sale = await db.seller_sales.find_one({"id": sale_id}, {"_id": 0})
     
     if not sale:
@@ -1468,6 +1617,48 @@ async def confirm_payment(sale_id: str):
             "updated_at": datetime.now(timezone.utc).isoformat()
         }}
     )
+    
+    # Notifications : user (paiement validé) + admin (expédition en attente)
+    try:
+        seller = await db.users.find_one({"id": sale["seller_id"]}, {"_id": 0})
+        seller_email = seller.get("email") if seller else None
+        
+        if seller_email:
+            await notify_user(
+                db,
+                EventType.USER_PAYMENT_VALIDATED,
+                seller_email,
+                {
+                    "title": "Paiement validé",
+                    "status_box": '<div class="success-box"><p style="margin: 0;"><strong>✓ Votre paiement a été validé avec succès !</strong></p></div>',
+                    "message": "Votre paiement pour la vente suivante a été validé par l'administration.",
+                    "article_name": sale.get("article_name", ""),
+                    "sale_price": sale.get("sale_price", 0),
+                    "sale_id": sale_id,
+                    "details": f'<table><tr><td>Article</td><td>{sale.get("article_name", "")}</td></tr><tr><td>Prix de vente</td><td>{sale.get("sale_price", 0)}€</td></tr><tr><td>ID Vente</td><td>{sale_id}</td></tr></table>',
+                    "action_button": f'<p style="text-align: center;"><a href="{{{{ base_url }}}}/seller/sales/{sale_id}" class="button">Voir ma vente</a></p>'
+                },
+                background_tasks
+            )
+        
+        await notify_admin(
+            db,
+            EventType.ADMIN_SHIPMENT_PENDING,
+            {
+                "title": "Expédition en attente",
+                "message": "Une vente est prête pour l'expédition.",
+                "article_name": sale.get("article_name", ""),
+                "sale_price": sale.get("sale_price", 0),
+                "seller_name": f"{seller.get('first_name', '')} {seller.get('last_name', '')}" if seller else "",
+                "seller_email": seller.get("email", "") if seller else "",
+                "sale_id": sale_id,
+                "details": f'<div class="info-box"><table><tr><td>Article</td><td>{sale.get("article_name", "")}</td></tr><tr><td>Prix de vente</td><td>{sale.get("sale_price", 0)}€</td></tr><tr><td>Vendeur</td><td>{seller.get("first_name", "") if seller else ""} {seller.get("last_name", "") if seller else ""} ({seller.get("email", "") if seller else ""})</td></tr><tr><td>ID Vente</td><td>{sale_id}</td></tr></table></div>',
+                "action_button": f'<p style="text-align: center;"><a href="{{{{ base_url }}}}/admin/sales/{sale_id}" class="button">Voir la vente</a></p>'
+            },
+            background_tasks
+        )
+    except Exception as e:
+        logger.error(f"Erreur notifications payment_validated: {str(e)}")
     
     return {"success": True, "message": "Paiement confirmé. Vente en attente d'expédition."}
 
@@ -1575,7 +1766,11 @@ async def initialize_default_settings():
         {"key": "support_email", "value": "support@downpricer.com"},
         {"key": "discord_invite_url", "value": ""},
         {"key": "email_notif_enabled", "value": False},
-        {"key": "admin_notif_email", "value": "contact@downpricer.com"}
+        {"key": "admin_notif_email", "value": "contact@downpricer.com"},
+        {"key": "brand_name", "value": "DownPricer"},
+        {"key": "base_url", "value": os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")},
+        {"key": "notify_admin_on_new_user", "value": True},
+        {"key": "notify_admin_on_new_request", "value": True}
     ]
     
     for setting in default_settings:

@@ -211,3 +211,4 @@ location /api/ {
 Après ce patch, `/api/uploads/<uuid>.webp` doit retourner **200 OK** et les images doivent s'afficher partout sur le site.
 
 
+
