@@ -202,29 +202,34 @@ async def notify_admin(
 ):
     """Notifie l'admin d'un événement"""
     try:
+        logger.info(f"[NOTIFY_ADMIN] Début notification {event_type}")
         settings = await get_notification_settings(db)
+        logger.info(f"[NOTIFY_ADMIN] Settings récupérés: email_enabled={settings.get('email_enabled')}, admin_email={settings.get('admin_email')}")
         
         if not settings["email_enabled"]:
-            logger.debug(f"Notifications email désactivées, skip {event_type}")
+            logger.warning(f"[NOTIFY_ADMIN] Notifications email désactivées, skip {event_type}")
             return
         
         admin_email = settings["admin_email"]
         if not admin_email:
-            logger.warning(f"Admin email non configuré, skip {event_type}")
+            logger.warning(f"[NOTIFY_ADMIN] Admin email non configuré, skip {event_type}")
             return
         
         # Vérifier si l'événement doit être notifié (pour certains événements optionnels)
         if event_type == EventType.ADMIN_NEW_USER and not settings.get("notify_admin_on_new_user", True):
-            logger.debug(f"Notification admin_new_user désactivée")
+            logger.info(f"[NOTIFY_ADMIN] Notification admin_new_user désactivée dans settings")
             return
         
         config = await get_email_config(db)
+        logger.info(f"[NOTIFY_ADMIN] Email config: enabled={config.get('enabled')}, smtp_host={config.get('smtp_host')}")
         if not config.get("enabled"):
+            logger.warning(f"[NOTIFY_ADMIN] Email config désactivée, skip {event_type}")
             return
         
         template_config = get_template_config(event_type)
-        if not template_config["template"]:
-            logger.error(f"Pas de template configuré pour {event_type}")
+        logger.info(f"[NOTIFY_ADMIN] Template config: {template_config}")
+        if not template_config.get("template"):
+            logger.error(f"[NOTIFY_ADMIN] Pas de template configuré pour {event_type}")
             return
         
         # Préparer le contexte
@@ -234,12 +239,15 @@ async def notify_admin(
             "base_url": settings["base_url"],
             "support_email": settings["support_email"]
         }
+        logger.info(f"[NOTIFY_ADMIN] Contexte préparé avec {len(context)} variables")
         
         # Rendre le template
         html_body = render_template(template_config["template"], context)
         if not html_body:
-            logger.error(f"Erreur lors du rendu du template pour {event_type}")
+            logger.error(f"[NOTIFY_ADMIN] Erreur lors du rendu du template pour {event_type} (html_body vide)")
             return
+        
+        logger.info(f"[NOTIFY_ADMIN] Template rendu avec succès ({len(html_body)} caractères)")
         
         subject = template_config["subject"]
         if payload.get("subject_extra"):
@@ -249,8 +257,9 @@ async def notify_admin(
         text_body = payload.get("text_body", subject)
         
         # Envoyer en background
+        logger.info(f"[NOTIFY_ADMIN] Ajout de la tâche background: {event_type} -> {admin_email} (subject: {subject})")
         background_tasks.add_task(send_email_sync, config, admin_email, subject, html_body, text_body)
-        logger.info(f"Notification admin planifiée: {event_type} -> {admin_email}")
+        logger.info(f"[NOTIFY_ADMIN] ✅ Notification admin planifiée: {event_type} -> {admin_email}")
         
     except Exception as e:
         logger.error(f"Erreur lors de la notification admin {event_type}: {str(e)}", exc_info=True)
@@ -265,23 +274,28 @@ async def notify_user(
 ):
     """Notifie un utilisateur d'un événement"""
     try:
+        logger.info(f"[NOTIFY_USER] Début notification {event_type} -> {user_email}")
         settings = await get_notification_settings(db)
+        logger.info(f"[NOTIFY_USER] Settings récupérés: email_enabled={settings.get('email_enabled')}")
         
         if not settings["email_enabled"]:
-            logger.debug(f"Notifications email désactivées, skip {event_type}")
+            logger.warning(f"[NOTIFY_USER] Notifications email désactivées, skip {event_type}")
             return
         
         if not user_email:
-            logger.warning(f"Email utilisateur vide, skip {event_type}")
+            logger.warning(f"[NOTIFY_USER] Email utilisateur vide, skip {event_type}")
             return
         
         config = await get_email_config(db)
+        logger.info(f"[NOTIFY_USER] Email config: enabled={config.get('enabled')}, smtp_host={config.get('smtp_host')}")
         if not config.get("enabled"):
+            logger.warning(f"[NOTIFY_USER] Email config désactivée, skip {event_type}")
             return
         
         template_config = get_template_config(event_type)
-        if not template_config["template"]:
-            logger.error(f"Pas de template configuré pour {event_type}")
+        logger.info(f"[NOTIFY_USER] Template config: {template_config}")
+        if not template_config.get("template"):
+            logger.error(f"[NOTIFY_USER] Pas de template configuré pour {event_type}")
             return
         
         # Préparer le contexte
@@ -292,12 +306,15 @@ async def notify_user(
             "base_url": settings["base_url"],
             "support_email": settings["support_email"]
         }
+        logger.info(f"[NOTIFY_USER] Contexte préparé avec {len(context)} variables")
         
         # Rendre le template
         html_body = render_template(template_config["template"], context)
         if not html_body:
-            logger.error(f"Erreur lors du rendu du template pour {event_type}")
+            logger.error(f"[NOTIFY_USER] Erreur lors du rendu du template pour {event_type} (html_body vide)")
             return
+        
+        logger.info(f"[NOTIFY_USER] Template rendu avec succès ({len(html_body)} caractères)")
         
         subject = template_config["subject"]
         if payload.get("subject_extra"):
@@ -307,8 +324,9 @@ async def notify_user(
         text_body = payload.get("text_body", subject)
         
         # Envoyer en background
+        logger.info(f"[NOTIFY_USER] Ajout de la tâche background: {event_type} -> {user_email} (subject: {subject})")
         background_tasks.add_task(send_email_sync, config, user_email, subject, html_body, text_body)
-        logger.info(f"Notification user planifiée: {event_type} -> {user_email}")
+        logger.info(f"[NOTIFY_USER] ✅ Notification user planifiée: {event_type} -> {user_email}")
         
     except Exception as e:
         logger.error(f"Erreur lors de la notification user {event_type}: {str(e)}", exc_info=True)
