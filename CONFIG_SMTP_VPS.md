@@ -156,3 +156,4 @@ SMTP_TLS_MODE=ssl
 - **Activation** : Les notifications peuvent être activées/désactivées depuis l'admin sans redémarrer
 
 
+

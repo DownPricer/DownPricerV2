@@ -323,3 +323,4 @@ Pour toute question ou problème :
 - Tester la connexion SMTP (voir section Dépannage)
 - Vérifier que les notifications sont activées dans l'admin panel
 
+

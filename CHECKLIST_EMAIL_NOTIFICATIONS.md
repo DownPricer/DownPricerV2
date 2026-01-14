@@ -244,3 +244,4 @@ Après configuration, le système doit :
 - **Fallback** : Si les settings DB n'existent pas, utilisation des env vars
 
 
+
