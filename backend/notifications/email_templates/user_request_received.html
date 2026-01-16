@@ -4,50 +4,146 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Votre demande a été reçue</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; margin: 0; padding: 0; }
-        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
-        .email-header { background-color: #1a1a1a; color: #ffffff; padding: 30px 20px; text-align: center; }
-        .email-header h1 { margin: 0; font-size: 24px; font-weight: 600; }
-        .email-body { padding: 30px 20px; }
-        .email-footer { background-color: #f9f9f9; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #e5e5e5; }
-        .email-footer a { color: #2563eb; text-decoration: none; }
-        .success-box { background-color: #d1fae5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        table td { padding: 10px; border-bottom: 1px solid #e5e5e5; }
-        table td:first-child { font-weight: 600; width: 40%; }
-        .button { display: inline-block; padding: 12px 24px; background-color: #ff5722; color: #ffffff; text-decoration: none; border-radius: 4px; margin: 20px 0; font-weight: 500; }
-        @media only screen and (max-width: 600px) { .email-body { padding: 20px 15px; } .email-header { padding: 20px 15px; } }
+        /* --- RESET & BASE --- */
+        body { 
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #09090b; /* Zinc-950 */
+            color: #e4e4e7; 
+            margin: 0; 
+            padding: 0; 
+            line-height: 1.6;
+        }
+        
+        .email-wrapper { width: 100%; background-color: #09090b; padding: 40px 0; }
+        
+        /* --- CONTAINER --- */
+        .email-container { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background-color: #18181b; /* Zinc-900 */
+            border: 1px solid #27272a; 
+            border-radius: 12px; 
+            overflow: hidden;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+        }
+
+        /* --- HEADER --- */
+        .email-header { 
+            background-color: #18181b; 
+            padding: 30px 20px; 
+            text-align: center; 
+            border-bottom: 1px solid #27272a;
+        }
+        .brand-text { font-size: 24px; font-weight: 800; color: #f97316; text-transform: uppercase; letter-spacing: -0.5px; }
+
+        /* --- BODY --- */
+        .email-body { padding: 40px 30px; }
+        h2 { color: #ffffff; margin-top: 0; font-size: 22px; font-weight: 700; margin-bottom: 16px; }
+        p { color: #a1a1aa; font-size: 15px; margin-bottom: 20px; }
+
+        /* --- SUCCESS BOX (Style Émeraude Dark) --- */
+        .success-box { 
+            background-color: rgba(16, 185, 129, 0.1); /* Fond vert très transparent */
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-left: 4px solid #10b981; /* Barre verte vive */
+            padding: 16px; 
+            margin: 25px 0; 
+            border-radius: 6px;
+            color: #34d399; /* Texte vert clair lisible sur fond noir */
+            font-weight: 500;
+        }
+
+        /* --- TABLEAU RÉCAP --- */
+        .data-table { 
+            width: 100%; 
+            border-collapse: separate; 
+            border-spacing: 0; 
+            margin: 25px 0; 
+            border: 1px solid #27272a; 
+            border-radius: 8px; 
+            overflow: hidden;
+        }
+        .data-table td { padding: 12px 15px; border-bottom: 1px solid #27272a; color: #ffffff; font-size: 14px; }
+        .data-table tr:last-child td { border-bottom: none; }
+        .data-table td:first-child { 
+            font-weight: 600; 
+            width: 40%; 
+            color: #a1a1aa; 
+            background-color: #202023; 
+            border-right: 1px solid #27272a;
+        }
+        .price-highlight { color: #f97316; font-weight: 700; }
+
+        /* --- BOUTON --- */
+        .button { 
+            display: inline-block; 
+            padding: 12px 28px; 
+            background-color: #f97316; 
+            color: #ffffff !important; 
+            text-decoration: none; 
+            border-radius: 50px; 
+            font-weight: 600; 
+            font-size: 15px; 
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+            transition: all 0.2s;
+        }
+
+        /* --- FOOTER --- */
+        .email-footer { 
+            background-color: #09090b; 
+            padding: 20px; 
+            text-align: center; 
+            font-size: 12px; 
+            color: #52525b; 
+            border-top: 1px solid #27272a; 
+        }
+        .email-footer a { color: #f97316; text-decoration: none; }
+
+        @media only screen and (max-width: 600px) { .email-body { padding: 25px 20px; } }
     </style>
 </head>
 <body>
-    <div class="email-container">
-        <div class="email-header">
-            <h1>{{ brand_name }}</h1>
-        </div>
-        <div class="email-body">
-            <h2 style="color: #2563eb; margin-top: 0;">Votre demande a été reçue</h2>
-            <p>Bonjour,</p>
-            <div class="success-box">
-                <p style="margin: 0;"><strong>✓ Votre demande a été enregistrée avec succès !</strong></p>
+    <div class="email-wrapper">
+        <div class="email-container">
+            
+            <div class="email-header">
+                <span class="brand-text">{{ brand_name }}</span>
             </div>
-            <p>Nous avons bien reçu votre demande "<strong>{{ demande_name }}</strong>" et nous allons l'étudier dans les plus brefs délais.</p>
-            <table>
-                <tr><td>ID Demande</td><td>{{ demande_id }}</td></tr>
-                <tr><td>Prix maximum</td><td>{{ max_price }}€</td></tr>
-                <tr><td>Acompte</td><td>{{ deposit_amount }}€</td></tr>
-                <tr><td>Statut</td><td>{{ status }}</td></tr>
-            </table>
-            <p>Vous recevrez une notification par email dès que votre demande évoluera.</p>
-            <p><a href="{{ base_url }}/demandes/{{ demande_id }}" class="button">Voir ma demande</a></p>
-        </div>
-        <div class="email-footer">
-            <p><strong>{{ brand_name }}</strong><br>Pour toute question, contactez-nous à <a href="mailto:{{ support_email }}">{{ support_email }}</a></p>
-            <p style="margin-top: 15px; color: #999;">Cet email a été envoyé automatiquement. Merci de ne pas y répondre.</p>
+
+            <div class="email-body">
+                <h2>Votre demande a été reçue 🙌</h2>
+                <p>Bonjour,</p>
+                
+                <div class="success-box">
+                    ✓ Votre demande a été enregistrée avec succès !
+                </div>
+
+                <p>Nous avons bien reçu votre demande concernant "<strong>{{ demande_name }}</strong>". Notre équipe va l'étudier dans les plus brefs délais.</p>
+
+                <table class="data-table">
+                    <tr><td>ID Demande</td><td>#{{ demande_id }}</td></tr>
+                    <tr><td>Prix maximum</td><td class="price-highlight">{{ max_price }}€</td></tr>
+                    <tr><td>Acompte</td><td class="price-highlight">{{ deposit_amount }}€</td></tr>
+                    <tr><td>Statut</td><td><span style="background:#27272a; border:1px solid #3f3f46; padding:2px 8px; border-radius:4px; font-size:12px; color:#e4e4e7;">{{ status }}</span></td></tr>
+                </table>
+
+                <p style="font-size: 14px;">Vous recevrez une notification par email dès que le statut de votre demande évoluera.</p>
+
+                <div style="text-align: center; margin-top: 30px;">
+                    <a href="{{ base_url }}/demandes/{{ demande_id }}" class="button">Suivre ma demande</a>
+                </div>
+            </div>
+
+            <div class="email-footer">
+                <p><strong>{{ brand_name }}</strong></p>
+                <p>Une question ? <a href="mailto:{{ support_email }}">{{ support_email }}</a></p>
+                <p style="margin-top: 15px; font-size: 11px;">Cet email est automatique, merci de ne pas répondre.</p>
+            </div>
         </div>
     </div>
 </body>
 </html>
-
-
-

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
@@ -54,4 +54,307 @@
 </html>
 
 
+ -->
+ <!-- <!DOCTYPE html>
+ <html lang="fr">
+ <head>
+     <meta charset="UTF-8">
+     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+     <title>Nouvelle demande client</title>
+     <link rel="preconnect" href="https://fonts.googleapis.com">
+     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;900&display=swap" rel="stylesheet">
+     <style>
+         /* --- GLOBAL --- */
+         body { 
+             font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+             background-color: #09090b; /* Zinc-950 */
+             color: #e4e4e7; 
+             margin: 0; 
+             padding: 0; 
+             line-height: 1.6;
+         }
+         
+         .email-wrapper { width: 100%; background-color: #09090b; padding: 40px 0; }
+         
+         /* --- CARTE --- */
+         .email-container { 
+             max-width: 600px; 
+             margin: 0 auto; 
+             background-color: #18181b; /* Zinc-900 */
+             border: 1px solid #27272a; 
+             border-radius: 12px; 
+             overflow: hidden;
+             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+         }
+ 
+         /* --- HEADER --- */
+         .email-header { 
+             background-color: #18181b; 
+             padding: 30px 20px; 
+             text-align: center; 
+             border-bottom: 1px solid #27272a;
+         }
+         .brand-text { font-size: 24px; font-weight: 800; color: #f97316; letter-spacing: -0.5px; text-transform: uppercase; }
+ 
+         /* --- BODY --- */
+         .email-body { padding: 40px 30px; }
+         
+         h2 { color: #ffffff; margin-top: 0; font-size: 22px; font-weight: 700; margin-bottom: 10px; }
+         p { color: #a1a1aa; font-size: 15px; margin-bottom: 20px; }
+ 
+         /* --- TABLEAU DASHBOARD --- */
+         .data-table { 
+             width: 100%; 
+             border-collapse: separate; 
+             border-spacing: 0; 
+             margin: 25px 0; 
+             border: 1px solid #27272a; 
+             border-radius: 8px; 
+             overflow: hidden;
+         }
+         .data-table td { padding: 12px 15px; border-bottom: 1px solid #27272a; color: #ffffff; font-size: 14px; }
+         .data-table tr:last-child td { border-bottom: none; }
+         .data-table td:first-child { 
+             font-weight: 600; 
+             width: 35%; 
+             color: #a1a1aa; 
+             background-color: #202023; /* Légèrement plus clair que le fond */
+             border-right: 1px solid #27272a;
+         }
+         .highlight { color: #f97316; font-weight: 600; } /* Pour les prix */
+ 
+         /* --- DESCRIPTION BOX --- */
+         .description-box {
+             background-color: #27272a; /* Zinc-800 */
+             padding: 20px;
+             border-radius: 6px;
+             border-left: 3px solid #f97316;
+             color: #d4d4d8;
+             font-size: 14px;
+             white-space: pre-wrap; /* Garde les sauts de ligne */
+             margin-bottom: 30px;
+         }
+ 
+         /* --- BOUTON --- */
+         .button { 
+             display: inline-block; 
+             padding: 12px 28px; 
+             background-color: #f97316; 
+             color: #ffffff !important; 
+             text-decoration: none; 
+             border-radius: 50px; 
+             font-weight: 600; 
+             font-size: 15px; 
+             box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+         }
+ 
+         /* --- FOOTER --- */
+         .email-footer { 
+             background-color: #09090b; 
+             padding: 20px; 
+             text-align: center; 
+             font-size: 12px; 
+             color: #52525b; 
+             border-top: 1px solid #27272a;
+         }
+         .email-footer a { color: #f97316; text-decoration: none; }
+ 
+         @media only screen and (max-width: 600px) { .email-body { padding: 20px; } }
+     </style>
+ </head>
+ <body>
+     <div class="email-wrapper">
+         <div class="email-container">
+             <div class="email-header">
+                 <span class="brand-text">{{ brand_name }}</span>
+             </div>
+             
+             <div class="email-body">
+                 <h2>Nouvelle demande client</h2>
+                 <p>Une nouvelle demande vient d'arriver sur la plateforme. Voici le récapitulatif :</p>
+                 
+                 <table class="data-table">
+                     <tr><td>ID Demande</td><td><strong>#{{ demande_id }}</strong></td></tr>
+                     <tr><td>Nom du projet</td><td>{{ demande_name }}</td></tr>
+                     <tr><td>Client</td><td>{{ client_name }} <br><span style="font-size:12px; color:#71717a;">{{ client_email }}</span></td></tr>
+                     <tr><td>Budget Max</td><td class="highlight">{{ max_price }}€</td></tr>
+                     <tr><td>Prix Réf.</td><td>{{ reference_price }}€</td></tr>
+                     <tr><td>Acompte</td><td class="highlight">{{ deposit_amount }}€</td></tr>
+                     <tr><td>Statut</td><td><span style="background:#27272a; border:1px solid #3f3f46; padding:2px 8px; border-radius:4px; font-size:12px;">{{ status }}</span></td></tr>
+                 </table>
+ 
+                 {% if description %}
+                 <p style="margin-bottom: 8px; font-weight: 600; color: #ffffff;">Description du besoin :</p>
+                 <div class="description-box">{{ description }}</div>
+                 {% endif %}
+ 
+                 <div style="text-align: center;">
+                     <a href="{{ base_url }}/admin/demandes/{{ demande_id }}" class="button">Gérer la demande</a>
+                 </div>
+             </div>
+ 
+             <div class="email-footer">
+                 <p><strong>{{ brand_name }}</strong> Admin Panel</p>
+                 <p style="margin-top: 10px;">Cet email est automatique. <br>Besoin d'aide ? <a href="mailto:{{ support_email }}">{{ support_email }}</a></p>
+             </div>
+         </div>
+     </div>
+ </body>
+ </html> -->
 
+
+
+
+ <!DOCTYPE html>
+ <html lang="fr" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+ <head>
+     <meta charset="utf-8">
+     <meta name="viewport" content="width=device-width">
+     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+     <meta name="x-apple-disable-message-reformatting">
+     <title>Nouvelle demande client - DownPricer</title>
+     
+     <link rel="preconnect" href="https://fonts.googleapis.com">
+     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+ 
+     <style>
+         /* RESET */
+         html, body { margin: 0 auto !important; padding: 0 !important; height: 100% !important; width: 100% !important; background-color: #09090b; }
+         * { -ms-text-size-adjust: 100%; -webkit-text-size-adjust: 100%; }
+         div[style*="margin: 16px 0"] { margin: 0 !important; }
+         table, td { mso-table-lspace: 0pt !important; mso-table-rspace: 0pt !important; }
+         table { border-spacing: 0 !important; border-collapse: collapse !important; table-layout: fixed !important; margin: 0 auto !important; }
+         img { -ms-interpolation-mode: bicubic; }
+         a { text-decoration: none; }
+ 
+         /* TYPOGRAPHY */
+         .outfit { font-family: 'Outfit', Arial, sans-serif; }
+         
+         /* MOBILE */
+         @media only screen and (max-width: 600px) {
+             .email-container { width: 100% !important; max-width: 100% !important; }
+             .mobile-padding { padding-left: 20px !important; padding-right: 20px !important; }
+             .header-text { font-size: 24px !important; }
+         }
+     </style>
+ </head>
+ <body width="100%" style="margin: 0; padding: 0 !important; mso-line-height-rule: exactly; background-color: #09090b;">
+     <center style="width: 100%; background-color: #09090b;">
+         
+         <div style="height: 40px; line-height: 40px; font-size: 10px;">&nbsp;</div>
+ 
+         <table align="center" role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto;" class="email-container">
+             
+             <tr>
+                 <td align="center" style="padding: 30px 0; background-color: #09090b;">
+                     <h1 class="outfit" style="margin: 0; font-size: 28px; font-weight: 800; color: #ffffff; letter-spacing: -1px; text-transform: uppercase;">
+                         Down<span style="color: #f97316;">Pricer</span>
+                     </h1>
+                 </td>
+             </tr>
+ 
+             <tr>
+                 <td bgcolor="#18181b" style="border-radius: 12px; border: 1px solid #27272a; padding: 40px;" class="mobile-padding">
+                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                         
+                         <tr>
+                             <td class="outfit" style="font-size: 24px; font-weight: 700; color: #ffffff; padding-bottom: 10px; line-height: 1.3;">
+                                 Nouvelle demande client
+                             </td>
+                         </tr>
+ 
+                         <tr>
+                             <td class="outfit" style="font-size: 15px; line-height: 24px; color: #a1a1aa; padding-bottom: 25px;">
+                                 Une nouvelle demande vient d'arriver sur la plateforme. Voici le récapitulatif :
+                             </td>
+                         </tr>
+ 
+                         <tr>
+                             <td style="padding-bottom: 30px;">
+                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border: 1px solid #27272a; border-radius: 8px; overflow: hidden;">
+                                     <tr>
+                                         <td class="outfit" width="35%" style="padding: 12px 15px; background-color: #202023; color: #a1a1aa; font-weight: 600; font-size: 14px; border-bottom: 1px solid #27272a; border-right: 1px solid #27272a;">ID Demande</td>
+                                         <td class="outfit" style="padding: 12px 15px; background-color: #18181b; color: #ffffff; font-size: 14px; border-bottom: 1px solid #27272a;"><strong>#{{ demande_id }}</strong></td>
+                                     </tr>
+                                     <tr>
+                                         <td class="outfit" style="padding: 12px 15px; background-color: #202023; color: #a1a1aa; font-weight: 600; font-size: 14px; border-bottom: 1px solid #27272a; border-right: 1px solid #27272a;">Projet</td>
+                                         <td class="outfit" style="padding: 12px 15px; background-color: #18181b; color: #ffffff; font-size: 14px; border-bottom: 1px solid #27272a;">{{ demande_name }}</td>
+                                     </tr>
+                                     <tr>
+                                         <td class="outfit" style="padding: 12px 15px; background-color: #202023; color: #a1a1aa; font-weight: 600; font-size: 14px; border-bottom: 1px solid #27272a; border-right: 1px solid #27272a;">Client</td>
+                                         <td class="outfit" style="padding: 12px 15px; background-color: #18181b; color: #ffffff; font-size: 14px; border-bottom: 1px solid #27272a;">
+                                             {{ client_name }}<br>
+                                             <span style="font-size: 12px; color: #71717a;">{{ client_email }}</span>
+                                         </td>
+                                     </tr>
+                                     <tr>
+                                         <td class="outfit" style="padding: 12px 15px; background-color: #202023; color: #a1a1aa; font-weight: 600; font-size: 14px; border-bottom: 1px solid #27272a; border-right: 1px solid #27272a;">Budget Max</td>
+                                         <td class="outfit" style="padding: 12px 15px; background-color: #18181b; color: #f97316; font-weight: 700; font-size: 14px; border-bottom: 1px solid #27272a;">{{ max_price }}€</td>
+                                     </tr>
+                                     <tr>
+                                         <td class="outfit" style="padding: 12px 15px; background-color: #202023; color: #a1a1aa; font-weight: 600; font-size: 14px; border-bottom: 1px solid #27272a; border-right: 1px solid #27272a;">Acompte</td>
+                                         <td class="outfit" style="padding: 12px 15px; background-color: #18181b; color: #f97316; font-weight: 700; font-size: 14px; border-bottom: 1px solid #27272a;">{{ deposit_amount }}€</td>
+                                     </tr>
+                                     <tr>
+                                         <td class="outfit" style="padding: 12px 15px; background-color: #202023; color: #a1a1aa; font-weight: 600; font-size: 14px; border-right: 1px solid #27272a;">Statut</td>
+                                         <td class="outfit" style="padding: 12px 15px; background-color: #18181b; color: #ffffff; font-size: 14px;">
+                                             <span style="background-color: #27272a; border: 1px solid #3f3f46; padding: 2px 8px; border-radius: 4px; font-size: 12px;">{{ status }}</span>
+                                         </td>
+                                     </tr>
+                                 </table>
+                             </td>
+                         </tr>
+ 
+                         {% if description %}
+                         <tr>
+                             <td class="outfit" style="padding-bottom: 8px; font-weight: 600; color: #ffffff; font-size: 14px;">
+                                 Description du besoin :
+                             </td>
+                         </tr>
+                         <tr>
+                             <td style="padding-bottom: 30px;">
+                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                     <tr>
+                                         <td class="outfit" style="background-color: #27272a; padding: 20px; border-radius: 6px; border-left: 3px solid #f97316; color: #d4d4d8; font-size: 14px; line-height: 1.5;">
+                                             {{ description }}
+                                         </td>
+                                     </tr>
+                                 </table>
+                             </td>
+                         </tr>
+                         {% endif %}
+ 
+                         <tr>
+                             <td align="center" style="padding-bottom: 10px;">
+                                 <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                                     <tr>
+                                         <td style="border-radius: 50px; background-color: #f97316; box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);">
+                                             <a href="{{ base_url }}/admin/demandes/{{ demande_id }}" target="_blank" class="outfit" style="padding: 14px 30px; border-radius: 50px; background-color: #f97316; color: #ffffff; display: inline-block; font-weight: 600; font-size: 15px; text-decoration: none; border: 1px solid #f97316;">
+                                                 Gérer la demande
+                                             </a>
+                                         </td>
+                                     </tr>
+                                 </table>
+                             </td>
+                         </tr>
+ 
+                     </table>
+                 </td>
+             </tr>
+ 
+             <tr>
+                 <td class="outfit" style="padding: 30px; text-align: center; font-size: 12px; color: #52525b;">
+                     <p style="margin: 0 0 10px 0;"><strong>DownPricer</strong> Admin Panel</p>
+                     <p style="margin: 0;">Cet email est automatique. Besoin d'aide ? <a href="mailto:{{ support_email }}" style="color: #f97316; text-decoration: none;">{{ support_email }}</a></p>
+                 </td>
+             </tr>
+ 
+         </table>
+         
+         <div style="height: 40px; line-height: 40px; font-size: 10px;">&nbsp;</div>
+ 
+     </center>
+ </body>
+ </html>

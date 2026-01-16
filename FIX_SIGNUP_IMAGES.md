@@ -294,3 +294,4 @@ docker compose -f docker-compose.prod.yml exec backend chmod -R 755 /app/uploads
 
 
 
+
