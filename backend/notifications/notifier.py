@@ -23,6 +23,7 @@ class EventType(str, Enum):
     ADMIN_NEW_SELLER_APPLICATION = "admin_new_seller_application"
     ADMIN_NEW_SALE = "admin_new_sale"
     ADMIN_PAYMENT_PROOF_SUBMITTED = "admin_payment_proof_submitted"
+    ADMIN_PAYMENT_VALIDATED = "admin_payment_validated"
     ADMIN_SHIPMENT_PENDING = "admin_shipment_pending"
     ADMIN_NEW_MINISITE = "admin_new_minisite"
     
@@ -144,6 +145,10 @@ def get_template_config(event_type: EventType) -> Dict[str, str]:
             "template": "admin_payment_proof_submitted.html",
             "subject": "Preuve de paiement à valider"
         },
+        EventType.ADMIN_PAYMENT_VALIDATED: {
+            "template": "admin_generic.html",
+            "subject": "Paiement validé"
+        },
         EventType.ADMIN_SHIPMENT_PENDING: {
             "template": "admin_shipment_pending.html",
             "subject": "Expédition en attente"
@@ -256,10 +261,14 @@ async def notify_admin(
         # Générer un text_body simple
         text_body = payload.get("text_body", subject)
         
+        # Ajouter event_type et event_id à la config pour les logs
+        config["event_type"] = str(event_type)
+        config["event_id"] = payload.get("demande_id") or payload.get("sale_id") or payload.get("site_id") or payload.get("request_id") or payload.get("user_email", "N/A")
+        
         # Envoyer en background
         logger.info(f"[NOTIFY_ADMIN] Ajout de la tâche background: {event_type} -> {admin_email} (subject: {subject})")
         background_tasks.add_task(send_email_sync, config, admin_email, subject, html_body, text_body)
-        logger.info(f"[NOTIFY_ADMIN] ✅ Notification admin planifiée: {event_type} -> {admin_email}")
+        logger.info(f"[NOTIFY_ADMIN] ✅ Notification admin planifiée: {event_type} -> {admin_email} | id={config['event_id']}")
         
     except Exception as e:
         logger.error(f"Erreur lors de la notification admin {event_type}: {str(e)}", exc_info=True)
@@ -323,10 +332,14 @@ async def notify_user(
         # Générer un text_body simple
         text_body = payload.get("text_body", subject)
         
+        # Ajouter event_type et event_id à la config pour les logs
+        config["event_type"] = str(event_type)
+        config["event_id"] = payload.get("demande_id") or payload.get("sale_id") or payload.get("site_id") or payload.get("request_id") or user_email
+        
         # Envoyer en background
         logger.info(f"[NOTIFY_USER] Ajout de la tâche background: {event_type} -> {user_email} (subject: {subject})")
         background_tasks.add_task(send_email_sync, config, user_email, subject, html_body, text_body)
-        logger.info(f"[NOTIFY_USER] ✅ Notification user planifiée: {event_type} -> {user_email}")
+        logger.info(f"[NOTIFY_USER] ✅ Notification user planifiée: {event_type} -> {user_email} | id={config['event_id']}")
         
     except Exception as e:
         logger.error(f"Erreur lors de la notification user {event_type}: {str(e)}", exc_info=True)

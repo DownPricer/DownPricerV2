@@ -546,6 +546,7 @@ async def request_seller_access(
     last_name: str = Form(...),
     email: str = Form(...),
     phone: str = Form(...),
+    background_tasks: BackgroundTasks,
     current_user=Depends(get_current_user)
 ):
     request_id = str(uuid.uuid4())
@@ -560,6 +561,67 @@ async def request_seller_access(
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.seller_requests.insert_one(request_doc)
+    
+    # Notifications : user (confirmation) + admin (nouvelle demande)
+    try:
+        await notify_user(
+            db,
+            EventType.USER_SELLER_APPLICATION_RECEIVED,
+            current_user.email,
+            {
+                "title": "Votre demande de vendeur a été reçue",
+                "status_box": '<div class="info-box"><p style="margin: 0;"><strong>✓ Demande reçue</strong></p></div>',
+                "message": "Votre demande pour devenir vendeur sur DownPricer a été reçue et sera examinée par notre équipe.",
+                "first_name": first_name,
+                "last_name": last_name,
+                "email": email,
+                "phone": phone,
+                "request_id": request_id,
+                "details": (
+                    f"<table>"
+                    f"<tr><td>Nom</td><td>{first_name} {last_name}</td></tr>"
+                    f"<tr><td>Email</td><td>{email}</td></tr>"
+                    f"<tr><td>Téléphone</td><td>{phone}</td></tr>"
+                    f"<tr><td>ID Demande</td><td>{request_id}</td></tr>"
+                    f"</table>"
+                ),
+                "action_button": ""
+            },
+            background_tasks
+        )
+        
+        await notify_admin(
+            db,
+            EventType.ADMIN_NEW_SELLER_APPLICATION,
+            {
+                "title": "Nouvelle demande de vendeur",
+                "message": "Une nouvelle demande pour devenir vendeur a été soumise.",
+                "first_name": first_name,
+                "last_name": last_name,
+                "email": email,
+                "phone": phone,
+                "user_email": current_user.email,
+                "request_id": request_id,
+                "details": (
+                    f'<div class="info-box"><table>'
+                    f"<tr><td>Nom</td><td>{first_name} {last_name}</td></tr>"
+                    f"<tr><td>Email</td><td>{email}</td></tr>"
+                    f"<tr><td>Téléphone</td><td>{phone}</td></tr>"
+                    f"<tr><td>Compte utilisateur</td><td>{current_user.email}</td></tr>"
+                    f"<tr><td>ID Demande</td><td>{request_id}</td></tr>"
+                    f"</table></div>"
+                ),
+                "action_button": (
+                    f'<p style="text-align: center;">'
+                    f'<a href="{{{{ base_url }}}}/admin/seller-requests/{request_id}" class="button">Voir la demande</a>'
+                    f"</p>"
+                )
+            },
+            background_tasks
+        )
+    except Exception as e:
+        logger.error(f"Erreur notifications seller_application: {str(e)}")
+    
     return {"success": True, "message": "Demande envoyée. Nous vous contacterons par email."}
 
 
@@ -997,6 +1059,95 @@ async def test_email(background_tasks: BackgroundTasks, current_user=Depends(get
         background_tasks.add_task(send_email_sync, config, test_email_to, subject, html_body, text_body)
         return {"success": True, "message": f"Email de test envoyé à {test_email_to}"}
 
+
+@api_router.post("/debug/email/test", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
+async def debug_email_test(background_tasks: BackgroundTasks, current_user=Depends(get_current_user)):
+    """Route de test pour vérifier les emails en production - envoie 2-3 emails (admin + user)"""
+    try:
+        config = await get_email_config(db)
+
+        if not config.get("enabled", False):
+            raise HTTPException(status_code=400, detail="Notifications email désactivées. Activez-les dans les paramètres.")
+
+        if not config.get("smtp_host") or not config.get("smtp_user") or not config.get("smtp_pass"):
+            raise HTTPException(status_code=500, detail="Configuration SMTP incomplète. Vérifiez les variables d'environnement.")
+
+        admin_email = config.get("admin_email") or current_user.email
+        
+        # Email 1: Admin - nouvelle demande
+        await notify_admin(
+            db,
+            EventType.ADMIN_NEW_CLIENT_REQUEST,
+            {
+                "title": "Test - Nouvelle demande client",
+                "message": "Ceci est un email de test pour vérifier la configuration SMTP de DownPricer.",
+                "demande_id": "test-123",
+                "demande_name": "Test Demande",
+                "client_name": "Test Client",
+                "client_email": "test@example.com",
+                "max_price": 100.0,
+                "reference_price": 120.0,
+                "deposit_amount": 10.0,
+                "status": "AWAITING_DEPOSIT",
+                "description": "Description de test",
+                "details": '<div class="info-box"><p>Email de test ADMIN - Nouvelle demande client ✅</p></div>',
+                "action_button": ""
+            },
+            background_tasks
+        )
+
+        # Email 2: User - demande reçue
+        await notify_user(
+            db,
+            EventType.USER_REQUEST_RECEIVED,
+            current_user.email,
+            {
+                "title": "Test - Votre demande a été reçue",
+                "status_box": '<div class="success-box"><p style="margin: 0;"><strong>✓ Email de test USER</strong></p></div>',
+                "message": "Ceci est un email de test pour vérifier la configuration SMTP de DownPricer.",
+                "demande_id": "test-123",
+                "demande_name": "Test Demande",
+                "details": '<div class="info-box"><p>Email de test USER - Demande reçue ✅</p></div>',
+                "action_button": ""
+            },
+            background_tasks
+        )
+
+        # Email 3: Admin - nouveau vendeur
+        await notify_admin(
+            db,
+            EventType.ADMIN_NEW_SELLER_APPLICATION,
+            {
+                "title": "Test - Nouvelle demande de vendeur",
+                "message": "Ceci est un email de test pour vérifier la configuration SMTP de DownPricer.",
+                "first_name": "Test",
+                "last_name": "Vendeur",
+                "email": "test@example.com",
+                "phone": "0123456789",
+                "user_email": current_user.email,
+                "request_id": "test-456",
+                "details": '<div class="info-box"><p>Email de test ADMIN - Nouvelle demande vendeur ✅</p></div>',
+                "action_button": ""
+            },
+            background_tasks
+        )
+
+        return {
+            "success": True,
+            "message": f"3 emails de test envoyés à {admin_email} (admin) et {current_user.email} (user)",
+            "emails_sent": [
+                "ADMIN_NEW_CLIENT_REQUEST",
+                "USER_REQUEST_RECEIVED",
+                "ADMIN_NEW_SELLER_APPLICATION"
+            ]
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur lors de l'envoi des emails de test: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'envoi des emails: {str(e)}")
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1125,7 +1276,7 @@ async def reject_sale(sale_id: str, data: dict, background_tasks: BackgroundTask
         {"$set": {"status": SaleStatus.REJECTED, "rejection_reason": reason, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
 
-    # Notification user : vente refusée
+    # Notifications : user (vente refusée) + admin (vente refusée)
     try:
         seller = await db.users.find_one({"id": sale["seller_id"]}, {"_id": 0})
         seller_email = seller.get("email") if seller else None
@@ -1159,8 +1310,40 @@ async def reject_sale(sale_id: str, data: dict, background_tasks: BackgroundTask
                 },
                 background_tasks
             )
+        
+        # Notification admin : vente refusée (pour traçabilité)
+        await notify_admin(
+            db,
+            EventType.ADMIN_NEW_SALE,
+            {
+                "title": "Vente refusée",
+                "message": "Une vente a été refusée par l'administration.",
+                "article_name": sale.get("article_name", ""),
+                "sale_price": sale.get("sale_price", 0),
+                "seller_name": f"{seller.get('first_name','') if seller else ''} {seller.get('last_name','') if seller else ''}",
+                "seller_email": seller.get("email", "") if seller else "",
+                "sale_id": sale_id,
+                "rejection_reason": reason,
+                "status": "REJECTED",
+                "details": (
+                    f'<div class="error-box"><table>'
+                    f"<tr><td>Article</td><td>{sale.get('article_name','')}</td></tr>"
+                    f"<tr><td>Prix de vente</td><td>{sale.get('sale_price',0)}€</td></tr>"
+                    f"<tr><td>Vendeur</td><td>{seller.get('first_name','') if seller else ''} {seller.get('last_name','') if seller else ''} ({seller.get('email','') if seller else ''})</td></tr>"
+                    f"<tr><td>Raison</td><td>{reason}</td></tr>"
+                    f"<tr><td>ID Vente</td><td>{sale_id}</td></tr>"
+                    f"</table></div>"
+                ),
+                "action_button": (
+                    f'<p style="text-align: center;">'
+                    f'<a href="{{{{ base_url }}}}/admin/sales/{sale_id}" class="button">Voir la vente</a>'
+                    f"</p>"
+                )
+            },
+            background_tasks
+        )
     except Exception as e:
-        logger.error(f"Erreur notification user_payment_rejected: {str(e)}")
+        logger.error(f"Erreur notification vente refusée: {str(e)}")
 
     return {"success": True, "message": "Vente refusée"}
 
@@ -1211,6 +1394,35 @@ async def confirm_payment(sale_id: str, background_tasks: BackgroundTasks):
                 },
                 background_tasks
             )
+
+        # Notification admin : paiement validé
+        await notify_admin(
+            db,
+            EventType.ADMIN_PAYMENT_VALIDATED,
+            {
+                "title": "Paiement validé",
+                "message": "Un paiement a été validé pour une vente.",
+                "article_name": sale.get("article_name", ""),
+                "sale_price": sale.get("sale_price", 0),
+                "seller_name": f"{seller.get('first_name','') if seller else ''} {seller.get('last_name','') if seller else ''}",
+                "seller_email": seller.get("email", "") if seller else "",
+                "sale_id": sale_id,
+                "details": (
+                    f'<div class="success-box"><table>'
+                    f"<tr><td>Article</td><td>{sale.get('article_name','')}</td></tr>"
+                    f"<tr><td>Prix de vente</td><td>{sale.get('sale_price',0)}€</td></tr>"
+                    f"<tr><td>Vendeur</td><td>{seller.get('first_name','') if seller else ''} {seller.get('last_name','') if seller else ''} ({seller.get('email','') if seller else ''})</td></tr>"
+                    f"<tr><td>ID Vente</td><td>{sale_id}</td></tr>"
+                    f"</table></div>"
+                ),
+                "action_button": (
+                    f'<p style="text-align: center;">'
+                    f'<a href="{{{{ base_url }}}}/admin/sales/{sale_id}" class="button">Voir la vente</a>'
+                    f"</p>"
+                )
+            },
+            background_tasks
+        )
 
         await notify_admin(
             db,
@@ -1270,7 +1482,7 @@ async def admin_reject_payment(sale_id: str, data: dict):
 
 
 @api_router.post("/admin/sales/{sale_id}/mark-shipped", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
-async def admin_mark_shipped(sale_id: str, data: dict):
+async def admin_mark_shipped(sale_id: str, data: dict, background_tasks: BackgroundTasks):
     tracking_number = data.get("tracking_number", "")
 
     sale = await db.seller_sales.find_one({"id": sale_id}, {"_id": 0})
@@ -1288,6 +1500,44 @@ async def admin_mark_shipped(sale_id: str, data: dict):
             "updated_at": datetime.now(timezone.utc).isoformat()
         }}
     )
+
+    # Notification user : expédition
+    try:
+        seller = await db.users.find_one({"id": sale["seller_id"]}, {"_id": 0})
+        seller_email = seller.get("email") if seller else None
+
+        if seller_email:
+            tracking_info = f"<tr><td>Numéro de suivi</td><td><strong>{tracking_number}</strong></td></tr>" if tracking_number else ""
+            await notify_user(
+                db,
+                EventType.USER_SHIPPED,
+                seller_email,
+                {
+                    "title": "Votre commande a été expédiée",
+                    "status_box": '<div class="success-box"><p style="margin: 0;"><strong>✓ Votre commande a été expédiée</strong></p></div>',
+                    "message": f'Votre vente de l\'article "{sale.get("article_name", "")}" a été expédiée.',
+                    "article_name": sale.get("article_name", ""),
+                    "sale_price": sale.get("sale_price", 0),
+                    "tracking_number": tracking_number,
+                    "sale_id": sale_id,
+                    "details": (
+                        f"<table>"
+                        f"<tr><td>Article</td><td>{sale.get('article_name','')}</td></tr>"
+                        f"<tr><td>Prix de vente</td><td>{sale.get('sale_price',0)}€</td></tr>"
+                        f"{tracking_info}"
+                        f"<tr><td>ID Vente</td><td>{sale_id}</td></tr>"
+                        f"</table>"
+                    ),
+                    "action_button": (
+                        f'<p style="text-align: center;">'
+                        f'<a href="{{{{ base_url }}}}/seller/sales/{sale_id}" class="button">Voir ma vente</a>'
+                        f"</p>"
+                    )
+                },
+                background_tasks
+            )
+    except Exception as e:
+        logger.error(f"Erreur notification user_shipped: {str(e)}")
 
     return {"success": True, "message": "Vente marquée comme expédiée"}
 

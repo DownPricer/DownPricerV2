@@ -43,6 +43,14 @@ async def get_email_config(db) -> Dict[str, Any]:
 
 def send_email_sync(config: Dict[str, Any], to: str, subject: str, html_body: str, text_body: Optional[str] = None):
     """Envoie un email de façon synchrone (à appeler depuis BackgroundTasks)"""
+    # Mode test: rediriger tous les emails vers une adresse unique
+    force_to = os.environ.get("EMAIL_FORCE_TO", "").strip()
+    if force_to:
+        original_to = to
+        to = force_to
+        subject = f"[TEST] {subject} (original: {original_to})"
+        logger.info(f"[SEND_EMAIL] MODE TEST: redirection {original_to} -> {to}")
+    
     logger.info(f"[SEND_EMAIL] Début envoi email à {to} (subject: {subject})")
     
     if not config.get("enabled", False):
@@ -94,7 +102,7 @@ def send_email_sync(config: Dict[str, Any], to: str, subject: str, html_body: st
         server.send_message(msg)
         server.quit()
         
-        logger.info(f"[SEND_EMAIL] ✅ Email envoyé avec succès à {to}")
+        logger.info(f"[SEND_EMAIL] ✅ Email envoyé avec succès à {to} | event_type={config.get('event_type', 'N/A')} | id={config.get('event_id', 'N/A')}")
         
     except smtplib.SMTPAuthenticationError as e:
         logger.error(f"[SEND_EMAIL] ❌ Erreur d'authentification SMTP: {str(e)}", exc_info=True)
