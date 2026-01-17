@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Body
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Body, BackgroundTasks
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
@@ -61,6 +61,10 @@ else:
             "Ajoutez DB_NAME=downpricer dans votre fichier backend/.env"
         )
 
+# Configuration du logger AVANT son utilisation
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 try:
     client = AsyncIOMotorClient(mongo_url)
     db = client[db_name]
@@ -71,9 +75,6 @@ except Exception as e:
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
 # Chemin relatif au répertoire backend pour les uploads
 UPLOAD_DIR = Path(ROOT_DIR / "uploads")
@@ -250,8 +251,8 @@ async def get_article(article_id: str):
 
 @api_router.post("/demandes", dependencies=[Depends(require_roles([UserRole.CLIENT, UserRole.ADMIN]))])
 async def create_demande(
-    demande_data: DemandeCreate,
     background_tasks: BackgroundTasks,
+    demande_data: DemandeCreate,
     current_user = Depends(get_current_user)
 ):
     user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0})
