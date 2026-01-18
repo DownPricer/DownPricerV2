@@ -139,7 +139,7 @@ export const Signup = () => {
                     data-testid="signup-cgu-checkbox"
                   />
                   <Label htmlFor="cgu" className="text-sm text-white font-medium cursor-pointer">
-                    J'accepte les <span className="text-orange-400 hover:text-orange-300 underline">conditions générales d'utilisation</span>
+                    J'accepte les <a href="/cgu" target="_blank" className="text-orange-400 hover:text-orange-300 underline">conditions générales d'utilisation</a>
                   </Label>
                 </div>
                 <Button

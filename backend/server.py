@@ -23,6 +23,7 @@ from models import (
 from auth import verify_password, get_password_hash, create_access_token
 from dependencies import get_current_user, require_roles
 from billing_provider import get_billing_provider
+from notifications import EventType, notify_admin, notify_user
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -95,7 +96,10 @@ async def get_deposit_percentage() -> float:
     return 40.0
 
 @api_router.post("/auth/signup")
-async def signup(user_data: UserCreate):
+async def signup(
+    background_tasks: BackgroundTasks,
+    user_data: UserCreate
+):
     existing = await db.users.find_one({"email": user_data.email}, {"_id": 0})
     if existing:
         raise HTTPException(status_code=400, detail="Cet email est déjà utilisé")
@@ -113,6 +117,24 @@ async def signup(user_data: UserCreate):
     }
     
     await db.users.insert_one(user_doc)
+    
+    # Notification admin : nouvel utilisateur
+    try:
+        await notify_admin(
+            db,
+            EventType.ADMIN_NEW_USER,
+            {
+                "title": "Nouvel utilisateur inscrit",
+                "message": f"Un nouvel utilisateur s'est inscrit sur la plateforme.",
+                "user_name": f"{user_data.first_name} {user_data.last_name}",
+                "user_email": user_data.email,
+                "created_at": user_doc["created_at"],
+                "details": f"<table class='details-table'><tr><td>Nom</td><td>{user_data.first_name} {user_data.last_name}</td></tr><tr><td>Email</td><td>{user_data.email}</td></tr><tr><td>Téléphone</td><td>{user_data.phone or 'Non renseigné'}</td></tr></table>"
+            },
+            background_tasks
+        )
+    except Exception as e:
+        logger.error(f"Erreur notification admin signup: {str(e)}")
     
     token = create_access_token(data={"sub": user_data.email, "roles": user_doc["roles"]})
     
@@ -285,6 +307,47 @@ async def create_demande(
     
     await db.demandes.insert_one(demande_doc)
     
+    # Notification admin : nouvelle demande client
+    try:
+        await notify_admin(
+            db,
+            EventType.ADMIN_NEW_CLIENT_REQUEST,
+            {
+                "title": "Nouvelle demande client",
+                "message": f"Une nouvelle demande a été créée par {user_doc.get('first_name', '')} {user_doc.get('last_name', '')}.",
+                "demande_id": demande_id,
+                "demande_name": demande_data.name,
+                "client_name": f"{user_doc.get('first_name', '')} {user_doc.get('last_name', '')}",
+                "client_email": user_doc["email"],
+                "max_price": demande_data.max_price,
+                "deposit_amount": deposit_amount,
+                "details": f"<table class='details-table'><tr><td>Demande</td><td>{demande_data.name}</td></tr><tr><td>Prix max</td><td>{demande_data.max_price}€</td></tr><tr><td>Acompte</td><td>{deposit_amount}€</td></tr><tr><td>Client</td><td>{user_doc.get('first_name', '')} {user_doc.get('last_name', '')} ({user_doc['email']})</td></tr></table>"
+            },
+            background_tasks
+        )
+    except Exception as e:
+        logger.error(f"Erreur notification admin demande: {str(e)}")
+    
+    # Notification user : demande reçue
+    try:
+        await notify_user(
+            db,
+            EventType.USER_REQUEST_RECEIVED,
+            user_doc["email"],
+            {
+                "title": "Votre demande a été reçue",
+                "message": f"Votre demande '{demande_data.name}' a été enregistrée avec succès.",
+                "demande_id": demande_id,
+                "demande_name": demande_data.name,
+                "max_price": demande_data.max_price,
+                "deposit_amount": deposit_amount,
+                "status": "AWAITING_DEPOSIT"
+            },
+            background_tasks
+        )
+    except Exception as e:
+        logger.error(f"Erreur notification user demande: {str(e)}")
+    
     return Demande(**demande_doc)
 
 @api_router.post("/demandes/{demande_id}/pay-deposit", dependencies=[Depends(require_roles([UserRole.CLIENT, UserRole.ADMIN]))])
@@ -407,6 +470,7 @@ async def cancel_demande(demande_id: str, current_user = Depends(get_current_use
 
 @api_router.post("/seller/request", dependencies=[Depends(get_current_user)])
 async def request_seller_access(
+    background_tasks: BackgroundTasks,
     first_name: str = Form(...),
     last_name: str = Form(...),
     email: str = Form(...),
@@ -426,6 +490,42 @@ async def request_seller_access(
     }
     
     await db.seller_requests.insert_one(request_doc)
+    
+    # Notification admin : nouvelle demande vendeur
+    try:
+        await notify_admin(
+            db,
+            EventType.ADMIN_NEW_SELLER_APPLICATION,
+            {
+                "title": "Nouvelle demande de vendeur",
+                "message": f"Une nouvelle demande d'accès vendeur a été soumise.",
+                "first_name": first_name,
+                "last_name": last_name,
+                "email": email,
+                "phone": phone,
+                "user_email": current_user.email,
+                "request_id": request_id,
+                "details": f"<table class='details-table'><tr><td>Nom</td><td>{first_name} {last_name}</td></tr><tr><td>Email</td><td>{email}</td></tr><tr><td>Téléphone</td><td>{phone}</td></tr><tr><td>Compte utilisateur</td><td>{current_user.email}</td></tr></table>"
+            },
+            background_tasks
+        )
+    except Exception as e:
+        logger.error(f"Erreur notification admin seller request: {str(e)}")
+    
+    # Notification user : demande reçue
+    try:
+        await notify_user(
+            db,
+            EventType.USER_SELLER_APPLICATION_RECEIVED,
+            current_user.email,
+            {
+                "title": "Votre demande vendeur a été reçue",
+                "message": "Votre demande d'accès vendeur a été enregistrée. Nous vous contacterons sous peu."
+            },
+            background_tasks
+        )
+    except Exception as e:
+        logger.error(f"Erreur notification user seller request: {str(e)}")
     
     return {"success": True, "message": "Demande envoyée. Nous vous contacterons par email."}
 
@@ -452,7 +552,11 @@ async def get_seller_articles(
     return articles
 
 @api_router.post("/seller/sales", dependencies=[Depends(require_roles([UserRole.SELLER, UserRole.ADMIN]))])
-async def create_seller_sale(sale_data: SellerSaleCreate, current_user = Depends(get_current_user)):
+async def create_seller_sale(
+    background_tasks: BackgroundTasks,
+    sale_data: SellerSaleCreate,
+    current_user = Depends(get_current_user)
+):
     user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0})
     article = await db.articles.find_one({"id": sale_data.article_id}, {"_id": 0})
     
@@ -490,6 +594,27 @@ async def create_seller_sale(sale_data: SellerSaleCreate, current_user = Depends
         {"id": sale_data.article_id},
         {"$set": {"stock": new_stock}}
     )
+    
+    # Notification admin : nouvelle vente à valider
+    try:
+        await notify_admin(
+            db,
+            EventType.ADMIN_NEW_SALE,
+            {
+                "title": "Nouvelle vente à valider",
+                "message": f"Une nouvelle vente nécessite votre validation.",
+                "article_name": article["name"],
+                "sale_price": sale_data.sale_price,
+                "profit": profit,
+                "seller_name": f"{user_doc.get('first_name', '')} {user_doc.get('last_name', '')}",
+                "seller_email": user_doc["email"],
+                "sale_id": sale_id,
+                "details": f"<table class='details-table'><tr><td>Article</td><td>{article['name']}</td></tr><tr><td>Prix de vente</td><td>{sale_data.sale_price}€</td></tr><tr><td>Profit</td><td>{profit}€</td></tr><tr><td>Vendeur</td><td>{user_doc.get('first_name', '')} {user_doc.get('last_name', '')} ({user_doc['email']})</td></tr></table>"
+            },
+            background_tasks
+        )
+    except Exception as e:
+        logger.error(f"Erreur notification admin sale: {str(e)}")
     
     return {"success": True, "message": "Vente enregistrée. Elle sera validée par DownPricer.", "sale": SellerSale(**sale_doc)}
 
@@ -760,7 +885,11 @@ async def admin_mark_shipped(sale_id: str, data: dict):
 # ===== MINI-SITES ROUTES =====
 
 @api_router.post("/minisites", dependencies=[Depends(require_roles([UserRole.CLIENT, UserRole.ADMIN]))])
-async def create_minisite(site_data: MiniSiteCreate, current_user = Depends(get_current_user)):
+async def create_minisite(
+    background_tasks: BackgroundTasks,
+    site_data: MiniSiteCreate,
+    current_user = Depends(get_current_user)
+):
     
     user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0})
     
@@ -807,6 +936,44 @@ async def create_minisite(site_data: MiniSiteCreate, current_user = Depends(get_
     if site_data.plan_id not in roles:
         roles.append(site_data.plan_id)
         await db.users.update_one({"id": user_doc["id"]}, {"$set": {"roles": roles}})
+    
+    # Notification admin : nouveau mini-site
+    try:
+        await notify_admin(
+            db,
+            EventType.ADMIN_NEW_MINISITE,
+            {
+                "title": "Nouveau mini-site créé",
+                "message": f"Un nouveau mini-site a été créé.",
+                "site_name": site_data.site_name,
+                "slug": site_data.slug,
+                "user_email": user_doc["email"],
+                "plan_id": site_data.plan_id,
+                "site_id": site_id,
+                "details": f"<table class='details-table'><tr><td>Nom du site</td><td>{site_data.site_name}</td></tr><tr><td>Slug</td><td>{site_data.slug}</td></tr><tr><td>Plan</td><td>{site_data.plan_id}</td></tr><tr><td>Utilisateur</td><td>{user_doc['email']}</td></tr></table>"
+            },
+            background_tasks
+        )
+    except Exception as e:
+        logger.error(f"Erreur notification admin minisite: {str(e)}")
+    
+    # Notification user : mini-site créé
+    try:
+        await notify_user(
+            db,
+            EventType.USER_MINISITE_CREATED,
+            user_doc["email"],
+            {
+                "title": "Votre mini-site a été créé",
+                "message": f"Félicitations ! Votre mini-site '{site_data.site_name}' est maintenant en ligne.",
+                "site_name": site_data.site_name,
+                "slug": site_data.slug,
+                "plan_id": site_data.plan_id
+            },
+            background_tasks
+        )
+    except Exception as e:
+        logger.error(f"Erreur notification user minisite: {str(e)}")
     
     return {"success": True, "minisite": MiniSite(**site_doc)}
 

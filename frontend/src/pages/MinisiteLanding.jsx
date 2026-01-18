@@ -151,7 +151,7 @@ export const MinisiteLanding = () => {
           <Card className="bg-zinc-900 border-zinc-800">
             <CardContent className="p-6 text-center">
               <Zap className="h-12 w-12 text-orange-500 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Ultra rapide</h3>
+              <h3 className="text-xl font-semibold mb-2 text-white">Ultra rapide</h3>
               <p className="text-zinc-400 text-sm">
                 Page optimisée mobile-first. Images compressées, chargement instantané.
               </p>
@@ -161,7 +161,7 @@ export const MinisiteLanding = () => {
           <Card className="bg-zinc-900 border-zinc-800">
             <CardContent className="p-6 text-center">
               <TrendingUp className="h-12 w-12 text-green-500 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Visibilité boostée</h3>
+              <h3 className="text-xl font-semibold mb-2 text-white">Visibilité boostée</h3>
               <p className="text-zinc-400 text-sm">
                 Vos articles apparaissent dans le catalogue public DownPricer.
               </p>
@@ -171,7 +171,7 @@ export const MinisiteLanding = () => {
           <Card className="bg-zinc-900 border-zinc-800">
             <CardContent className="p-6 text-center">
               <Users className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Catalogue revendeurs</h3>
+              <h3 className="text-xl font-semibold mb-2 text-white">Catalogue revendeurs</h3>
               <p className="text-zinc-400 text-sm">
                 Plans Standard/Premium : affichez vos articles aux autres revendeurs.
               </p>

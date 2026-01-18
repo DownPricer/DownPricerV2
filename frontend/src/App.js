@@ -338,6 +338,7 @@ import { getUser } from './utils/auth';
 import { Home } from './pages/Home';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
+import { CGU } from './pages/CGU';
 import { ArticleDetail } from './pages/ArticleDetail';
 import { FaireDemande } from './pages/FaireDemande';
 import { DevenirVendeur } from './pages/DevenirVendeur';
@@ -404,6 +405,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/cgu" element={<CGU />} />
           <Route path="/article/:id" element={<ArticleDetail />} />
           <Route path="/faire-demande" element={<FaireDemande />} />
           <Route path="/devenir-vendeur" element={<DevenirVendeur />} />
