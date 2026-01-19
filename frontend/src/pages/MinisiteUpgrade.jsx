@@ -264,6 +264,7 @@ export const MinisiteUpgrade = () => {
   const [upgrading, setUpgrading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [billingMode, setBillingMode] = useState('FREE_TEST');
+  const [paymentsEnabled, setPaymentsEnabled] = useState(false);
 
   // --- Configuration des Plans ---
   const PLANS = [
@@ -321,7 +322,7 @@ export const MinisiteUpgrade = () => {
       try {
         const [planRes, settingsRes] = await Promise.all([
           api.get('/minisites/my').catch(() => null), // Ignore error if no site
-          api.get('/settings').catch(() => ({ data: {} }))
+          api.get('/settings/public').catch(() => ({ data: {} }))
         ]);
 
         if (!planRes) {
@@ -333,6 +334,7 @@ export const MinisiteUpgrade = () => {
         if (settingsRes.data.billing_mode) {
           setBillingMode(settingsRes.data.billing_mode);
         }
+        setPaymentsEnabled(settingsRes.data.payments_enabled || false);
       } catch (e) {
         console.error(e);
       } finally {
@@ -469,7 +471,7 @@ export const MinisiteUpgrade = () => {
                     <Button disabled className="w-full bg-zinc-800 text-zinc-400 border border-zinc-700">
                       <ShieldCheck className="h-4 w-4 mr-2" /> Votre plan actuel
                     </Button>
-                  ) : canUpgrade ? (
+                  ) : canUpgrade && paymentsEnabled ? (
                     <Button 
                       className={`w-full py-6 text-lg font-bold shadow-lg transition-transform active:scale-95 ${
                         plan.popular ? 'bg-blue-600 hover:bg-blue-700' : 
@@ -485,6 +487,11 @@ export const MinisiteUpgrade = () => {
                         <Zap className="h-5 w-5 mr-2 fill-current" />
                       )}
                       Passer au {plan.name}
+                    </Button>
+                  ) : !paymentsEnabled ? (
+                    <Button disabled className="w-full bg-zinc-900 border border-zinc-800 text-zinc-600 cursor-not-allowed">
+                      <X className="h-4 w-4 mr-2" />
+                      Paiements désactivés
                     </Button>
                   ) : (
                     <Button disabled className="w-full bg-zinc-900 border border-zinc-800 text-zinc-600 cursor-not-allowed">

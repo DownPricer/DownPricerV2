@@ -222,12 +222,15 @@ async def upload_image(file: UploadFile = File(...), current_user = Depends(get_
 
 @api_router.get("/settings/public")
 async def get_public_settings():
-    settings_docs = await db.settings.find({"key": {"$in": ["logo_url", "contact_phone", "contact_email", "discord_invite_url", "billing_mode"]}}, {"_id": 0}).to_list(100)
+    settings_docs = await db.settings.find({"key": {"$in": ["logo_url", "contact_phone", "contact_email", "discord_invite_url", "billing_mode", "payments_enabled"]}}, {"_id": 0}).to_list(100)
     
     settings_dict = {s["key"]: s["value"] for s in settings_docs}
     
     if "billing_mode" not in settings_dict:
         settings_dict["billing_mode"] = BillingMode.FREE_TEST
+    
+    if "payments_enabled" not in settings_dict:
+        settings_dict["payments_enabled"] = False
     
     return settings_dict
 
@@ -1330,6 +1333,50 @@ async def update_user_roles(user_id: str, roles: List[str]):
     
     return {"success": True, "message": "Rôles mis à jour"}
 
+@api_router.delete("/admin/users/{user_id}", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
+async def delete_user(user_id: str):
+    """
+    Supprime définitivement un utilisateur et toutes ses données liées (hard delete)
+    """
+    # Vérifier que l'utilisateur existe
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    
+    user_email = user.get("email", "")
+    
+    try:
+        # 1. Supprimer les mini-sites et leurs articles
+        minisites = await db.minisites.find({"user_id": user_id}, {"_id": 0, "id": 1}).to_list(1000)
+        for minisite in minisites:
+            # Supprimer les articles du mini-site
+            await db.minisite_articles.delete_many({"minisite_id": minisite["id"]})
+            # Supprimer le mini-site
+            await db.minisites.delete_one({"id": minisite["id"]})
+        
+        # 2. Supprimer les demandes (client_id)
+        await db.demandes.delete_many({"client_id": user_id})
+        
+        # 3. Supprimer les ventes vendeur (seller_id)
+        await db.seller_sales.delete_many({"seller_id": user_id})
+        
+        # 4. Supprimer les abonnements (subscriptions)
+        await db.subscriptions.delete_many({"user_id": user_id})
+        
+        # 5. Supprimer les demandes vendeur (seller_requests)
+        await db.seller_requests.delete_many({"user_email": user_email})
+        
+        # 6. Supprimer l'utilisateur lui-même
+        await db.users.delete_one({"id": user_id})
+        
+        logger.info(f"✅ Utilisateur {user_id} ({user_email}) supprimé définitivement avec toutes ses données")
+        
+        return {"success": True, "message": f"Utilisateur {user_email} supprimé définitivement"}
+    
+    except Exception as e:
+        logger.error(f"❌ Erreur lors de la suppression de l'utilisateur {user_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la suppression: {str(e)}")
+
 @api_router.get("/admin/settings", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
 async def get_all_settings():
     settings = await db.settings.find({}, {"_id": 0}).to_list(100)
@@ -1552,6 +1599,13 @@ async def create_minisite_checkout(
     """
     Crée une session Stripe Checkout pour un abonnement Mini-site
     """
+    # Vérifier si les paiements sont activés
+    payments_setting = await db.settings.find_one({"key": "payments_enabled"}, {"_id": 0})
+    payments_enabled = payments_setting.get("value", False) if payments_setting else False
+    
+    if not payments_enabled:
+        raise HTTPException(status_code=403, detail="Les paiements sont actuellement désactivés")
+    
     plan = plan_data.get("plan")
     
     if plan not in ["starter", "standard", "premium"]:

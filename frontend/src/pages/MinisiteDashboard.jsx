@@ -703,6 +703,7 @@ export const MinisiteDashboard = () => {
   const [deleting, setDeleting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [supportEmail, setSupportEmail] = useState('support@downpricer.com');
+  const [paymentsEnabled, setPaymentsEnabled] = useState(false);
   
   const [articleForm, setArticleForm] = useState({
     name: '',
@@ -756,11 +757,12 @@ export const MinisiteDashboard = () => {
 
   const fetchSettings = async () => {
     try {
-      const response = await api.get('/settings');
+      const response = await api.get('/settings/public');
       const settings = response.data;
       if (settings.support_email) setSupportEmail(settings.support_email);
       else if (settings.billing_support_email) setSupportEmail(settings.billing_support_email);
       else if (settings.contact_email) setSupportEmail(settings.contact_email);
+      setPaymentsEnabled(settings.payments_enabled || false);
     } catch (error) {
       console.error('Error fetching settings:', error);
     }
@@ -1223,18 +1225,27 @@ export const MinisiteDashboard = () => {
                       ) : (
                         <>
                           <div className="p-4 bg-zinc-950 rounded-lg border border-zinc-800 text-center">
-                            <p className="text-zinc-400 mb-4">Aucun abonnement actif</p>
-                            <div className="flex flex-col gap-2">
-                              <Button size="sm" onClick={() => handleSubscribe('starter')} className="bg-green-600 hover:bg-green-700">
-                                Souscrire Starter (1€/mois)
-                              </Button>
-                              <Button size="sm" onClick={() => handleSubscribe('standard')} className="bg-blue-600 hover:bg-blue-700">
-                                Souscrire Standard (10€/mois)
-                              </Button>
-                              <Button size="sm" onClick={() => handleSubscribe('premium')} className="bg-purple-600 hover:bg-purple-700">
-                                Souscrire Premium (15€/mois)
-                              </Button>
-                            </div>
+                            {paymentsEnabled ? (
+                              <>
+                                <p className="text-zinc-400 mb-4">Aucun abonnement actif</p>
+                                <div className="flex flex-col gap-2">
+                                  <Button size="sm" onClick={() => handleSubscribe('starter')} className="bg-green-600 hover:bg-green-700">
+                                    Souscrire Starter (1€/mois)
+                                  </Button>
+                                  <Button size="sm" onClick={() => handleSubscribe('standard')} className="bg-blue-600 hover:bg-blue-700">
+                                    Souscrire Standard (10€/mois)
+                                  </Button>
+                                  <Button size="sm" onClick={() => handleSubscribe('premium')} className="bg-purple-600 hover:bg-purple-700">
+                                    Souscrire Premium (15€/mois)
+                                  </Button>
+                                </div>
+                              </>
+                            ) : (
+                              <div>
+                                <p className="text-zinc-400 mb-2">Aucun abonnement actif</p>
+                                <p className="text-xs text-orange-500">Les paiements sont actuellement désactivés</p>
+                              </div>
+                            )}
                           </div>
                         </>
                       )}

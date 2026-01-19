@@ -101,6 +101,24 @@ export const AdminParametresPage = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Activer les paiements (Stripe)</Label>
+                      <p className="text-xs text-slate-500">Active ou désactive les boutons de paiement Stripe Checkout sur le site</p>
+                    </div>
+                    <Switch
+                      checked={settings.payments_enabled || false}
+                      onCheckedChange={(checked) => {
+                        setSettings({...settings, payments_enabled: checked});
+                        updateSetting('payments_enabled', checked);
+                      }}
+                    />
+                  </div>
+                  {!settings.payments_enabled && (
+                    <p className="text-xs text-orange-600">Les paiements sont désactivés. Les boutons "S'abonner / Payer" seront masqués.</p>
+                  )}
+                </div>
+                <div className="space-y-2">
                   <Label>Mode de facturation</Label>
                   <Select
                     value={settings.billing_mode || 'FREE_TEST'}

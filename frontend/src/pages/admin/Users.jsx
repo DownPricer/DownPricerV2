@@ -5,8 +5,9 @@ import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Checkbox } from '../../components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
+import { Trash2, AlertTriangle } from 'lucide-react';
 import api from '../../utils/api';
 import { toast } from 'sonner';
 
@@ -28,6 +29,9 @@ export const AdminUsersPage = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [showRolesDialog, setShowRolesDialog] = useState(false);
   const [selectedRoles, setSelectedRoles] = useState([]);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -68,6 +72,32 @@ export const AdminUsersPage = () => {
     }
   };
 
+  const openDeleteDialog = (user) => {
+    setSelectedUser(user);
+    setDeleteConfirmText('');
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteUser = async () => {
+    if (deleteConfirmText !== 'SUPPRIMER') {
+      toast.error('Veuillez taper "SUPPRIMER" pour confirmer');
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await api.delete(`/admin/users/${selectedUser.id}`);
+      toast.success(`Utilisateur ${selectedUser.email} supprimé définitivement`);
+      setShowDeleteDialog(false);
+      setDeleteConfirmText('');
+      fetchUsers();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erreur lors de la suppression');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const filteredUsers = users.filter(u => 
     u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     u.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -104,14 +134,24 @@ export const AdminUsersPage = () => {
                         <p className="font-semibold text-slate-900 text-sm truncate">{user.first_name} {user.last_name}</p>
                         <p className="text-xs text-slate-500 truncate">{user.email}</p>
                       </div>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => openRolesDialog(user)}
-                        className="text-xs flex-shrink-0 ml-2"
-                      >
-                        Rôles
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => openRolesDialog(user)}
+                          className="text-xs flex-shrink-0"
+                        >
+                          Rôles
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => openDeleteDialog(user)}
+                          className="text-xs flex-shrink-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                     <div className="flex gap-1 flex-wrap">
                       {user.roles?.slice(0, 3).map(role => (
@@ -135,14 +175,24 @@ export const AdminUsersPage = () => {
                         ))}
                       </div>
                     </div>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => openRolesDialog(user)}
-                      data-testid={`manage-roles-btn-${user.id}`}
-                    >
-                      Gérer rôles
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => openRolesDialog(user)}
+                        data-testid={`manage-roles-btn-${user.id}`}
+                      >
+                        Gérer rôles
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => openDeleteDialog(user)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -183,6 +233,68 @@ export const AdminUsersPage = () => {
                 Annuler
               </Button>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <AlertTriangle className="h-5 w-5" />
+                Supprimer définitivement un compte
+              </DialogTitle>
+              <DialogDescription>
+                Cette action est irréversible et supprimera toutes les données associées à cet utilisateur.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm font-medium text-red-900 mb-2">
+                  ⚠️ Attention : Action irréversible
+                </p>
+                <p className="text-sm text-red-800 mb-2">
+                  L'utilisateur <strong>{selectedUser?.email}</strong> sera définitivement supprimé ainsi que :
+                </p>
+                <ul className="text-sm text-red-700 space-y-1 list-disc list-inside">
+                  <li>Tous ses mini-sites et articles</li>
+                  <li>Toutes ses demandes</li>
+                  <li>Toutes ses ventes vendeur</li>
+                  <li>Tous ses abonnements</li>
+                  <li>Toutes ses demandes d'accès vendeur</li>
+                </ul>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="delete-confirm" className="text-slate-700">
+                  Tapez <strong className="text-red-600">SUPPRIMER</strong> pour confirmer :
+                </Label>
+                <Input
+                  id="delete-confirm"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="SUPPRIMER"
+                  className="font-mono"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowDeleteDialog(false);
+                  setDeleteConfirmText('');
+                }}
+                disabled={deleting}
+              >
+                Annuler
+              </Button>
+              <Button 
+                onClick={handleDeleteUser}
+                disabled={deleteConfirmText !== 'SUPPRIMER' || deleting}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {deleting ? 'Suppression...' : 'Supprimer définitivement'}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
