@@ -355,21 +355,34 @@ export const MinisiteUpgrade = () => {
       return;
     }
 
+    if (!paymentsEnabled) {
+      toast.error('Les paiements sont actuellement désactivés');
+      return;
+    }
+
     setUpgrading(true);
     setSelectedPlan(planId);
 
     try {
-      if (billingMode === 'FREE_TEST') {
-        // Simulation immédiate
-        await api.post('/minisites/upgrade', { plan_id: planId });
-        toast.success('Félicitations ! Votre plan a été mis à jour.');
-        navigate('/minisite/dashboard');
+      // Mapper les plan IDs vers les noms de plan Stripe
+      const planMapping = {
+        'SITE_PLAN_1': 'starter',
+        'SITE_PLAN_10': 'standard',
+        'SITE_PLAN_15': 'premium'
+      };
+      
+      const stripePlan = planMapping[planId];
+      if (!stripePlan) {
+        toast.error('Plan invalide');
+        return;
+      }
+
+      // Créer une session Stripe Checkout
+      const response = await api.post('/billing/minisite/checkout', { plan: stripePlan });
+      if (response.data.url) {
+        window.location.href = response.data.url;
       } else {
-        // TODO: Intégration Stripe réelle ici
-        toast.info('Redirection vers le paiement sécurisé...');
-        setTimeout(() => {
-          navigate('/minisite/dashboard'); // Stub pour l'instant
-        }, 1500);
+        toast.error('Erreur lors de la création de la session de paiement');
       }
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erreur lors de l'upgrade");
