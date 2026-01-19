@@ -8,27 +8,32 @@ import api from '../../utils/api';
 import { toast } from 'sonner';
 
 export const AdminAbonnementsPage = () => {
+  const [subscriptions, setSubscriptions] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchUsers();
+    fetchData();
   }, []);
 
-  const fetchUsers = async () => {
+  const fetchData = async () => {
     try {
-      const response = await api.get('/admin/users');
-      setUsers(response.data);
+      const [subsResponse, usersResponse] = await Promise.all([
+        api.get('/admin/subscriptions'),
+        api.get('/admin/users')
+      ]);
+      setSubscriptions(subsResponse.data || []);
+      setUsers(usersResponse.data || []);
     } catch (error) {
       toast.error('Erreur lors du chargement');
     }
     setLoading(false);
   };
 
+  const miniSiteSubscriptions = subscriptions.filter(s => s.product === 'minisite');
   const miniSiteUsers = users.filter(u => 
     u.roles.includes('SITE_PLAN_1') || u.roles.includes('SITE_PLAN_10') || u.roles.includes('SITE_PLAN_15')
   );
-
   const sPlanUsers = users.filter(u => 
     u.roles.includes('S_PLAN_5') || u.roles.includes('S_PLAN_15')
   );
@@ -119,27 +124,67 @@ export const AdminAbonnementsPage = () => {
             </TabsList>
 
             <TabsContent value="mini-sites" className="mt-6">
-              {miniSiteUsers.length === 0 ? (
+              {miniSiteSubscriptions.length === 0 ? (
                 <Card>
                   <CardContent className="p-12 text-center">
-                    <p className="text-slate-500">Aucun abonné Mini-site</p>
+                    <p className="text-slate-500">Aucun abonnement Mini-site actif</p>
                   </CardContent>
                 </Card>
               ) : (
                 <div className="space-y-4">
-                  {miniSiteUsers.map((user) => (
-                    <Card key={user.id}>
-                      <CardContent className="p-6">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <h3 className="font-semibold text-lg">{user.first_name} {user.last_name}</h3>
-                            <p className="text-sm text-slate-500">{user.email}</p>
+                  {miniSiteSubscriptions.map((sub) => {
+                    const getStatusBadge = (status) => {
+                      const statusMap = {
+                        active: { className: "bg-green-100 text-green-800", label: "Actif" },
+                        trialing: { className: "bg-blue-100 text-blue-800", label: "Essai" },
+                        canceled: { className: "bg-gray-100 text-gray-800", label: "Annulé" },
+                        past_due: { className: "bg-yellow-100 text-yellow-800", label: "En retard" },
+                        unpaid: { className: "bg-red-100 text-red-800", label: "Impayé" }
+                      };
+                      const config = statusMap[status] || { className: "bg-gray-100 text-gray-800", label: status };
+                      return <Badge className={config.className}>{config.label}</Badge>;
+                    };
+                    
+                    const getPlanLabel = (plan) => {
+                      const planMap = {
+                        starter: "Starter (1€/mois)",
+                        standard: "Standard (10€/mois)",
+                        premium: "Premium (15€/mois)"
+                      };
+                      return planMap[plan] || plan;
+                    };
+                    
+                    const formatDate = (dateStr) => {
+                      if (!dateStr) return "N/A";
+                      return new Date(dateStr).toLocaleDateString('fr-FR');
+                    };
+                    
+                    return (
+                      <Card key={sub.id}>
+                        <CardContent className="p-6">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-lg">{sub.user_name || sub.user_email}</h3>
+                              <p className="text-sm text-slate-500">{sub.user_email}</p>
+                              <div className="mt-2 flex gap-2 flex-wrap">
+                                <Badge className="bg-blue-100 text-blue-800">{getPlanLabel(sub.plan)}</Badge>
+                                {getStatusBadge(sub.status)}
+                              </div>
+                              {sub.current_period_end && (
+                                <p className="text-xs text-slate-400 mt-2">
+                                  Prochaine échéance : {formatDate(sub.current_period_end)}
+                                </p>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm text-slate-500">ID Stripe</p>
+                              <p className="text-xs font-mono text-slate-400">{sub.stripe_subscription_id?.substring(0, 20)}...</p>
+                            </div>
                           </div>
-                          {getPlanBadge(user.roles)}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
             </TabsContent>

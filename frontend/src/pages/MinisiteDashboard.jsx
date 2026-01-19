@@ -691,6 +691,7 @@ export const MinisiteDashboard = () => {
   const [minisite, setMinisite] = useState(null);
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [subscription, setSubscription] = useState(null);
   
   // Modals state
   const [showArticleModal, setShowArticleModal] = useState(false);
@@ -725,6 +726,7 @@ export const MinisiteDashboard = () => {
   useEffect(() => {
     fetchMinisiteData();
     fetchSettings();
+    fetchSubscription();
   }, []);
 
   const fetchMinisiteData = async () => {
@@ -761,6 +763,33 @@ export const MinisiteDashboard = () => {
       else if (settings.contact_email) setSupportEmail(settings.contact_email);
     } catch (error) {
       console.error('Error fetching settings:', error);
+    }
+  };
+
+  const fetchSubscription = async () => {
+    try {
+      const response = await api.get('/billing/subscription');
+      setSubscription(response.data);
+    } catch (error) {
+      console.error('Error fetching subscription:', error);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    try {
+      const response = await api.post('/billing/portal');
+      window.location.href = response.data.url;
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erreur lors de l\'ouverture du portail');
+    }
+  };
+
+  const handleSubscribe = async (plan) => {
+    try {
+      const response = await api.post('/billing/minisite/checkout', { plan });
+      window.location.href = response.data.url;
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erreur lors de la création de la session');
     }
   };
 
@@ -1157,18 +1186,58 @@ export const MinisiteDashboard = () => {
                 <Card className="bg-zinc-900 border-zinc-800">
                    <CardHeader><CardTitle>Abonnement</CardTitle></CardHeader>
                    <CardContent className="space-y-4">
-                      <div className="flex items-center justify-between p-4 bg-zinc-950 rounded-lg border border-zinc-800">
-                         <div>
-                            <p className="font-bold text-white">{getPlanLabel(minisite.plan_id)}</p>
-                            <p className="text-xs text-zinc-500">Renouvellement mensuel</p>
-                         </div>
-                         {minisite.plan_id !== 'SITE_PLAN_15' && (
-                            <Button size="sm" onClick={handleUpgrade} className="bg-purple-600 hover:bg-purple-700">Upgrade</Button>
-                         )}
-                      </div>
-                      <Button variant="ghost" className="w-full text-zinc-400 hover:text-white" onClick={() => setShowCancelModal(true)}>
-                         <Mail className="h-4 w-4 mr-2" /> Demander l'annulation
-                      </Button>
+                      {subscription?.has_subscription ? (
+                        <>
+                          <div className="flex items-center justify-between p-4 bg-zinc-950 rounded-lg border border-zinc-800">
+                             <div>
+                                <p className="font-bold text-white">
+                                  {subscription.plan === 'starter' ? 'Starter (1€/mois)' :
+                                   subscription.plan === 'standard' ? 'Standard (10€/mois)' :
+                                   subscription.plan === 'premium' ? 'Premium (15€/mois)' :
+                                   getPlanLabel(minisite.plan_id)}
+                                </p>
+                                <p className="text-xs text-zinc-500">
+                                  Statut: <span className={subscription.status === 'active' ? 'text-green-400' : subscription.status === 'trialing' ? 'text-blue-400' : 'text-yellow-400'}>
+                                    {subscription.status === 'active' ? 'Actif' :
+                                     subscription.status === 'trialing' ? 'Essai' :
+                                     subscription.status === 'canceled' ? 'Annulé' :
+                                     subscription.status === 'past_due' ? 'En retard' :
+                                     subscription.status}
+                                  </span>
+                                </p>
+                                {subscription.current_period_end && (
+                                  <p className="text-xs text-zinc-500 mt-1">
+                                    Prochaine échéance : {new Date(subscription.current_period_end).toLocaleDateString('fr-FR')}
+                                  </p>
+                                )}
+                             </div>
+                          </div>
+                          <Button 
+                            variant="outline" 
+                            className="w-full border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white" 
+                            onClick={handleManageSubscription}
+                          >
+                            <Settings className="h-4 w-4 mr-2" /> Gérer mon abonnement
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <div className="p-4 bg-zinc-950 rounded-lg border border-zinc-800 text-center">
+                            <p className="text-zinc-400 mb-4">Aucun abonnement actif</p>
+                            <div className="flex flex-col gap-2">
+                              <Button size="sm" onClick={() => handleSubscribe('starter')} className="bg-green-600 hover:bg-green-700">
+                                Souscrire Starter (1€/mois)
+                              </Button>
+                              <Button size="sm" onClick={() => handleSubscribe('standard')} className="bg-blue-600 hover:bg-blue-700">
+                                Souscrire Standard (10€/mois)
+                              </Button>
+                              <Button size="sm" onClick={() => handleSubscribe('premium')} className="bg-purple-600 hover:bg-purple-700">
+                                Souscrire Premium (15€/mois)
+                              </Button>
+                            </div>
+                          </div>
+                        </>
+                      )}
                    </CardContent>
                 </Card>
 

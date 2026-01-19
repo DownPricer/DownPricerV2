@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Body, BackgroundTasks
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Body, BackgroundTasks, Request
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
@@ -24,6 +24,16 @@ from auth import verify_password, get_password_hash, create_access_token
 from dependencies import get_current_user, require_roles
 from billing_provider import get_billing_provider
 from notifications import EventType, notify_admin, notify_user
+from stripe_billing import (
+    create_checkout_session,
+    create_portal_session,
+    handle_checkout_session_completed,
+    handle_subscription_updated,
+    handle_subscription_deleted,
+    handle_invoice_payment_failed,
+    handle_invoice_paid
+)
+import stripe
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -1286,6 +1296,28 @@ async def get_all_users():
     users = await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(1000)
     return users
 
+@api_router.get("/admin/subscriptions", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
+async def get_all_subscriptions():
+    """
+    Récupère tous les abonnements Mini-site depuis la collection subscriptions
+    """
+    subscriptions = await db.subscriptions.find(
+        {"product": "minisite"},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(1000)
+    
+    # Enrichir avec les infos utilisateur
+    for sub in subscriptions:
+        user = await db.users.find_one(
+            {"id": sub.get("user_id")},
+            {"_id": 0, "first_name": 1, "last_name": 1, "email": 1}
+        )
+        if user:
+            sub["user_name"] = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
+            sub["user_email"] = user.get("email", sub.get("user_email", ""))
+    
+    return subscriptions
+
 @api_router.put("/admin/users/{user_id}/roles", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
 async def update_user_roles(user_id: str, roles: List[str]):
     result = await db.users.update_one(
@@ -1509,6 +1541,165 @@ async def get_seller_sale_detail(sale_id: str, current_user = Depends(get_curren
         "sale": sale,
         "article": article
     }
+
+# ===== STRIPE BILLING ENDPOINTS =====
+
+@api_router.post("/billing/minisite/checkout", dependencies=[Depends(get_current_user)])
+async def create_minisite_checkout(
+    plan_data: dict = Body(...),
+    current_user = Depends(get_current_user)
+):
+    """
+    Crée une session Stripe Checkout pour un abonnement Mini-site
+    """
+    plan = plan_data.get("plan")
+    
+    if plan not in ["starter", "standard", "premium"]:
+        raise HTTPException(status_code=400, detail="Plan invalide. Doit être: starter, standard ou premium")
+    
+    user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    
+    result = create_checkout_session(
+        db,
+        user_doc["id"],
+        current_user.email,
+        plan
+    )
+    
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=result.get("error", "Erreur lors de la création de la session"))
+    
+    return {"url": result["url"]}
+
+
+@api_router.get("/billing/subscription", dependencies=[Depends(get_current_user)])
+async def get_my_subscription(
+    current_user = Depends(get_current_user)
+):
+    """
+    Récupère les informations d'abonnement de l'utilisateur connecté
+    """
+    user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    
+    subscription_id = user_doc.get("stripe_subscription_id")
+    if not subscription_id:
+        return {
+            "has_subscription": False,
+            "minisite_active": False
+        }
+    
+    # Récupérer l'abonnement depuis la collection subscriptions
+    subscription = await db.subscriptions.find_one(
+        {"id": subscription_id},
+        {"_id": 0}
+    )
+    
+    if not subscription:
+        return {
+            "has_subscription": False,
+            "minisite_active": user_doc.get("minisite_active", False)
+        }
+    
+    return {
+        "has_subscription": True,
+        "subscription_id": subscription_id,
+        "plan": subscription.get("plan"),
+        "status": subscription.get("status"),
+        "current_period_end": subscription.get("current_period_end"),
+        "minisite_active": user_doc.get("minisite_active", False)
+    }
+
+
+@api_router.post("/billing/portal", dependencies=[Depends(get_current_user)])
+async def create_portal_session(
+    current_user = Depends(get_current_user)
+):
+    """
+    Crée une session Stripe Customer Portal pour gérer l'abonnement
+    """
+    user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    
+    if not user_doc.get("stripe_customer_id"):
+        raise HTTPException(status_code=400, detail="Aucun abonnement actif")
+    
+    result = create_portal_session(db, user_doc["id"])
+    
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=result.get("error", "Erreur lors de la création de la session"))
+    
+    return {"url": result["url"]}
+
+
+@api_router.post("/billing/webhook")
+async def stripe_webhook(request: Request):
+    """
+    Webhook Stripe pour gérer les événements d'abonnement
+    ⚠️ IMPORTANT: Cette route doit être accessible publiquement (pas d'auth)
+    """
+    webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET")
+    
+    if not webhook_secret:
+        logger.error("STRIPE_WEBHOOK_SECRET not configured")
+        raise HTTPException(status_code=500, detail="Webhook secret not configured")
+    
+    # Récupérer le raw body pour vérifier la signature
+    body = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+    
+    if not sig_header:
+        raise HTTPException(status_code=400, detail="Missing stripe-signature header")
+    
+    try:
+        # Vérifier la signature Stripe
+        event = stripe.Webhook.construct_event(
+            body,
+            sig_header,
+            webhook_secret
+        )
+    except ValueError as e:
+        logger.error(f"Invalid payload: {str(e)}")
+        raise HTTPException(status_code=400, detail="Invalid payload")
+    except stripe.error.SignatureVerificationError as e:
+        logger.error(f"Invalid signature: {str(e)}")
+        raise HTTPException(status_code=400, detail="Invalid signature")
+    
+    # Gérer les événements
+    event_type = event.get("type")
+    event_data = event.get("data", {}).get("object", {})
+    
+    try:
+        if event_type == "checkout.session.completed":
+            handle_checkout_session_completed(db, event_data)
+        
+        elif event_type == "customer.subscription.updated":
+            handle_subscription_updated(db, event_data)
+        
+        elif event_type == "customer.subscription.deleted":
+            handle_subscription_deleted(db, event_data)
+        
+        elif event_type == "invoice.payment_failed":
+            handle_invoice_payment_failed(db, event_data)
+        
+        elif event_type == "invoice.paid":
+            handle_invoice_paid(db, event_data)
+        
+        else:
+            logger.info(f"Unhandled event type: {event_type}")
+        
+        return {"received": True}
+        
+    except Exception as e:
+        logger.error(f"Error processing webhook {event_type}: {str(e)}", exc_info=True)
+        # Retourner 200 pour éviter que Stripe réessaie immédiatement
+        # On log l'erreur pour la corriger manuellement
+        return {"received": True, "error": str(e)}
+
 
 app.include_router(api_router)
 
