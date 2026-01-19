@@ -176,9 +176,13 @@ def handle_checkout_session_completed(db, session: Dict[str, Any]) -> None:
         user_id = metadata.get("user_id")
         plan = metadata.get("plan")
         subscription_id = session.get("subscription")
+        session_id = session.get("id")
+        customer_id = session.get("customer")
+        
+        logger.info(f"🛒 Processing checkout.session.completed - Session: {session_id}, User: {user_id}, Plan: {plan}, Subscription: {subscription_id}, Customer: {customer_id}")
         
         if not user_id or not plan or not subscription_id:
-            logger.error(f"Missing data in checkout session: {session.get('id')}")
+            logger.error(f"❌ Missing data in checkout session: {session_id} - user_id={user_id}, plan={plan}, subscription_id={subscription_id}")
             return
         
         # Récupérer la subscription complète depuis Stripe
@@ -247,7 +251,7 @@ def handle_checkout_session_completed(db, session: Dict[str, Any]) -> None:
             upsert=True
         )
         
-        logger.info(f"Processed checkout.session.completed for user {user_id}, subscription {subscription_id}")
+        logger.info(f"✅ Checkout traité avec succès - User: {user_id} ({user.get('email') if user else 'N/A'}), Subscription: {subscription_id}, Plan: {plan}, Status: {subscription.status}")
         
     except Exception as e:
         logger.error(f"Error handling checkout.session.completed: {str(e)}", exc_info=True)
@@ -263,9 +267,12 @@ def handle_subscription_updated(db, subscription: Dict[str, Any]) -> None:
         user_id = metadata.get("user_id")
         plan = metadata.get("plan")
         status = subscription.get("status")
+        customer_id = subscription.get("customer")
+        
+        logger.info(f"🔄 Processing subscription.updated - Subscription: {subscription_id}, User: {user_id}, Plan: {plan}, Status: {status}, Customer: {customer_id}")
         
         if not user_id or not subscription_id:
-            logger.error(f"Missing data in subscription: {subscription_id}")
+            logger.error(f"❌ Missing data in subscription: {subscription_id} - user_id={user_id}")
             return
         
         # Mapper le plan
@@ -323,7 +330,8 @@ def handle_subscription_updated(db, subscription: Dict[str, Any]) -> None:
             {"$set": subscription_doc}
         )
         
-        logger.info(f"Processed subscription.updated for user {user_id}, subscription {subscription_id}, status {status}")
+        user_email = user.get("email") if user else "N/A"
+        logger.info(f"✅ Subscription mise à jour - User: {user_id} ({user_email}), Subscription: {subscription_id}, Plan: {plan}, Status: {status}, Active: {status in ['active', 'trialing']}")
         
     except Exception as e:
         logger.error(f"Error handling subscription.updated: {str(e)}", exc_info=True)
@@ -337,9 +345,12 @@ def handle_subscription_deleted(db, subscription: Dict[str, Any]) -> None:
         subscription_id = subscription.get("id")
         metadata = subscription.get("metadata", {})
         user_id = metadata.get("user_id")
+        customer_id = subscription.get("customer")
+        
+        logger.info(f"🗑️  Processing subscription.deleted - Subscription: {subscription_id}, User: {user_id}, Customer: {customer_id}")
         
         if not user_id or not subscription_id:
-            logger.error(f"Missing data in subscription: {subscription_id}")
+            logger.error(f"❌ Missing data in subscription: {subscription_id} - user_id={user_id}")
             return
         
         # Mettre à jour l'utilisateur
@@ -368,7 +379,8 @@ def handle_subscription_deleted(db, subscription: Dict[str, Any]) -> None:
             }}
         )
         
-        logger.info(f"Processed subscription.deleted for user {user_id}, subscription {subscription_id}")
+        user_email = user.get("email") if user else "N/A"
+        logger.info(f"✅ Subscription annulée - User: {user_id} ({user_email}), Subscription: {subscription_id}")
         
     except Exception as e:
         logger.error(f"Error handling subscription.deleted: {str(e)}", exc_info=True)
@@ -379,8 +391,15 @@ def handle_invoice_payment_failed(db, invoice: Dict[str, Any]) -> None:
     Gère l'événement invoice.payment_failed
     """
     try:
+        invoice_id = invoice.get("id")
         subscription_id = invoice.get("subscription")
+        customer_id = invoice.get("customer")
+        amount = invoice.get("amount_due", 0) / 100
+        
+        logger.info(f"💳 Processing invoice.payment_failed - Invoice: {invoice_id}, Subscription: {subscription_id}, Customer: {customer_id}, Amount: {amount}€")
+        
         if not subscription_id:
+            logger.warning(f"⚠️  No subscription_id in invoice: {invoice_id}")
             return
         
         # Récupérer l'abonnement depuis Stripe pour avoir les metadata
@@ -389,7 +408,7 @@ def handle_invoice_payment_failed(db, invoice: Dict[str, Any]) -> None:
         user_id = metadata.get("user_id")
         
         if not user_id:
-            logger.error(f"No user_id in subscription metadata: {subscription_id}")
+            logger.error(f"❌ No user_id in subscription metadata: {subscription_id}")
             return
         
         # Mettre à jour l'utilisateur
@@ -410,7 +429,9 @@ def handle_invoice_payment_failed(db, invoice: Dict[str, Any]) -> None:
             }}
         )
         
-        logger.info(f"Processed invoice.payment_failed for user {user_id}, subscription {subscription_id}")
+        user = db.users.find_one({"id": user_id}, {"_id": 0, "email": 1})
+        user_email = user.get("email") if user else "N/A"
+        logger.info(f"✅ Paiement échoué traité - User: {user_id} ({user_email}), Subscription: {subscription_id}, Status: {invoice.get('status', 'past_due')}")
         
     except Exception as e:
         logger.error(f"Error handling invoice.payment_failed: {str(e)}", exc_info=True)
@@ -421,8 +442,15 @@ def handle_invoice_paid(db, invoice: Dict[str, Any]) -> None:
     Gère l'événement invoice.paid
     """
     try:
+        invoice_id = invoice.get("id")
         subscription_id = invoice.get("subscription")
+        customer_id = invoice.get("customer")
+        amount = invoice.get("amount_paid", 0) / 100
+        
+        logger.info(f"💳 Processing invoice.paid - Invoice: {invoice_id}, Subscription: {subscription_id}, Customer: {customer_id}, Amount: {amount}€")
+        
         if not subscription_id:
+            logger.warning(f"⚠️  No subscription_id in invoice: {invoice_id}")
             return
         
         # Récupérer l'abonnement depuis Stripe
@@ -431,7 +459,7 @@ def handle_invoice_paid(db, invoice: Dict[str, Any]) -> None:
         user_id = metadata.get("user_id")
         
         if not user_id:
-            logger.error(f"No user_id in subscription metadata: {subscription_id}")
+            logger.error(f"❌ No user_id in subscription metadata: {subscription_id}")
             return
         
         # Mettre à jour l'utilisateur (réactiver l'accès)
@@ -452,7 +480,9 @@ def handle_invoice_paid(db, invoice: Dict[str, Any]) -> None:
             }}
         )
         
-        logger.info(f"Processed invoice.paid for user {user_id}, subscription {subscription_id}")
+        user = db.users.find_one({"id": user_id}, {"_id": 0, "email": 1})
+        user_email = user.get("email") if user else "N/A"
+        logger.info(f"✅ Paiement traité avec succès - User: {user_id} ({user_email}), Subscription: {subscription_id}, Status: {subscription.status}, Active: {subscription.status in ['active', 'trialing']}")
         
     except Exception as e:
         logger.error(f"Error handling invoice.paid: {str(e)}", exc_info=True)

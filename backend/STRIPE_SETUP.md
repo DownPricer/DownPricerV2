@@ -76,14 +76,18 @@ STRIPE_PORTAL_RETURN_URL=http://localhost:3000/minisite/dashboard
 
 1. Dans Stripe Dashboard → **Webhooks**
 2. Cliquer sur **"Add endpoint"**
-3. URL : `https://votre-domaine.com/api/billing/webhook`
-4. Événements à écouter :
-   - `checkout.session.completed`
-   - `customer.subscription.updated`
-   - `customer.subscription.deleted`
-   - `invoice.payment_failed`
-   - `invoice.paid`
-5. Récupérer le **Signing Secret** et l'ajouter dans `.env` du serveur
+3. URL : `http://VOTRE_IP/api/billing/webhook` (ex: `http://51.210.179.212/api/billing/webhook`)
+4. **Événements à activer (MINIMUM requis) :**
+   - ✅ `checkout.session.completed`
+   - ✅ `customer.subscription.updated`
+   - ✅ `customer.subscription.deleted`
+   - ✅ `invoice.paid`
+   - ✅ `invoice.payment_failed`
+   
+   **Note :** `customer.subscription.created` n'est pas nécessaire car `checkout.session.completed` couvre ce cas.
+5. Récupérer le **Signing Secret** (cliquer sur "Reveal") et l'ajouter dans `.env` du serveur comme `STRIPE_WEBHOOK_SECRET`
+
+**⚠️ IMPORTANT :** Utiliser l'IP du VPS, pas `localhost` ni un domaine si vous n'en avez pas configuré.
 
 ---
 

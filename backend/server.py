@@ -1641,64 +1641,104 @@ async def stripe_webhook(request: Request):
     """
     Webhook Stripe pour gérer les événements d'abonnement
     ⚠️ IMPORTANT: Cette route doit être accessible publiquement (pas d'auth)
+    Utilise le RAW BODY pour vérifier la signature Stripe
     """
     webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET")
     
     if not webhook_secret:
-        logger.error("STRIPE_WEBHOOK_SECRET not configured")
+        logger.error("❌ STRIPE_WEBHOOK_SECRET not configured")
         raise HTTPException(status_code=500, detail="Webhook secret not configured")
     
-    # Récupérer le raw body pour vérifier la signature
+    # Récupérer le raw body (IMPORTANT: ne pas parser en JSON avant)
     body = await request.body()
     sig_header = request.headers.get("stripe-signature")
     
+    logger.info(f"📥 Webhook reçu - Headers: stripe-signature={'présent' if sig_header else 'MANQUANT'}, body_size={len(body)} bytes")
+    
     if not sig_header:
+        logger.error("❌ Missing stripe-signature header")
         raise HTTPException(status_code=400, detail="Missing stripe-signature header")
     
     try:
-        # Vérifier la signature Stripe
+        # Vérifier la signature Stripe avec le raw body
         event = stripe.Webhook.construct_event(
             body,
             sig_header,
             webhook_secret
         )
+        logger.info(f"✅ Signature Stripe vérifiée - Event ID: {event.get('id')}")
     except ValueError as e:
-        logger.error(f"Invalid payload: {str(e)}")
+        logger.error(f"❌ Invalid payload: {str(e)}")
         raise HTTPException(status_code=400, detail="Invalid payload")
     except stripe.error.SignatureVerificationError as e:
-        logger.error(f"Invalid signature: {str(e)}")
+        logger.error(f"❌ Invalid signature: {str(e)}")
         raise HTTPException(status_code=400, detail="Invalid signature")
     
-    # Gérer les événements
+    # Extraire les infos de l'événement
     event_type = event.get("type")
+    event_id = event.get("id")
     event_data = event.get("data", {}).get("object", {})
     
+    # Logs détaillés selon le type d'événement
+    if event_type == "checkout.session.completed":
+        customer_id = event_data.get("customer")
+        subscription_id = event_data.get("subscription")
+        metadata = event_data.get("metadata", {})
+        user_id = metadata.get("user_id")
+        plan = metadata.get("plan")
+        logger.info(f"🛒 CHECKOUT SESSION COMPLETED - Event: {event_id}, Customer: {customer_id}, Subscription: {subscription_id}, User: {user_id}, Plan: {plan}")
+    
+    elif event_type in ["customer.subscription.updated", "customer.subscription.deleted"]:
+        subscription_id = event_data.get("id")
+        customer_id = event_data.get("customer")
+        status = event_data.get("status")
+        metadata = event_data.get("metadata", {})
+        user_id = metadata.get("user_id")
+        plan = metadata.get("plan")
+        logger.info(f"🔄 SUBSCRIPTION {event_type.upper().split('.')[-1]} - Event: {event_id}, Subscription: {subscription_id}, Customer: {customer_id}, Status: {status}, User: {user_id}, Plan: {plan}")
+    
+    elif event_type in ["invoice.payment_failed", "invoice.paid"]:
+        invoice_id = event_data.get("id")
+        subscription_id = event_data.get("subscription")
+        customer_id = event_data.get("customer")
+        amount = event_data.get("amount_paid", event_data.get("amount_due", 0)) / 100
+        logger.info(f"💳 INVOICE {event_type.upper().split('.')[-1]} - Event: {event_id}, Invoice: {invoice_id}, Subscription: {subscription_id}, Customer: {customer_id}, Amount: {amount}€")
+    
+    else:
+        logger.info(f"ℹ️  Unhandled event type: {event_type} - Event ID: {event_id}")
+    
+    # Gérer les événements
     try:
         if event_type == "checkout.session.completed":
             handle_checkout_session_completed(db, event_data)
+            logger.info(f"✅ Traitement réussi: checkout.session.completed")
         
         elif event_type == "customer.subscription.updated":
             handle_subscription_updated(db, event_data)
+            logger.info(f"✅ Traitement réussi: customer.subscription.updated")
         
         elif event_type == "customer.subscription.deleted":
             handle_subscription_deleted(db, event_data)
+            logger.info(f"✅ Traitement réussi: customer.subscription.deleted")
         
         elif event_type == "invoice.payment_failed":
             handle_invoice_payment_failed(db, event_data)
+            logger.info(f"✅ Traitement réussi: invoice.payment_failed")
         
         elif event_type == "invoice.paid":
             handle_invoice_paid(db, event_data)
+            logger.info(f"✅ Traitement réussi: invoice.paid")
         
         else:
-            logger.info(f"Unhandled event type: {event_type}")
+            logger.warning(f"⚠️  Event type non géré: {event_type}")
         
-        return {"received": True}
+        return {"received": True, "event_id": event_id, "event_type": event_type}
         
     except Exception as e:
-        logger.error(f"Error processing webhook {event_type}: {str(e)}", exc_info=True)
+        logger.error(f"❌ Erreur lors du traitement du webhook {event_type} (ID: {event_id}): {str(e)}", exc_info=True)
         # Retourner 200 pour éviter que Stripe réessaie immédiatement
         # On log l'erreur pour la corriger manuellement
-        return {"received": True, "error": str(e)}
+        return {"received": True, "error": str(e), "event_id": event_id}
 
 
 app.include_router(api_router)
