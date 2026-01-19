@@ -165,6 +165,24 @@ export const AdminParametresRichesPage = () => {
                 <CardTitle>Tarification et quotas</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="space-y-2 mb-6 pb-6 border-b border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-base font-semibold">Activer les paiements (Stripe)</Label>
+                      <p className="text-xs text-slate-500">Active ou désactive les boutons de paiement Stripe Checkout sur le site</p>
+                    </div>
+                    <Switch
+                      checked={settings.payments_enabled === true || settings.payments_enabled === "true"}
+                      onCheckedChange={(checked) => {
+                        handleChange('payments_enabled', checked);
+                        handleSave('payments_enabled', checked);
+                      }}
+                    />
+                  </div>
+                  {!settings.payments_enabled && (
+                    <p className="text-xs text-orange-600 mt-2">⚠️ Les paiements sont désactivés. Les boutons "S'abonner / Payer" seront masqués sur le site.</p>
+                  )}
+                </div>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Pourcentage d'acompte (%)</Label>
