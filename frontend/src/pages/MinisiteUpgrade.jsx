@@ -253,16 +253,22 @@ import { Header } from '../components/Header';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { Check, Crown, Zap, Star, ArrowLeft, Loader2, ShieldCheck, X } from 'lucide-react';
+import { Check, Crown, Zap, Star, ArrowLeft, Loader2, ShieldCheck, X, CreditCard } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'sonner';
+
+// Logger simple pour le debug
+const logger = {
+  info: (msg, ...args) => console.log('[MinisiteUpgrade]', msg, ...args),
+  error: (msg, ...args) => console.error('[MinisiteUpgrade]', msg, ...args)
+};
 
 export const MinisiteUpgrade = () => {
   const navigate = useNavigate();
   const [currentPlan, setCurrentPlan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [upgrading, setUpgrading] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [selectedPlanId, setSelectedPlanId] = useState(null); // Plan sélectionné pour le paiement
   const [billingMode, setBillingMode] = useState('FREE_TEST');
   const [paymentsEnabled, setPaymentsEnabled] = useState(false);
 
@@ -349,9 +355,25 @@ export const MinisiteUpgrade = () => {
     return order[planId] || 0;
   };
 
-  const handleUpgrade = async (planId) => {
+  const handleSelectPlan = (planId) => {
+    // Vérifier que le plan peut être sélectionné
     if (getPlanOrder(planId) <= getPlanOrder(currentPlan)) {
-      toast.error('Vous ne pouvez pas passer à un plan inférieur ici.');
+      toast.error('Vous ne pouvez pas sélectionner un plan inférieur ou identique à votre plan actuel.');
+      return;
+    }
+
+    if (!paymentsEnabled) {
+      toast.error('Les paiements sont actuellement désactivés');
+      return;
+    }
+
+    // Sélectionner le plan (UI seulement)
+    setSelectedPlanId(planId);
+  };
+
+  const handleStartCheckout = async () => {
+    if (!selectedPlanId) {
+      toast.error('Veuillez sélectionner un plan');
       return;
     }
 
@@ -361,7 +383,6 @@ export const MinisiteUpgrade = () => {
     }
 
     setUpgrading(true);
-    setSelectedPlan(planId);
 
     try {
       // Mapper les plan IDs vers les noms de plan Stripe
@@ -371,24 +392,34 @@ export const MinisiteUpgrade = () => {
         'SITE_PLAN_15': 'premium'
       };
       
-      const stripePlan = planMapping[planId];
+      const stripePlan = planMapping[selectedPlanId];
       if (!stripePlan) {
         toast.error('Plan invalide');
         return;
       }
 
+      logger.info(`Creating checkout session for plan: ${stripePlan}, planId: ${selectedPlanId}`);
+
       // Créer une session Stripe Checkout
       const response = await api.post('/billing/minisite/checkout', { plan: stripePlan });
-      if (response.data.url) {
+      
+      if (response.data && response.data.url) {
+        logger.info(`Checkout session created, redirecting to: ${response.data.url}`);
         window.location.href = response.data.url;
       } else {
-        toast.error('Erreur lors de la création de la session de paiement');
+        toast.error('Erreur : aucune URL de paiement reçue');
+        logger.error('No URL in checkout response:', response.data);
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Erreur lors de l'upgrade");
+      const errorMessage = error.response?.data?.detail || error.message || "Erreur lors de la création de la session de paiement";
+      toast.error(errorMessage);
+      logger.error('Checkout error:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
     } finally {
       setUpgrading(false);
-      setSelectedPlan(null);
     }
   };
 
@@ -440,7 +471,12 @@ export const MinisiteUpgrade = () => {
             return (
               <Card 
                 key={plan.id} 
-                className={`relative flex flex-col h-full border-2 transition-all duration-300 ${plan.popular ? 'scale-105 shadow-2xl shadow-blue-900/20 z-10' : 'hover:border-zinc-600'} ${plan.style.border} ${plan.style.bg}`}
+                onClick={() => !isCurrent && canUpgrade && paymentsEnabled && handleSelectPlan(plan.id)}
+                className={`relative flex flex-col h-full border-2 transition-all duration-300 cursor-pointer ${
+                  plan.popular ? 'scale-105 shadow-2xl shadow-blue-900/20 z-10' : 'hover:border-zinc-600'
+                } ${
+                  selectedPlanId === plan.id ? 'ring-4 ring-orange-500 ring-offset-2 ring-offset-zinc-950' : ''
+                } ${plan.style.border} ${plan.style.bg}`}
               >
                 {/* Badge Populaire */}
                 {plan.popular && (
@@ -452,12 +488,27 @@ export const MinisiteUpgrade = () => {
                 )}
 
                 <CardHeader className="text-center pb-2">
-                  <h3 className="text-lg font-medium text-zinc-300">{plan.name}</h3>
+                  <h3 
+                    className="text-lg font-medium text-zinc-300 cursor-pointer hover:text-white transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isCurrent && canUpgrade && paymentsEnabled) {
+                        handleSelectPlan(plan.id);
+                      }
+                    }}
+                  >
+                    {plan.name}
+                  </h3>
                   <div className="flex items-baseline justify-center mt-2">
                     <span className="text-5xl font-bold text-white">{plan.price}€</span>
                     <span className="text-zinc-500 ml-2">/mois</span>
                   </div>
                   <p className="text-sm text-zinc-400 mt-2">{plan.description}</p>
+                  {selectedPlanId === plan.id && (
+                    <Badge className="mt-2 bg-orange-500 text-white">
+                      <Check className="h-3 w-3 mr-1" /> Sélectionné
+                    </Badge>
+                  )}
                 </CardHeader>
 
                 <CardContent className="flex-1 mt-6">
@@ -481,33 +532,45 @@ export const MinisiteUpgrade = () => {
 
                 <CardFooter className="pt-6">
                   {isCurrent ? (
-                    <Button disabled className="w-full bg-zinc-800 text-zinc-400 border border-zinc-700">
+                    <Button disabled className="w-full bg-zinc-800 text-zinc-400 border border-zinc-700" type="button">
                       <ShieldCheck className="h-4 w-4 mr-2" /> Votre plan actuel
                     </Button>
                   ) : canUpgrade && paymentsEnabled ? (
                     <Button 
-                      className={`w-full py-6 text-lg font-bold shadow-lg transition-transform active:scale-95 ${
-                        plan.popular ? 'bg-blue-600 hover:bg-blue-700' : 
-                        plan.id === 'SITE_PLAN_15' ? 'bg-purple-600 hover:bg-purple-700' : 
-                        'bg-white text-black hover:bg-zinc-200'
+                      type="button"
+                      className={`w-full py-4 text-base font-semibold shadow-lg transition-all ${
+                        selectedPlanId === plan.id 
+                          ? 'bg-orange-600 hover:bg-orange-700 ring-2 ring-orange-400' 
+                          : plan.popular 
+                            ? 'bg-blue-600 hover:bg-blue-700' 
+                            : plan.id === 'SITE_PLAN_15' 
+                              ? 'bg-purple-600 hover:bg-purple-700' 
+                              : 'bg-white text-black hover:bg-zinc-200'
                       }`}
-                      onClick={() => handleUpgrade(plan.id)}
-                      disabled={upgrading}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectPlan(plan.id);
+                      }}
                     >
-                      {upgrading && selectedPlan === plan.id ? (
-                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                      {selectedPlanId === plan.id ? (
+                        <>
+                          <Check className="h-4 w-4 mr-2" />
+                          Plan sélectionné
+                        </>
                       ) : (
-                        <Zap className="h-5 w-5 mr-2 fill-current" />
+                        <>
+                          <Zap className="h-4 w-4 mr-2" />
+                          Choisir {plan.name}
+                        </>
                       )}
-                      Passer au {plan.name}
                     </Button>
                   ) : !paymentsEnabled ? (
-                    <Button disabled className="w-full bg-zinc-900 border border-zinc-800 text-zinc-600 cursor-not-allowed">
+                    <Button disabled type="button" className="w-full bg-zinc-900 border border-zinc-800 text-zinc-600 cursor-not-allowed">
                       <X className="h-4 w-4 mr-2" />
                       Paiements désactivés
                     </Button>
                   ) : (
-                    <Button disabled className="w-full bg-zinc-900 border border-zinc-800 text-zinc-600 cursor-not-allowed">
+                    <Button disabled type="button" className="w-full bg-zinc-900 border border-zinc-800 text-zinc-600 cursor-not-allowed">
                       Non disponible
                     </Button>
                   )}
@@ -516,6 +579,48 @@ export const MinisiteUpgrade = () => {
             );
           })}
         </div>
+
+        {/* Bouton de paiement */}
+        {selectedPlanId && paymentsEnabled && (
+          <div className="max-w-6xl mx-auto mt-8 flex justify-center">
+            <Card className="bg-gradient-to-r from-orange-900/20 to-red-900/20 border-orange-500/50 w-full max-w-md">
+              <CardContent className="p-6">
+                <div className="text-center space-y-4">
+                  <div>
+                    <p className="text-zinc-300 text-sm mb-2">Plan sélectionné :</p>
+                    <p className="text-2xl font-bold text-white">
+                      {PLANS.find(p => p.id === selectedPlanId)?.name || 'Inconnu'}
+                    </p>
+                    <p className="text-zinc-400 text-sm mt-1">
+                      {PLANS.find(p => p.id === selectedPlanId)?.price}€ / mois
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleStartCheckout}
+                    disabled={upgrading || !selectedPlanId}
+                    className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white py-6 text-lg font-bold shadow-lg"
+                  >
+                    {upgrading ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                        Création de la session...
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="h-5 w-5 mr-2" />
+                        Passer au paiement
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-xs text-zinc-500">
+                    Vous serez redirigé vers Stripe pour finaliser votre paiement
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Footer Info */}
         <div className="text-center mt-12 text-zinc-500 text-sm">

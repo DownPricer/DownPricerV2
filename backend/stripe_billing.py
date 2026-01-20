@@ -75,20 +75,43 @@ def create_checkout_session(
     Crée une session Stripe Checkout pour un abonnement
     """
     try:
+        logger.info(f"🔄 create_checkout_session called - User: {user_id}, Email: {user_email}, Plan: {plan}")
+        
         # Vérifier que le plan est valide
         if plan not in PRICE_IDS:
-            raise ValueError(f"Invalid plan: {plan}")
+            error_msg = f"Invalid plan: {plan}. Valid plans: {list(PRICE_IDS.keys())}"
+            logger.error(f"❌ {error_msg}")
+            raise ValueError(error_msg)
         
         price_id = PRICE_IDS[plan]
         if not price_id:
-            raise ValueError(f"Price ID not configured for plan: {plan}")
+            error_msg = f"Price ID not configured for plan: {plan}. Check STRIPE_PRICE_MINISITE_{plan.upper()} env var"
+            logger.error(f"❌ {error_msg}")
+            logger.error(f"Current PRICE_IDS: {PRICE_IDS}")
+            raise ValueError(error_msg)
+        
+        logger.info(f"✅ Plan validated - Plan: {plan}, Price ID: {price_id}")
+        
+        # Vérifier les URLs de redirection
+        if not SUCCESS_URL or not CANCEL_URL:
+            error_msg = "SUCCESS_URL or CANCEL_URL not configured"
+            logger.error(f"❌ {error_msg}")
+            raise ValueError(error_msg)
+        
+        logger.info(f"✅ URLs configured - Success: {SUCCESS_URL[:50]}..., Cancel: {CANCEL_URL[:50]}...")
         
         # Récupérer ou créer le customer Stripe
+        logger.info(f"🔄 Getting/creating Stripe customer - User: {user_id}")
         customer_id = get_stripe_customer_id(db, user_id, user_email)
         if not customer_id:
-            raise Exception("Failed to get/create Stripe customer")
+            error_msg = "Failed to get/create Stripe customer"
+            logger.error(f"❌ {error_msg} - User: {user_id}")
+            raise Exception(error_msg)
+        
+        logger.info(f"✅ Stripe customer ready - Customer ID: {customer_id}")
         
         # Créer la session Checkout
+        logger.info(f"🔄 Creating Stripe checkout session - Customer: {customer_id}, Price: {price_id}")
         session = stripe.checkout.Session.create(
             customer=customer_id,
             payment_method_types=["card"],
@@ -113,7 +136,7 @@ def create_checkout_session(
             }
         )
         
-        logger.info(f"Created checkout session {session.id} for user {user_id}, plan {plan}")
+        logger.info(f"✅ Stripe checkout session created - Session ID: {session.id}, URL: {session.url[:50]}...")
         
         return {
             "success": True,
@@ -121,11 +144,29 @@ def create_checkout_session(
             "session_id": session.id
         }
         
-    except Exception as e:
-        logger.error(f"Error creating checkout session: {str(e)}")
+    except ValueError as e:
+        # Erreurs de validation (plan invalide, config manquante)
+        error_msg = str(e)
+        logger.error(f"❌ Validation error in create_checkout_session: {error_msg}")
         return {
             "success": False,
-            "error": str(e)
+            "error": error_msg
+        }
+    except stripe.error.StripeError as e:
+        # Erreurs Stripe spécifiques
+        error_msg = f"Stripe error: {str(e)}"
+        logger.error(f"❌ Stripe API error in create_checkout_session: {error_msg}")
+        return {
+            "success": False,
+            "error": error_msg
+        }
+    except Exception as e:
+        # Autres erreurs
+        error_msg = f"Unexpected error: {str(e)}"
+        logger.error(f"❌ Unexpected error in create_checkout_session: {error_msg}", exc_info=True)
+        return {
+            "success": False,
+            "error": error_msg
         }
 
 
