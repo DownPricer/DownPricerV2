@@ -1632,14 +1632,9 @@ async def create_minisite_checkout(
     user_id = user_doc.get("id")
     logger.info(f"✅ User found - ID: {user_id}, Email: {current_user.email}")
     
-    # Vérifier que l'utilisateur a un mini-site
-    minisite = await db.minisites.find_one({"user_id": user_id}, {"_id": 0, "id": 1})
-    if not minisite:
-        logger.warning(f"⚠️ No minisite found for user - User ID: {user_id}")
-        raise HTTPException(status_code=404, detail="Aucun mini-site trouvé. Veuillez d'abord créer un mini-site.")
-    
-    minisite_id = minisite.get("id")
-    logger.info(f"✅ Minisite found - ID: {minisite_id}")
+    # Note: On ne vérifie PAS si un mini-site existe déjà
+    # Le mini-site sera créé automatiquement après le paiement réussi via webhook
+    # Cela permet de créer un checkout depuis la landing page
     
     # Vérifier les variables Stripe
     stripe_secret = os.environ.get("STRIPE_SECRET_KEY", "")
@@ -1649,45 +1644,76 @@ async def create_minisite_checkout(
     
     logger.info(f"✅ Stripe secret key present: {stripe_secret[:10]}...")
     
-    # Créer la session checkout
-    try:
-        logger.info(f"🔄 Creating checkout session - User: {user_id}, Plan: {plan}")
-        result = create_checkout_session(
-            db,
-            user_id,
-            current_user.email,
-            plan
-        )
-        
-        if not result.get("success"):
-            error_msg = result.get("error", "Erreur inconnue lors de la création de la session")
-            logger.error(f"❌ Checkout session creation failed - Error: {error_msg}, User: {user_id}, Plan: {plan}")
+        # Créer la session checkout
+        try:
+            logger.info(f"🔄 Creating checkout session - User: {user_id}, Plan: {plan}, Email: {current_user.email}")
             
-            # Analyser l'erreur pour retourner un code approprié
-            if "Price ID not configured" in error_msg or "Invalid plan" in error_msg:
-                raise HTTPException(status_code=400, detail=f"Configuration invalide pour le plan '{plan}'. Veuillez contacter le support.")
-            elif "Failed to get/create Stripe customer" in error_msg:
-                raise HTTPException(status_code=500, detail="Erreur lors de la création du client Stripe. Veuillez réessayer.")
-            else:
-                raise HTTPException(status_code=500, detail=f"Erreur lors de la création de la session: {error_msg}")
+            # Mapper le plan vers le price ID
+            plan_to_price_key = {
+                "starter": "STRIPE_PRICE_MINISITE_STARTER",
+                "standard": "STRIPE_PRICE_MINISITE_STANDARD",
+                "premium": "STRIPE_PRICE_MINISITE_PREMIUM"
+            }
+            price_key = plan_to_price_key.get(plan)
+            price_id_env = os.environ.get(price_key, "") if price_key else ""
+            
+            logger.info(f"📊 Plan mapping - Plan: {plan}, Price Key: {price_key}, Price ID configured: {bool(price_id_env)}")
+            
+            result = await create_checkout_session(
+                db,
+                user_id,
+                current_user.email,
+                plan
+            )
+            
+            if not result.get("success"):
+                error_msg = result.get("error", "Erreur inconnue lors de la création de la session")
+                logger.error(f"❌ Checkout session creation failed - Error: {error_msg}, User: {user_id}, Plan: {plan}")
+                
+                # Analyser l'erreur pour retourner un code approprié
+                if "Price ID not configured" in error_msg or "Invalid plan" in error_msg or "STRIPE_PRICE" in error_msg:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"Configuration invalide pour le plan '{plan}'. Variable d'environnement {price_key} manquante ou vide."
+                    )
+                elif "Failed to get/create Stripe customer" in error_msg or "Stripe customer" in error_msg:
+                    raise HTTPException(
+                        status_code=500, 
+                        detail="Erreur lors de la création du client Stripe. Veuillez réessayer ou contacter le support."
+                    )
+                elif "Validation error" in error_msg or "User" in error_msg and "not found" in error_msg:
+                    raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+                elif "Stripe error" in error_msg or "Stripe API" in error_msg:
+                    # Extraire le message d'erreur Stripe sans exposer les clés
+                    stripe_error = error_msg.replace("Stripe error: ", "").replace("Stripe API error: ", "")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Erreur Stripe: {stripe_error}"
+                    )
+                else:
+                    raise HTTPException(status_code=500, detail=f"Erreur lors de la création de la session: {error_msg}")
         
-        checkout_url = result.get("url")
-        session_id = result.get("session_id")
+            checkout_url = result.get("url")
+            session_id = result.get("session_id")
+            
+            if not checkout_url:
+                logger.error(f"❌ No URL in checkout result - Result: {result}")
+                raise HTTPException(status_code=500, detail="Aucune URL de paiement générée par Stripe")
+            
+            logger.info(f"✅ Checkout session created successfully - Session ID: {session_id}, User: {user_id}, URL: {checkout_url[:50]}...")
+            
+            return {"url": checkout_url, "session_id": session_id}
         
-        if not checkout_url:
-            logger.error(f"❌ No URL in checkout result - Result: {result}")
-            raise HTTPException(status_code=500, detail="Aucune URL de paiement générée")
-        
-        logger.info(f"✅ Checkout session created successfully - Session ID: {session_id}, User: {user_id}")
-        
-        return {"url": checkout_url, "session_id": session_id}
-        
-    except HTTPException:
-        # Re-lancer les HTTPException telles quelles
-        raise
-    except Exception as e:
-        logger.error(f"❌ Unexpected error in checkout endpoint - Error: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
+        except HTTPException:
+            # Re-lancer les HTTPException telles quelles
+            raise
+        except ValueError as e:
+            # Erreurs de validation
+            logger.error(f"❌ Validation error in checkout endpoint: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Erreur de validation: {str(e)}")
+        except Exception as e:
+            logger.error(f"❌ Unexpected error in checkout endpoint - Error: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Erreur serveur inattendue: {str(e)}")
 
 
 @api_router.get("/billing/subscription", dependencies=[Depends(get_current_user)])
@@ -1744,7 +1770,7 @@ async def create_portal_session(
     if not user_doc.get("stripe_customer_id"):
         raise HTTPException(status_code=400, detail="Aucun abonnement actif")
     
-    result = create_portal_session(db, user_doc["id"])
+    result = await create_portal_session(db, user_doc["id"])
     
     if not result.get("success"):
         raise HTTPException(status_code=500, detail=result.get("error", "Erreur lors de la création de la session"))

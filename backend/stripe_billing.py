@@ -27,45 +27,78 @@ CANCEL_URL = os.environ.get("STRIPE_CANCEL_URL", "http://localhost:3000/mon-site
 PORTAL_RETURN_URL = os.environ.get("STRIPE_PORTAL_RETURN_URL", "http://localhost:3000/mon-site")
 
 
-def get_stripe_customer_id(db, user_id: str, user_email: str) -> Optional[str]:
+async def get_stripe_customer_id(db, user_id: str, user_email: str) -> Optional[str]:
     """
     Récupère ou crée un customer Stripe pour un utilisateur
     """
     try:
-        user = db.users.find_one({"id": user_id}, {"_id": 0})
+        logger.info(f"🔄 get_stripe_customer_id - User ID: {user_id}, Email: {user_email}")
+        
+        # Vérifier que Stripe est configuré
+        if not stripe.api_key:
+            error_msg = "STRIPE_SECRET_KEY not configured"
+            logger.error(f"❌ {error_msg}")
+            raise ValueError(error_msg)
+        
+        user = await db.users.find_one({"id": user_id}, {"_id": 0})
         
         if not user:
-            logger.error(f"User {user_id} not found")
-            return None
+            error_msg = f"User {user_id} not found in database"
+            logger.error(f"❌ {error_msg}")
+            raise ValueError(error_msg)
         
         # Si l'utilisateur a déjà un customer_id, le retourner
-        if user.get("stripe_customer_id"):
-            return user["stripe_customer_id"]
+        existing_customer_id = user.get("stripe_customer_id")
+        if existing_customer_id:
+            logger.info(f"✅ Existing Stripe customer found - Customer ID: {existing_customer_id}")
+            return existing_customer_id
         
         # Sinon, créer un nouveau customer Stripe
-        customer = stripe.Customer.create(
-            email=user_email,
-            metadata={
-                "user_id": user_id,
-                "product": "minisite"
-            }
-        )
+        logger.info(f"🔄 Creating new Stripe customer - Email: {user_email}")
+        try:
+            customer = stripe.Customer.create(
+                email=user_email,
+                metadata={
+                    "user_id": user_id,
+                    "product": "minisite"
+                }
+            )
+            logger.info(f"✅ Stripe customer created - Customer ID: {customer.id}")
+        except stripe.error.StripeError as e:
+            error_msg = f"Stripe API error creating customer: {str(e)}"
+            logger.error(f"❌ {error_msg}")
+            raise Exception(error_msg)
         
         # Sauvegarder le customer_id dans la DB
-        db.users.update_one(
-            {"id": user_id},
-            {"$set": {"stripe_customer_id": customer.id}}
-        )
+        try:
+            await db.users.update_one(
+                {"id": user_id},
+                {"$set": {"stripe_customer_id": customer.id}}
+            )
+            logger.info(f"✅ Customer ID saved to database - Customer ID: {customer.id}")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to save customer_id to DB (non-critical): {str(e)}")
+            # On continue quand même car le customer Stripe est créé
         
-        logger.info(f"Created Stripe customer {customer.id} for user {user_id}")
         return customer.id
         
+    except ValueError as e:
+        # Erreurs de validation (user not found, config missing)
+        logger.error(f"❌ Validation error in get_stripe_customer_id: {str(e)}")
+        raise
+    except stripe.error.StripeError as e:
+        # Erreurs Stripe spécifiques
+        error_msg = f"Stripe error: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        raise Exception(error_msg)
     except Exception as e:
-        logger.error(f"Error getting/creating Stripe customer: {str(e)}")
-        return None
+        # Autres erreurs
+        error_msg = f"Unexpected error: {str(e)}"
+        logger.error(f"❌ {error_msg}", exc_info=True)
+        raise Exception(error_msg)
 
 
-def create_checkout_session(
+async def create_checkout_session(
     db,
     user_id: str,
     user_email: str,
@@ -101,10 +134,21 @@ def create_checkout_session(
         logger.info(f"✅ URLs configured - Success: {SUCCESS_URL[:50]}..., Cancel: {CANCEL_URL[:50]}...")
         
         # Récupérer ou créer le customer Stripe
-        logger.info(f"🔄 Getting/creating Stripe customer - User: {user_id}")
-        customer_id = get_stripe_customer_id(db, user_id, user_email)
-        if not customer_id:
-            error_msg = "Failed to get/create Stripe customer"
+        logger.info(f"🔄 Getting/creating Stripe customer - User: {user_id}, Email: {user_email}")
+        try:
+            customer_id = await get_stripe_customer_id(db, user_id, user_email)
+            if not customer_id:
+                error_msg = "Failed to get/create Stripe customer - customer_id is None"
+                logger.error(f"❌ {error_msg} - User: {user_id}")
+                raise Exception(error_msg)
+        except ValueError as e:
+            # Erreur de validation (user not found, config missing)
+            error_msg = f"Validation error: {str(e)}"
+            logger.error(f"❌ {error_msg}")
+            raise ValueError(error_msg)
+        except Exception as e:
+            # Autres erreurs (Stripe API, etc.)
+            error_msg = f"Failed to get/create Stripe customer: {str(e)}"
             logger.error(f"❌ {error_msg} - User: {user_id}")
             raise Exception(error_msg)
         
@@ -170,7 +214,7 @@ def create_checkout_session(
         }
 
 
-def create_portal_session(
+async def create_portal_session(
     db,
     user_id: str
 ) -> Dict[str, Any]:
@@ -178,7 +222,7 @@ def create_portal_session(
     Crée une session Stripe Customer Portal pour gérer l'abonnement
     """
     try:
-        user = db.users.find_one({"id": user_id}, {"_id": 0})
+        user = await db.users.find_one({"id": user_id}, {"_id": 0})
         
         if not user:
             raise ValueError(f"User {user_id} not found")

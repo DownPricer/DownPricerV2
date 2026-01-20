@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { Check, Globe, Zap, TrendingUp, MessageCircle, Users, Loader2 } from 'lucide-react';
+import { Check, Globe, Zap, TrendingUp, MessageCircle, Users, Loader2, CreditCard } from 'lucide-react';
 import { getUser, getToken } from '../utils/auth';
 import api from '../utils/api';
+import { toast } from 'sonner';
 
 export const MinisiteLanding = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [checkingMinisite, setCheckingMinisite] = useState(true);
   const [hasMinisite, setHasMinisite] = useState(false);
+  const [startingCheckout, setStartingCheckout] = useState(false);
 
   useEffect(() => {
     // Vérifier si l'utilisateur a déjà un mini-site
@@ -19,6 +22,13 @@ export const MinisiteLanding = () => {
       const token = getToken();
       if (!token) {
         setCheckingMinisite(false);
+        // Vérifier si autopay est demandé après login
+        const autopay = searchParams.get('autopay');
+        const plan = searchParams.get('plan');
+        if (autopay === '1' && plan) {
+          // Pas connecté mais autopay demandé -> rediriger vers login
+          navigate(`/login?redirect=/minisite?autopay=1&plan=${plan}`);
+        }
         return;
       }
       
@@ -33,14 +43,24 @@ export const MinisiteLanding = () => {
         // Pas de mini-site, afficher la page pricing
       }
       setCheckingMinisite(false);
+
+      // Vérifier si autopay est demandé (après login)
+      const autopay = searchParams.get('autopay');
+      const plan = searchParams.get('plan');
+      if (autopay === '1' && plan && (plan === 'starter' || plan === 'standard' || plan === 'premium')) {
+        // Lancer automatiquement le checkout
+        setTimeout(() => {
+          startCheckout(plan);
+        }, 500);
+      }
     };
     
     checkMinisite();
-  }, [navigate]);
+  }, [navigate, searchParams]);
 
   const plans = [
     {
-      id: 'SITE_PLAN_1',
+      planKey: 'starter',
       name: 'Starter',
       price: '1€',
       period: '/mois',
@@ -57,7 +77,7 @@ export const MinisiteLanding = () => {
       ]
     },
     {
-      id: 'SITE_PLAN_10',
+      planKey: 'standard',
       name: 'Standard',
       price: '10€',
       period: '/mois',
@@ -76,7 +96,7 @@ export const MinisiteLanding = () => {
       ]
     },
     {
-      id: 'SITE_PLAN_15',
+      planKey: 'premium',
       name: 'Premium',
       price: '15€',
       period: '/mois',
@@ -97,11 +117,41 @@ export const MinisiteLanding = () => {
     }
   ];
 
-  const handleSelectPlan = (planId) => {
+  const startCheckout = async (planKey) => {
+    if (!planKey || !['starter', 'standard', 'premium'].includes(planKey)) {
+      toast.error('Plan invalide');
+      return;
+    }
+
+    setStartingCheckout(true);
+    try {
+      console.log(`[MinisiteLanding] Starting checkout for plan: ${planKey}`);
+      const response = await api.post('/billing/minisite/checkout', { plan: planKey });
+      
+      const checkoutUrl = response.data?.url || response.data?.checkout_url;
+      if (checkoutUrl) {
+        console.log(`[MinisiteLanding] Checkout URL received, redirecting...`);
+        window.location.href = checkoutUrl;
+      } else {
+        console.error('[MinisiteLanding] No URL in checkout response:', response.data);
+        toast.error('Erreur : aucune URL de paiement reçue');
+      }
+    } catch (error) {
+      console.error('[MinisiteLanding] Checkout error:', error);
+      const errorMessage = error.response?.data?.detail || error.response?.data?.error || error.message || 'Erreur lors de la création de la session de paiement';
+      toast.error(errorMessage);
+    } finally {
+      setStartingCheckout(false);
+    }
+  };
+
+  const handleSelectPlan = (planKey) => {
     if (!getUser()) {
-      navigate('/login?redirect=/minisite/create&plan=' + planId);
+      // Pas connecté -> rediriger vers login avec autopay
+      navigate(`/login?redirect=/minisite?autopay=1&plan=${planKey}`);
     } else {
-      navigate(`/minisite/create?plan=${planId}`);
+      // Connecté -> lancer directement le checkout
+      startCheckout(planKey);
     }
   };
 
@@ -186,7 +236,7 @@ export const MinisiteLanding = () => {
           <div className="grid md:grid-cols-3 gap-6">
             {plans.map((plan) => (
               <Card 
-                key={plan.id}
+                key={plan.planKey}
                 className={`bg-zinc-900 border-2 relative ${
                   plan.popular ? 'border-blue-500' : 'border-zinc-800'
                 }`}
@@ -219,10 +269,22 @@ export const MinisiteLanding = () => {
                   </ul>
                   
                   <Button
+                    type="button"
                     className={`w-full ${plan.bgClass}`}
-                    onClick={() => handleSelectPlan(plan.id)}
+                    onClick={() => handleSelectPlan(plan.planKey)}
+                    disabled={startingCheckout}
                   >
-                    Choisir {plan.name}
+                    {startingCheckout ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Redirection...
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Choisir {plan.name}
+                      </>
+                    )}
                   </Button>
                 </CardContent>
               </Card>
