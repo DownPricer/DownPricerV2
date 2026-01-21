@@ -163,3 +163,4 @@ STRIPE_CANCEL_URL=https://downpricer.com/minisite?stripe=cancel
 2. Vérifier que les webhooks créent bien le mini-site après paiement
 3. Ajouter des tests unitaires pour `get_stripe_customer_id()` et `create_checkout_session()`
 
+

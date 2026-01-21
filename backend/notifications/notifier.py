@@ -26,6 +26,8 @@ class EventType(str, Enum):
     ADMIN_PAYMENT_PROOF_SUBMITTED = "admin_payment_proof_submitted"
     ADMIN_SHIPMENT_PENDING = "admin_shipment_pending"
     ADMIN_NEW_MINISITE = "admin_new_minisite"
+    ADMIN_DEPOSIT_PAID = "admin_deposit_paid"
+    ADMIN_MINISITE_SUBSCRIPTION = "admin_minisite_subscription"
     
     # User notifications
     USER_REQUEST_RECEIVED = "user_request_received"
@@ -125,6 +127,8 @@ async def notify_admin(
             EventType.ADMIN_PAYMENT_PROOF_SUBMITTED: "admin_generic.html",
             EventType.ADMIN_SHIPMENT_PENDING: "admin_generic.html",
             EventType.ADMIN_NEW_MINISITE: "admin_generic.html",
+            EventType.ADMIN_DEPOSIT_PAID: "admin_generic.html",
+            EventType.ADMIN_MINISITE_SUBSCRIPTION: "admin_generic.html",
         }
         
         template_name = template_map.get(event_type, "admin_generic.html")

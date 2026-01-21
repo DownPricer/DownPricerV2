@@ -15,8 +15,11 @@ class UserRole(str, Enum):
     ADMIN = "ADMIN"
 
 class DemandeStatus(str, Enum):
-    AWAITING_DEPOSIT = "AWAITING_DEPOSIT"
+    ANALYSIS = "ANALYSIS"
+    DEPOSIT_PENDING = "DEPOSIT_PENDING"
     DEPOSIT_PAID = "DEPOSIT_PAID"
+    ANALYSIS_AFTER_DEPOSIT = "ANALYSIS_AFTER_DEPOSIT"
+    AWAITING_DEPOSIT = "AWAITING_DEPOSIT"  # Ancien statut, gardé pour compatibilité
     ACCEPTED = "ACCEPTED"
     IN_ANALYSIS = "IN_ANALYSIS"
     PURCHASE_LAUNCHED = "PURCHASE_LAUNCHED"
@@ -118,6 +121,10 @@ class Demande(BaseModel):
     prefer_hand_delivery: bool = False
     status: DemandeStatus
     payment_type: Optional[str] = None
+    deposit_payment_url: Optional[str] = None
+    deposit_requested_at: Optional[str] = None
+    deposit_paid_at: Optional[str] = None
+    deposit_stripe_session_id: Optional[str] = None
     created_at: str
     can_cancel: bool = True
 

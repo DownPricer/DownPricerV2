@@ -21,10 +21,14 @@ PRICE_IDS = {
     "premium": os.environ.get("STRIPE_PRICE_MINISITE_PREMIUM", ""),
 }
 
-# URLs de redirection
-SUCCESS_URL = os.environ.get("STRIPE_SUCCESS_URL", "http://localhost:3000/mon-site?stripe=success&session_id={CHECKOUT_SESSION_ID}")
-CANCEL_URL = os.environ.get("STRIPE_CANCEL_URL", "http://localhost:3000/mon-site?stripe=cancel")
-PORTAL_RETURN_URL = os.environ.get("STRIPE_PORTAL_RETURN_URL", "http://localhost:3000/mon-site")
+# URLs de redirection - Utiliser https://downpricer.com en production
+BASE_URL = os.environ.get("FRONTEND_URL", os.environ.get("BACKEND_PUBLIC_URL", "https://downpricer.com"))
+if BASE_URL.startswith("http://localhost"):
+    BASE_URL = "https://downpricer.com"  # Forcer https://downpricer.com en production
+
+SUCCESS_URL = os.environ.get("STRIPE_SUCCESS_URL", f"{BASE_URL}/minisite/dashboard?stripe=success&session_id={{CHECKOUT_SESSION_ID}}")
+CANCEL_URL = os.environ.get("STRIPE_CANCEL_URL", f"{BASE_URL}/minisite/dashboard?stripe=cancel")
+PORTAL_RETURN_URL = os.environ.get("STRIPE_PORTAL_RETURN_URL", f"{BASE_URL}/minisite/dashboard")
 
 
 async def get_stripe_customer_id(db, user_id: str, user_email: str) -> Optional[str]:
@@ -255,14 +259,58 @@ async def create_portal_session(
 def handle_checkout_session_completed(db, session: Dict[str, Any]) -> None:
     """
     Gère l'événement checkout.session.completed
+    Supporte à la fois les abonnements minisite et les acomptes de demandes
     """
     try:
         metadata = session.get("metadata", {})
         user_id = metadata.get("user_id")
-        plan = metadata.get("plan")
-        subscription_id = session.get("subscription")
+        payment_type = metadata.get("type")
         session_id = session.get("id")
         customer_id = session.get("customer")
+        
+        # Vérifier si c'est un acompte
+        if payment_type == "deposit":
+            demande_id = metadata.get("demande_id")
+            logger.info(f"💰 Processing deposit payment - Session: {session_id}, Demande: {demande_id}, User: {user_id}")
+            
+            if not demande_id or not user_id:
+                logger.error(f"❌ Missing data in deposit checkout session: {session_id} - demande_id={demande_id}, user_id={user_id}")
+                return
+            
+            # Mettre à jour la demande
+            now = datetime.now(timezone.utc).isoformat()
+            db.demandes.update_one(
+                {"id": demande_id},
+                {"$set": {
+                    "status": "DEPOSIT_PAID",
+                    "deposit_paid_at": now,
+                    "deposit_stripe_session_id": session_id,
+                    "payment_type": "stripe"
+                }}
+            )
+            
+            # Passer automatiquement en ANALYSIS_AFTER_DEPOSIT
+            db.demandes.update_one(
+                {"id": demande_id},
+                {"$set": {"status": "ANALYSIS_AFTER_DEPOSIT"}}
+            )
+            
+            # Récupérer la demande pour les notifications
+            demande = db.demandes.find_one({"id": demande_id}, {"_id": 0})
+            user = db.users.find_one({"id": user_id}, {"_id": 0, "email": 1})
+            
+            if demande and user:
+                logger.info(f"✅ Deposit paid successfully - Demande: {demande_id}, User: {user_id} ({user.get('email', 'N/A')})")
+                
+                # Notification admin sera envoyée via le webhook handler dans server.py
+            else:
+                logger.warning(f"⚠️  Demande or user not found after deposit payment - Demande: {demande_id}, User: {user_id}")
+            
+            return
+        
+        # Sinon, c'est un abonnement minisite (logique existante)
+        plan = metadata.get("plan")
+        subscription_id = session.get("subscription")
         
         logger.info(f"🛒 Processing checkout.session.completed - Session: {session_id}, User: {user_id}, Plan: {plan}, Subscription: {subscription_id}, Customer: {customer_id}")
         
@@ -520,6 +568,93 @@ def handle_invoice_payment_failed(db, invoice: Dict[str, Any]) -> None:
         
     except Exception as e:
         logger.error(f"Error handling invoice.payment_failed: {str(e)}", exc_info=True)
+
+
+async def create_deposit_checkout_session(
+    db,
+    demande_id: str,
+    user_id: str,
+    user_email: str,
+    amount: float
+) -> Dict[str, Any]:
+    """
+    Crée une session Stripe Checkout pour un acompte (paiement unique)
+    """
+    try:
+        logger.info(f"🔄 create_deposit_checkout_session - Demande: {demande_id}, User: {user_id}, Amount: {amount}€")
+        
+        if not stripe.api_key:
+            error_msg = "STRIPE_SECRET_KEY not configured"
+            logger.error(f"❌ {error_msg}")
+            raise ValueError(error_msg)
+        
+        # Récupérer ou créer le customer Stripe
+        customer_id = await get_stripe_customer_id(db, user_id, user_email)
+        if not customer_id:
+            error_msg = "Failed to get/create Stripe customer"
+            logger.error(f"❌ {error_msg}")
+            raise Exception(error_msg)
+        
+        # URLs de redirection pour acompte
+        base_url = os.environ.get("BACKEND_PUBLIC_URL", "https://downpricer.com")
+        success_url = f"{base_url}/demandes/{demande_id}?deposit=success&session_id={{CHECKOUT_SESSION_ID}}"
+        cancel_url = f"{base_url}/demandes/{demande_id}?deposit=cancel"
+        
+        # Créer la session Checkout en mode "payment" (paiement unique)
+        session = stripe.checkout.Session.create(
+            customer=customer_id,
+            payment_method_types=["card"],
+            line_items=[{
+                "price_data": {
+                    "currency": "eur",
+                    "product_data": {
+                        "name": f"Acompte - Demande {demande_id}",
+                        "description": "Acompte pour votre demande DownPricer"
+                    },
+                    "unit_amount": int(amount * 100)  # Convertir en centimes
+                },
+                "quantity": 1
+            }],
+            mode="payment",  # Paiement unique, pas d'abonnement
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={
+                "user_id": user_id,
+                "demande_id": demande_id,
+                "type": "deposit",
+                "amount": str(amount)
+            }
+        )
+        
+        logger.info(f"✅ Deposit checkout session created - Session ID: {session.id}, URL: {session.url[:50]}...")
+        
+        return {
+            "success": True,
+            "url": session.url,
+            "session_id": session.id
+        }
+        
+    except ValueError as e:
+        error_msg = str(e)
+        logger.error(f"❌ Validation error in create_deposit_checkout_session: {error_msg}")
+        return {
+            "success": False,
+            "error": error_msg
+        }
+    except stripe.error.StripeError as e:
+        error_msg = f"Stripe error: {str(e)}"
+        logger.error(f"❌ Stripe API error in create_deposit_checkout_session: {error_msg}")
+        return {
+            "success": False,
+            "error": error_msg
+        }
+    except Exception as e:
+        error_msg = f"Unexpected error: {str(e)}"
+        logger.error(f"❌ Unexpected error in create_deposit_checkout_session: {error_msg}", exc_info=True)
+        return {
+            "success": False,
+            "error": error_msg
+        }
 
 
 def handle_invoice_paid(db, invoice: Dict[str, Any]) -> None:

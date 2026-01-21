@@ -728,7 +728,65 @@ export const MinisiteDashboard = () => {
     fetchMinisiteData();
     fetchSettings();
     fetchSubscription();
+    
+    // Vérifier si on revient d'un paiement Stripe réussi
+    const urlParams = new URLSearchParams(window.location.search);
+    const stripeSuccess = urlParams.get('stripe');
+    const sessionId = urlParams.get('session_id');
+    
+    if (stripeSuccess === 'success' && sessionId) {
+      // Poller pour vérifier l'activation de l'abonnement
+      pollSubscriptionActivation();
+      
+      // Nettoyer l'URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
   }, []);
+  
+  const pollSubscriptionActivation = async (maxAttempts = 20) => {
+    let attempts = 0;
+    const pollInterval = 2000; // 2 secondes
+    
+    const poll = async () => {
+      attempts++;
+      
+      try {
+        // Vérifier l'abonnement
+        const subResponse = await api.get('/billing/subscription');
+        const subscription = subResponse.data;
+        
+        // Vérifier l'utilisateur (rôles)
+        const userResponse = await api.get('/auth/me');
+        const user = userResponse.data;
+        
+        const hasPlanRole = user.roles?.some(role => 
+          ['SITE_PLAN_1', 'SITE_PLAN_10', 'SITE_PLAN_15'].includes(role)
+        );
+        
+        if (subscription?.has_subscription && hasPlanRole) {
+          // Abonnement activé !
+          toast.success('Abonnement activé avec succès !');
+          fetchMinisiteData();
+          fetchSubscription();
+          return;
+        }
+        
+        if (attempts < maxAttempts) {
+          setTimeout(poll, pollInterval);
+        } else {
+          toast.warning('L\'activation prend plus de temps que prévu. Veuillez rafraîchir la page dans quelques instants.');
+        }
+      } catch (error) {
+        console.error('Error polling subscription:', error);
+        if (attempts < maxAttempts) {
+          setTimeout(poll, pollInterval);
+        }
+      }
+    };
+    
+    // Démarrer le polling après un court délai
+    setTimeout(poll, 1000);
+  };
 
   const fetchMinisiteData = async () => {
     try {

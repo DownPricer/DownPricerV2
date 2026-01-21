@@ -312,8 +312,12 @@ async def create_demande(
         "deposit_amount": deposit_amount if billing_mode == BillingMode.STRIPE_PROD else 0,
         "prefer_delivery": demande_data.prefer_delivery,
         "prefer_hand_delivery": demande_data.prefer_hand_delivery,
-        "status": DemandeStatus.AWAITING_DEPOSIT,
+        "status": DemandeStatus.ANALYSIS,
         "payment_type": None,
+        "deposit_payment_url": None,
+        "deposit_requested_at": None,
+        "deposit_paid_at": None,
+        "deposit_stripe_session_id": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "can_cancel": True
     }
@@ -354,7 +358,7 @@ async def create_demande(
                 "demande_name": demande_data.name,
                 "max_price": demande_data.max_price,
                 "deposit_amount": deposit_amount,
-                "status": "AWAITING_DEPOSIT"
+                "status": "ANALYSIS"
             },
             background_tasks
         )
@@ -811,6 +815,104 @@ async def admin_update_demande_status(demande_id: str, data: dict):
         raise HTTPException(status_code=404, detail="Demande non trouvée")
     
     return {"success": True, "message": f"Statut mis à jour: {new_status}"}
+
+@api_router.patch("/admin/demandes/{demande_id}/request-deposit", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
+async def admin_request_deposit(
+    background_tasks: BackgroundTasks,
+    demande_id: str,
+    data: dict = Body(...)
+):
+    """
+    Demande un acompte pour une demande
+    L'admin peut soit fournir un lien Stripe existant, soit générer une nouvelle session checkout
+    """
+    demande = await db.demandes.find_one({"id": demande_id}, {"_id": 0})
+    
+    if not demande:
+        raise HTTPException(status_code=404, detail="Demande non trouvée")
+    
+    if demande["status"] != DemandeStatus.ANALYSIS:
+        raise HTTPException(status_code=400, detail="Seules les demandes en analyse peuvent recevoir une demande d'acompte")
+    
+    deposit_payment_url = data.get("deposit_payment_url", "").strip()
+    generate_stripe_session = data.get("generate_stripe_session", False)
+    
+    if not deposit_payment_url and not generate_stripe_session:
+        raise HTTPException(status_code=400, detail="Soit 'deposit_payment_url' soit 'generate_stripe_session' doit être fourni")
+    
+    # Si on doit générer une session Stripe
+    if generate_stripe_session:
+        from stripe_billing import create_deposit_checkout_session
+        
+        user = await db.users.find_one({"id": demande["client_id"]}, {"_id": 0})
+        if not user:
+            raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+        
+        try:
+            result = await create_deposit_checkout_session(
+                db,
+                demande_id,
+                demande["client_id"],
+                user.get("email", ""),
+                demande["deposit_amount"]
+            )
+            
+            if not result.get("success"):
+                raise HTTPException(status_code=500, detail=result.get("error", "Erreur lors de la création de la session Stripe"))
+            
+            deposit_payment_url = result.get("url")
+            deposit_stripe_session_id = result.get("session_id")
+        except Exception as e:
+            logger.error(f"Erreur création session Stripe pour acompte: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Erreur lors de la création de la session: {str(e)}")
+    else:
+        deposit_stripe_session_id = None
+    
+    # Mettre à jour la demande
+    now = datetime.now(timezone.utc).isoformat()
+    update_data = {
+        "status": DemandeStatus.DEPOSIT_PENDING,
+        "deposit_payment_url": deposit_payment_url,
+        "deposit_requested_at": now
+    }
+    
+    if deposit_stripe_session_id:
+        update_data["deposit_stripe_session_id"] = deposit_stripe_session_id
+    
+    await db.demandes.update_one(
+        {"id": demande_id},
+        {"$set": update_data}
+    )
+    
+    # Envoyer un email au client
+    user = await db.users.find_one({"id": demande["client_id"]}, {"_id": 0})
+    if user:
+        try:
+            await notify_user(
+                db,
+                EventType.USER_PAYMENT_REQUIRED,
+                user["email"],
+                {
+                    "title": "Acompte requis pour votre demande",
+                    "message": f"Un acompte de {demande['deposit_amount']}€ est requis pour votre demande '{demande['name']}'.",
+                    "demande_id": demande_id,
+                    "demande_name": demande["name"],
+                    "deposit_amount": demande["deposit_amount"],
+                    "deposit_payment_url": deposit_payment_url,
+                    "action_button": f'<a href="{deposit_payment_url}" style="display: inline-block; padding: 12px 24px; background-color: #FF5722; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Payer l\'acompte</a>',
+                    "details": f"<p>Veuillez cliquer sur le lien ci-dessous pour procéder au paiement de l'acompte :</p><p><a href='{deposit_payment_url}'>{deposit_payment_url}</a></p>"
+                },
+                background_tasks
+            )
+        except Exception as e:
+            logger.error(f"Erreur notification user acompte: {str(e)}")
+    
+    return {
+        "success": True,
+        "message": "Demande d'acompte envoyée",
+        "deposit_payment_url": deposit_payment_url,
+        "deposit_stripe_session_id": deposit_stripe_session_id
+    }
 
 @api_router.get("/admin/settings", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
 async def admin_get_all_settings():
@@ -1852,7 +1954,67 @@ async def stripe_webhook(request: Request):
     # Gérer les événements
     try:
         if event_type == "checkout.session.completed":
+            metadata = event_data.get("metadata", {})
+            payment_type = metadata.get("type")
+            
             handle_checkout_session_completed(db, event_data)
+            
+            # Notifications selon le type de paiement
+            if payment_type == "deposit":
+                # Notification admin : acompte payé
+                demande_id = metadata.get("demande_id")
+                user_id = metadata.get("user_id")
+                
+                if demande_id and user_id:
+                    demande = await db.demandes.find_one({"id": demande_id}, {"_id": 0})
+                    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+                    
+                    if demande and user:
+                        # Créer une tâche en arrière-plan pour la notification
+                        try:
+                            await notify_admin(
+                                db,
+                                EventType.ADMIN_DEPOSIT_PAID,
+                                {
+                                    "title": "Acompte payé",
+                                    "message": f"L'acompte pour la demande '{demande['name']}' a été payé avec succès.",
+                                    "demande_id": demande_id,
+                                    "demande_name": demande["name"],
+                                    "client_name": f"{user.get('first_name', '')} {user.get('last_name', '')}",
+                                    "client_email": user.get("email", ""),
+                                    "deposit_amount": demande.get("deposit_amount", 0),
+                                    "details": f"<table class='details-table'><tr><td>Demande</td><td>{demande['name']}</td></tr><tr><td>Acompte</td><td>{demande.get('deposit_amount', 0)}€</td></tr><tr><td>Client</td><td>{user.get('first_name', '')} {user.get('last_name', '')} ({user.get('email', '')})</td></tr></table>"
+                                },
+                                BackgroundTasks()
+                            )
+                        except Exception as e:
+                            logger.error(f"Erreur notification admin acompte payé: {str(e)}")
+            elif metadata.get("product") == "minisite":
+                # Notification admin : nouvel abonnement minisite
+                user_id = metadata.get("user_id")
+                plan = metadata.get("plan")
+                
+                if user_id:
+                    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+                    
+                    if user:
+                        try:
+                            await notify_admin(
+                                db,
+                                EventType.ADMIN_MINISITE_SUBSCRIPTION,
+                                {
+                                    "title": "Nouvel abonnement Mini-site",
+                                    "message": f"Un nouvel abonnement Mini-site a été souscrit.",
+                                    "user_name": f"{user.get('first_name', '')} {user.get('last_name', '')}",
+                                    "user_email": user.get("email", ""),
+                                    "plan": plan,
+                                    "details": f"<table class='details-table'><tr><td>Plan</td><td>{plan}</td></tr><tr><td>Utilisateur</td><td>{user.get('first_name', '')} {user.get('last_name', '')} ({user.get('email', '')})</td></tr></table>"
+                                },
+                                BackgroundTasks()
+                            )
+                        except Exception as e:
+                            logger.error(f"Erreur notification admin abonnement minisite: {str(e)}")
+            
             logger.info(f"✅ Traitement réussi: checkout.session.completed")
         
         elif event_type == "customer.subscription.updated":
