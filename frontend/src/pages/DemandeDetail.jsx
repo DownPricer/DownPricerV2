@@ -30,8 +30,11 @@ import { resolveImageUrl } from '../utils/images';
 
 // --- Même configuration que MesDemandes pour la cohérence ---
 const STATUS_CONFIG = {
+  'ANALYSIS': { label: 'En analyse', icon: Clock, className: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20' },
+  'DEPOSIT_PENDING': { label: 'Acompte requis', icon: Wallet, className: 'bg-orange-500/10 text-orange-400 border-orange-500/20' },
+  'DEPOSIT_PAID': { label: 'Acompte payé', icon: CheckCircle, className: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+  'ANALYSIS_AFTER_DEPOSIT': { label: 'En analyse', icon: Search, className: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' },
   'AWAITING_DEPOSIT': { label: 'Acompte requis', icon: Wallet, className: 'bg-orange-500/10 text-orange-400 border-orange-500/20' },
-  'DEPOSIT_PAID': { label: 'Recherche en cours', icon: Search, className: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
   'IN_ANALYSIS': { label: 'En analyse', icon: Clock, className: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20' },
   'PURCHASE_LAUNCHED': { label: 'Achat lancé', icon: Package, className: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
   'PROPOSAL_FOUND': { label: 'Offre trouvée !', icon: CheckCircle, className: 'bg-green-500/10 text-green-400 border-green-500/20' },
@@ -222,9 +225,25 @@ export const DemandeDetail = () => {
                   </div>
                 </div>
 
+                {/* Bouton payer acompte si DEPOSIT_PENDING */}
+                {demande.status === 'DEPOSIT_PENDING' && demande.deposit_payment_url && (
+                  <div className="pt-2 pb-4">
+                    <Button 
+                      onClick={() => window.open(demande.deposit_payment_url, '_blank')}
+                      className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+                    >
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      Payer l'acompte ({demande.deposit_amount}€)
+                    </Button>
+                    <p className="text-xs text-zinc-500 mt-2 text-center">
+                      Cliquez pour ouvrir la page de paiement Stripe dans un nouvel onglet
+                    </p>
+                  </div>
+                )}
+
                 {/* Bouton d'action contextuel (Annulation) */}
                 <div className="pt-2">
-                  {demande.can_cancel && demande.status !== 'CANCELLED' ? (
+                  {demande.can_cancel && demande.status !== 'CANCELLED' && demande.status !== 'DEPOSIT_PENDING' ? (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button 

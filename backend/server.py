@@ -210,9 +210,10 @@ async def upload_image(file: UploadFile = File(...), current_user = Depends(get_
         # Sauvegarder en WebP avec qualité optimisée
         image.save(file_path, "WEBP", quality=75, method=4)
         
-        # Utiliser l'URL publique du backend pour les images accessibles de l'extérieur
-        backend_url = os.environ.get('BACKEND_PUBLIC_URL', os.environ.get('REACT_APP_BACKEND_URL', 'http://localhost:8001'))
-        image_url = f"{backend_url}/api/uploads/{unique_filename}"
+        # Retourner une URL relative (le navigateur résoudra automatiquement)
+        # Nginx servira les fichiers depuis /api/uploads/ via le proxy ou directement
+        # En production, cela évitera les problèmes de certificat SSL avec les IPs
+        image_url = f"/api/uploads/{unique_filename}"
         
         return {"success": True, "url": image_url, "filename": unique_filename}
     
