@@ -256,7 +256,7 @@ async def create_portal_session(
         }
 
 
-def handle_checkout_session_completed(db, session: Dict[str, Any]) -> None:
+async def handle_checkout_session_completed(db, session: Dict[str, Any]) -> None:
     """
     Gère l'événement checkout.session.completed
     Supporte à la fois les abonnements minisite et les acomptes de demandes
@@ -279,7 +279,7 @@ def handle_checkout_session_completed(db, session: Dict[str, Any]) -> None:
             
             # Mettre à jour la demande
             now = datetime.now(timezone.utc).isoformat()
-            db.demandes.update_one(
+            await db.demandes.update_one(
                 {"id": demande_id},
                 {"$set": {
                     "status": "DEPOSIT_PAID",
@@ -290,14 +290,14 @@ def handle_checkout_session_completed(db, session: Dict[str, Any]) -> None:
             )
             
             # Passer automatiquement en ANALYSIS_AFTER_DEPOSIT
-            db.demandes.update_one(
+            await db.demandes.update_one(
                 {"id": demande_id},
                 {"$set": {"status": "ANALYSIS_AFTER_DEPOSIT"}}
             )
             
             # Récupérer la demande pour les notifications
-            demande = db.demandes.find_one({"id": demande_id}, {"_id": 0})
-            user = db.users.find_one({"id": user_id}, {"_id": 0, "email": 1})
+            demande = await db.demandes.find_one({"id": demande_id}, {"_id": 0})
+            user = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1})
             
             if demande and user:
                 logger.info(f"✅ Deposit paid successfully - Demande: {demande_id}, User: {user_id} ({user.get('email', 'N/A')})")
@@ -329,6 +329,16 @@ def handle_checkout_session_completed(db, session: Dict[str, Any]) -> None:
         }
         internal_plan = plan_mapping.get(plan)
         
+        # Récupérer l'utilisateur AVANT de mettre à jour
+        user = await db.users.find_one({"id": user_id}, {"_id": 0})
+        if not user:
+            logger.error(f"❌ User not found: {user_id}")
+            return
+        
+        # Log des rôles avant
+        roles_before = user.get("roles", [])
+        logger.info(f"📊 User roles BEFORE update: {roles_before}")
+        
         # Mettre à jour l'utilisateur
         user_update = {
             "stripe_subscription_id": subscription_id,
@@ -342,23 +352,31 @@ def handle_checkout_session_completed(db, session: Dict[str, Any]) -> None:
         }
         
         # Ajouter le rôle si nécessaire
-        user = db.users.find_one({"id": user_id}, {"_id": 0})
-        if user:
-            roles = user.get("roles", [])
-            if internal_plan and internal_plan not in roles:
-                roles.append(internal_plan)
-                user_update["roles"] = roles
+        roles = roles_before.copy()
+        if internal_plan and internal_plan not in roles:
+            roles.append(internal_plan)
+            user_update["roles"] = roles
+            logger.info(f"➕ Adding role: {internal_plan}")
+        else:
+            logger.info(f"ℹ️  Role {internal_plan} already present or not needed")
         
-        db.users.update_one(
+        # Mettre à jour l'utilisateur
+        result = await db.users.update_one(
             {"id": user_id},
             {"$set": user_update}
         )
+        logger.info(f"📝 User update result - Modified: {result.modified_count}, Matched: {result.matched_count}")
+        
+        # Vérifier les rôles après update
+        user_after = await db.users.find_one({"id": user_id}, {"_id": 0, "roles": 1})
+        roles_after = user_after.get("roles", []) if user_after else []
+        logger.info(f"📊 User roles AFTER update: {roles_after}")
         
         # Créer ou mettre à jour l'abonnement dans la collection subscriptions
         subscription_doc = {
             "id": subscription_id,
             "user_id": user_id,
-            "user_email": user.get("email") if user else "",
+            "user_email": user.get("email", ""),
             "product": "minisite",
             "plan": plan,
             "price_id": subscription.items.data[0].price.id if subscription.items.data else "",
@@ -378,19 +396,21 @@ def handle_checkout_session_completed(db, session: Dict[str, Any]) -> None:
             "updated_at": datetime.now(timezone.utc).isoformat()
         }
         
-        db.subscriptions.update_one(
+        sub_result = await db.subscriptions.update_one(
             {"id": subscription_id},
             {"$set": subscription_doc},
             upsert=True
         )
+        logger.info(f"📝 Subscription update result - Modified: {sub_result.modified_count}, Upserted: {sub_result.upserted_id}")
         
-        logger.info(f"✅ Checkout traité avec succès - User: {user_id} ({user.get('email') if user else 'N/A'}), Subscription: {subscription_id}, Plan: {plan}, Status: {subscription.status}")
+        logger.info(f"✅ Checkout traité avec succès - User: {user_id} ({user.get('email', 'N/A')}), Subscription: {subscription_id}, Plan: {plan}, Status: {subscription.status}, Roles: {roles_after}")
         
     except Exception as e:
-        logger.error(f"Error handling checkout.session.completed: {str(e)}", exc_info=True)
+        logger.error(f"❌ Error handling checkout.session.completed: {str(e)}", exc_info=True)
+        raise  # Re-lancer pour que le webhook router gère l'erreur
 
 
-def handle_subscription_updated(db, subscription: Dict[str, Any]) -> None:
+async def handle_subscription_updated(db, subscription: Dict[str, Any]) -> None:
     """
     Gère l'événement customer.subscription.updated
     """
@@ -416,6 +436,16 @@ def handle_subscription_updated(db, subscription: Dict[str, Any]) -> None:
         }
         internal_plan = plan_mapping.get(plan)
         
+        # Récupérer l'utilisateur AVANT de mettre à jour
+        user = await db.users.find_one({"id": user_id}, {"_id": 0})
+        if not user:
+            logger.error(f"❌ User not found: {user_id}")
+            return
+        
+        # Log des rôles avant
+        roles_before = user.get("roles", [])
+        logger.info(f"📊 User roles BEFORE update: {roles_before}")
+        
         # Mettre à jour l'utilisateur
         user_update = {
             "stripe_subscription_status": status,
@@ -430,20 +460,26 @@ def handle_subscription_updated(db, subscription: Dict[str, Any]) -> None:
             user_update["minisite_plan"] = plan
         
         # Gérer les rôles (upgrade/downgrade)
-        user = db.users.find_one({"id": user_id}, {"_id": 0})
-        if user:
-            roles = user.get("roles", [])
-            # Retirer les anciens rôles de plan
-            roles = [r for r in roles if r not in ["SITE_PLAN_1", "SITE_PLAN_10", "SITE_PLAN_15"]]
-            # Ajouter le nouveau rôle
-            if internal_plan:
-                roles.append(internal_plan)
-            user_update["roles"] = roles
+        roles = roles_before.copy()
+        # Retirer les anciens rôles de plan
+        roles = [r for r in roles if r not in ["SITE_PLAN_1", "SITE_PLAN_10", "SITE_PLAN_15"]]
+        # Ajouter le nouveau rôle
+        if internal_plan:
+            roles.append(internal_plan)
+            logger.info(f"🔄 Updating roles - Removed old plan roles, added: {internal_plan}")
+        user_update["roles"] = roles
         
-        db.users.update_one(
+        # Mettre à jour l'utilisateur
+        result = await db.users.update_one(
             {"id": user_id},
             {"$set": user_update}
         )
+        logger.info(f"📝 User update result - Modified: {result.modified_count}, Matched: {result.matched_count}")
+        
+        # Vérifier les rôles après update
+        user_after = await db.users.find_one({"id": user_id}, {"_id": 0, "roles": 1, "email": 1})
+        roles_after = user_after.get("roles", []) if user_after else []
+        logger.info(f"📊 User roles AFTER update: {roles_after}")
         
         # Mettre à jour l'abonnement dans la collection subscriptions
         subscription_doc = {
@@ -458,19 +494,21 @@ def handle_subscription_updated(db, subscription: Dict[str, Any]) -> None:
         if plan:
             subscription_doc["plan"] = plan
         
-        db.subscriptions.update_one(
+        sub_result = await db.subscriptions.update_one(
             {"id": subscription_id},
             {"$set": subscription_doc}
         )
+        logger.info(f"📝 Subscription update result - Modified: {sub_result.modified_count}")
         
-        user_email = user.get("email") if user else "N/A"
-        logger.info(f"✅ Subscription mise à jour - User: {user_id} ({user_email}), Subscription: {subscription_id}, Plan: {plan}, Status: {status}, Active: {status in ['active', 'trialing']}")
+        user_email = user_after.get("email", "N/A") if user_after else user.get("email", "N/A")
+        logger.info(f"✅ Subscription mise à jour - User: {user_id} ({user_email}), Subscription: {subscription_id}, Plan: {plan}, Status: {status}, Active: {status in ['active', 'trialing']}, Roles: {roles_after}")
         
     except Exception as e:
-        logger.error(f"Error handling subscription.updated: {str(e)}", exc_info=True)
+        logger.error(f"❌ Error handling subscription.updated: {str(e)}", exc_info=True)
+        raise  # Re-lancer pour que le webhook router gère l'erreur
 
 
-def handle_subscription_deleted(db, subscription: Dict[str, Any]) -> None:
+async def handle_subscription_deleted(db, subscription: Dict[str, Any]) -> None:
     """
     Gère l'événement customer.subscription.deleted
     """
@@ -486,40 +524,54 @@ def handle_subscription_deleted(db, subscription: Dict[str, Any]) -> None:
             logger.error(f"❌ Missing data in subscription: {subscription_id} - user_id={user_id}")
             return
         
+        # Récupérer l'utilisateur AVANT de mettre à jour
+        user = await db.users.find_one({"id": user_id}, {"_id": 0})
+        if not user:
+            logger.error(f"❌ User not found: {user_id}")
+            return
+        
+        roles_before = user.get("roles", [])
+        logger.info(f"📊 User roles BEFORE deletion: {roles_before}")
+        
+        # Retirer les rôles de plan
+        roles = [r for r in roles_before if r not in ["SITE_PLAN_1", "SITE_PLAN_10", "SITE_PLAN_15"]]
+        
         # Mettre à jour l'utilisateur
-        user = db.users.find_one({"id": user_id}, {"_id": 0})
-        if user:
-            roles = user.get("roles", [])
-            # Retirer les rôles de plan
-            roles = [r for r in roles if r not in ["SITE_PLAN_1", "SITE_PLAN_10", "SITE_PLAN_15"]]
-            
-            db.users.update_one(
-                {"id": user_id},
-                {"$set": {
-                    "stripe_subscription_status": "canceled",
-                    "minisite_active": False,
-                    "minisite_plan": None,
-                    "roles": roles
-                }}
-            )
+        result = await db.users.update_one(
+            {"id": user_id},
+            {"$set": {
+                "stripe_subscription_status": "canceled",
+                "minisite_active": False,
+                "minisite_plan": None,
+                "roles": roles
+            }}
+        )
+        logger.info(f"📝 User update result - Modified: {result.modified_count}, Matched: {result.matched_count}")
+        
+        # Vérifier les rôles après update
+        user_after = await db.users.find_one({"id": user_id}, {"_id": 0, "roles": 1, "email": 1})
+        roles_after = user_after.get("roles", []) if user_after else []
+        logger.info(f"📊 User roles AFTER deletion: {roles_after}")
         
         # Mettre à jour l'abonnement
-        db.subscriptions.update_one(
+        sub_result = await db.subscriptions.update_one(
             {"id": subscription_id},
             {"$set": {
                 "status": "canceled",
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }}
         )
+        logger.info(f"📝 Subscription update result - Modified: {sub_result.modified_count}")
         
-        user_email = user.get("email") if user else "N/A"
-        logger.info(f"✅ Subscription annulée - User: {user_id} ({user_email}), Subscription: {subscription_id}")
+        user_email = user_after.get("email", "N/A") if user_after else user.get("email", "N/A")
+        logger.info(f"✅ Subscription annulée - User: {user_id} ({user_email}), Subscription: {subscription_id}, Roles: {roles_after}")
         
     except Exception as e:
-        logger.error(f"Error handling subscription.deleted: {str(e)}", exc_info=True)
+        logger.error(f"❌ Error handling subscription.deleted: {str(e)}", exc_info=True)
+        raise  # Re-lancer pour que le webhook router gère l'erreur
 
 
-def handle_invoice_payment_failed(db, invoice: Dict[str, Any]) -> None:
+async def handle_invoice_payment_failed(db, invoice: Dict[str, Any]) -> None:
     """
     Gère l'événement invoice.payment_failed
     """
@@ -532,8 +584,15 @@ def handle_invoice_payment_failed(db, invoice: Dict[str, Any]) -> None:
         logger.info(f"💳 Processing invoice.payment_failed - Invoice: {invoice_id}, Subscription: {subscription_id}, Customer: {customer_id}, Amount: {amount}€")
         
         if not subscription_id:
-            logger.warning(f"⚠️  No subscription_id in invoice: {invoice_id}")
-            return
+            # Essayer de récupérer depuis invoice.lines si disponible
+            lines = invoice.get("lines", {}).get("data", [])
+            if lines and len(lines) > 0:
+                subscription_id = lines[0].get("subscription")
+                logger.info(f"📋 Found subscription_id in invoice.lines: {subscription_id}")
+            
+            if not subscription_id:
+                logger.warning(f"⚠️  No subscription_id in invoice: {invoice_id}")
+                return
         
         # Récupérer l'abonnement depuis Stripe pour avoir les metadata
         subscription = stripe.Subscription.retrieve(subscription_id)
@@ -545,29 +604,32 @@ def handle_invoice_payment_failed(db, invoice: Dict[str, Any]) -> None:
             return
         
         # Mettre à jour l'utilisateur
-        db.users.update_one(
+        result = await db.users.update_one(
             {"id": user_id},
             {"$set": {
                 "stripe_subscription_status": invoice.get("status", "past_due"),
                 "minisite_active": False
             }}
         )
+        logger.info(f"📝 User update result - Modified: {result.modified_count}")
         
         # Mettre à jour l'abonnement
-        db.subscriptions.update_one(
+        sub_result = await db.subscriptions.update_one(
             {"id": subscription_id},
             {"$set": {
                 "status": invoice.get("status", "past_due"),
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }}
         )
+        logger.info(f"📝 Subscription update result - Modified: {sub_result.modified_count}")
         
-        user = db.users.find_one({"id": user_id}, {"_id": 0, "email": 1})
+        user = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1})
         user_email = user.get("email") if user else "N/A"
         logger.info(f"✅ Paiement échoué traité - User: {user_id} ({user_email}), Subscription: {subscription_id}, Status: {invoice.get('status', 'past_due')}")
         
     except Exception as e:
-        logger.error(f"Error handling invoice.payment_failed: {str(e)}", exc_info=True)
+        logger.error(f"❌ Error handling invoice.payment_failed: {str(e)}", exc_info=True)
+        raise  # Re-lancer pour que le webhook router gère l'erreur
 
 
 async def create_deposit_checkout_session(
@@ -657,7 +719,7 @@ async def create_deposit_checkout_session(
         }
 
 
-def handle_invoice_paid(db, invoice: Dict[str, Any]) -> None:
+async def handle_invoice_paid(db, invoice: Dict[str, Any]) -> None:
     """
     Gère l'événement invoice.paid
     """
@@ -670,8 +732,15 @@ def handle_invoice_paid(db, invoice: Dict[str, Any]) -> None:
         logger.info(f"💳 Processing invoice.paid - Invoice: {invoice_id}, Subscription: {subscription_id}, Customer: {customer_id}, Amount: {amount}€")
         
         if not subscription_id:
-            logger.warning(f"⚠️  No subscription_id in invoice: {invoice_id}")
-            return
+            # Essayer de récupérer depuis invoice.lines si disponible
+            lines = invoice.get("lines", {}).get("data", [])
+            if lines and len(lines) > 0:
+                subscription_id = lines[0].get("subscription")
+                logger.info(f"📋 Found subscription_id in invoice.lines: {subscription_id}")
+            
+            if not subscription_id:
+                logger.warning(f"⚠️  No subscription_id in invoice: {invoice_id}")
+                return
         
         # Récupérer l'abonnement depuis Stripe
         subscription = stripe.Subscription.retrieve(subscription_id)
@@ -683,27 +752,30 @@ def handle_invoice_paid(db, invoice: Dict[str, Any]) -> None:
             return
         
         # Mettre à jour l'utilisateur (réactiver l'accès)
-        db.users.update_one(
+        result = await db.users.update_one(
             {"id": user_id},
             {"$set": {
                 "stripe_subscription_status": subscription.status,
                 "minisite_active": subscription.status in ["active", "trialing"]
             }}
         )
+        logger.info(f"📝 User update result - Modified: {result.modified_count}")
         
         # Mettre à jour l'abonnement
-        db.subscriptions.update_one(
+        sub_result = await db.subscriptions.update_one(
             {"id": subscription_id},
             {"$set": {
                 "status": subscription.status,
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }}
         )
+        logger.info(f"📝 Subscription update result - Modified: {sub_result.modified_count}")
         
-        user = db.users.find_one({"id": user_id}, {"_id": 0, "email": 1})
+        user = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1})
         user_email = user.get("email") if user else "N/A"
         logger.info(f"✅ Paiement traité avec succès - User: {user_id} ({user_email}), Subscription: {subscription_id}, Status: {subscription.status}, Active: {subscription.status in ['active', 'trialing']}")
         
     except Exception as e:
-        logger.error(f"Error handling invoice.paid: {str(e)}", exc_info=True)
+        logger.error(f"❌ Error handling invoice.paid: {str(e)}", exc_info=True)
+        raise  # Re-lancer pour que le webhook router gère l'erreur
 

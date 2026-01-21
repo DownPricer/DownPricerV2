@@ -1958,21 +1958,20 @@ async def stripe_webhook(request: Request):
             metadata = event_data.get("metadata", {})
             payment_type = metadata.get("type")
             
-            handle_checkout_session_completed(db, event_data)
+            await handle_checkout_session_completed(db, event_data)
             
-            # Notifications selon le type de paiement
+            # Notifications selon le type de paiement (après traitement réussi)
             if payment_type == "deposit":
                 # Notification admin : acompte payé
                 demande_id = metadata.get("demande_id")
                 user_id = metadata.get("user_id")
                 
                 if demande_id and user_id:
-                    demande = await db.demandes.find_one({"id": demande_id}, {"_id": 0})
-                    user = await db.users.find_one({"id": user_id}, {"_id": 0})
-                    
-                    if demande and user:
-                        # Créer une tâche en arrière-plan pour la notification
-                        try:
+                    try:
+                        demande = await db.demandes.find_one({"id": demande_id}, {"_id": 0})
+                        user = await db.users.find_one({"id": user_id}, {"_id": 0})
+                        
+                        if demande and user:
                             await notify_admin(
                                 db,
                                 EventType.ADMIN_DEPOSIT_PAID,
@@ -1988,18 +1987,18 @@ async def stripe_webhook(request: Request):
                                 },
                                 BackgroundTasks()
                             )
-                        except Exception as e:
-                            logger.error(f"Erreur notification admin acompte payé: {str(e)}")
+                    except Exception as e:
+                        logger.error(f"Erreur notification admin acompte payé: {str(e)}")
             elif metadata.get("product") == "minisite":
                 # Notification admin : nouvel abonnement minisite
                 user_id = metadata.get("user_id")
                 plan = metadata.get("plan")
                 
                 if user_id:
-                    user = await db.users.find_one({"id": user_id}, {"_id": 0})
-                    
-                    if user:
-                        try:
+                    try:
+                        user = await db.users.find_one({"id": user_id}, {"_id": 0})
+                        
+                        if user:
                             await notify_admin(
                                 db,
                                 EventType.ADMIN_MINISITE_SUBSCRIPTION,
@@ -2013,25 +2012,25 @@ async def stripe_webhook(request: Request):
                                 },
                                 BackgroundTasks()
                             )
-                        except Exception as e:
-                            logger.error(f"Erreur notification admin abonnement minisite: {str(e)}")
+                    except Exception as e:
+                        logger.error(f"Erreur notification admin abonnement minisite: {str(e)}")
             
             logger.info(f"✅ Traitement réussi: checkout.session.completed")
         
         elif event_type == "customer.subscription.updated":
-            handle_subscription_updated(db, event_data)
+            await handle_subscription_updated(db, event_data)
             logger.info(f"✅ Traitement réussi: customer.subscription.updated")
         
         elif event_type == "customer.subscription.deleted":
-            handle_subscription_deleted(db, event_data)
+            await handle_subscription_deleted(db, event_data)
             logger.info(f"✅ Traitement réussi: customer.subscription.deleted")
         
         elif event_type == "invoice.payment_failed":
-            handle_invoice_payment_failed(db, event_data)
+            await handle_invoice_payment_failed(db, event_data)
             logger.info(f"✅ Traitement réussi: invoice.payment_failed")
         
         elif event_type == "invoice.paid":
-            handle_invoice_paid(db, event_data)
+            await handle_invoice_paid(db, event_data)
             logger.info(f"✅ Traitement réussi: invoice.paid")
         
         else:
@@ -2039,11 +2038,13 @@ async def stripe_webhook(request: Request):
         
         return {"received": True, "event_id": event_id, "event_type": event_type}
         
+    except HTTPException:
+        # Re-lancer les HTTPException telles quelles
+        raise
     except Exception as e:
         logger.error(f"❌ Erreur lors du traitement du webhook {event_type} (ID: {event_id}): {str(e)}", exc_info=True)
-        # Retourner 200 pour éviter que Stripe réessaie immédiatement
-        # On log l'erreur pour la corriger manuellement
-        return {"received": True, "error": str(e), "event_id": event_id}
+        # Retourner 500 pour que Stripe réessaie
+        raise HTTPException(status_code=500, detail=f"Erreur lors du traitement du webhook: {str(e)}")
 
 
 app.include_router(api_router)
