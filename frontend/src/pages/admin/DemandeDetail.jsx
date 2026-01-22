@@ -91,16 +91,16 @@ export const AdminDemandeDetail = () => {
     }
     setUpdating(true);
     try {
-      await api.put(`/admin/demandes/${id}/status`, { 
-        status: 'CANCELLED',
+      // Utiliser le nouvel endpoint PATCH /admin/demandes/{id}/cancel qui conserve les infos de paiement
+      await api.patch(`/admin/demandes/${id}/cancel`, { 
         reason: cancelReason 
       });
-      toast.success('Demande annulée');
+      toast.success('Demande annulée avec succès');
       setShowCancelModal(false);
       setCancelReason('');
       fetchDemandeDetail();
     } catch (error) {
-      toast.error('Erreur lors de l\'annulation');
+      toast.error(error.response?.data?.detail || 'Erreur lors de l\'annulation');
     }
     setUpdating(false);
   };
@@ -267,6 +267,7 @@ export const AdminDemandeDetail = () => {
                   disabled={updating}
                   variant="outline"
                   className="border-red-300 text-red-600 hover:bg-red-50"
+                  title="Annuler la demande (même après acompte payé)"
                 >
                   <XCircle className="h-4 w-4 mr-1" />
                   Annuler

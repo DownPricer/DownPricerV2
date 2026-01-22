@@ -41,10 +41,30 @@ class EventType(str, Enum):
     USER_MINISITE_CREATED = "user_minisite_created"
 
 
+def get_status_label(status: str) -> str:
+    """Convertit un statut technique en libellé lisible"""
+    status_labels = {
+        "ANALYSIS": "En analyse",
+        "DEPOSIT_PENDING": "En attente d'acompte",
+        "DEPOSIT_PAID": "Acompte payé",
+        "ANALYSIS_AFTER_DEPOSIT": "En analyse (après acompte)",
+        "AWAITING_DEPOSIT": "En attente d'acompte",
+        "ACCEPTED": "Acceptée",
+        "IN_ANALYSIS": "En analyse",
+        "PROPOSAL_FOUND": "Proposition trouvée",
+        "AWAITING_BALANCE": "En attente du solde",
+        "COMPLETED": "Terminée",
+        "CANCELLED": "Annulée",
+        "PURCHASE_LAUNCHED": "Achat lancé"
+    }
+    return status_labels.get(status, status)
+
+
 def render_template(template_name: str, context: Dict[str, Any]) -> str:
     """
     Rend un template HTML avec les variables du contexte
-    Échappe automatiquement les valeurs pour éviter XSS
+    Gère les variables {{ variable }} et les conditions {% if variable %}
+    Échappe automatiquement les valeurs pour éviter XSS (sauf pour HTML déjà formaté)
     """
     template_path = TEMPLATES_DIR / template_name
     
@@ -63,11 +83,39 @@ def render_template(template_name: str, context: Dict[str, Any]) -> str:
         with open(template_path, "r", encoding="utf-8") as f:
             content = f.read()
         
-        # Remplacement simple des variables {{ variable }}
+        # Convertir les statuts en libellés lisibles si nécessaire
+        if "status" in context and isinstance(context["status"], str):
+            context["status_label"] = get_status_label(context["status"])
+        
+        # Gérer les conditions {% if variable %} ... {% endif %}
+        import re
+        if_pattern = r'\{%\s*if\s+(\w+)\s*%\}(.*?)\{%\s*endif\s*%\}'
+        
+        def process_condition(match):
+            var_name = match.group(1)
+            inner_content = match.group(2)
+            var_value = context.get(var_name)
+            
+            # Vérifier si la variable existe et n'est pas vide/False
+            if var_value and str(var_value).strip() and str(var_value).lower() not in ['false', 'none', 'null']:
+                return inner_content
+            return ""
+        
+        content = re.sub(if_pattern, process_condition, content, flags=re.DOTALL)
+        
+        # Remplacement des variables {{ variable }}
+        # Variables qui ne doivent PAS être échappées (déjà du HTML)
+        html_vars = ["details", "action_button", "status_message", "status_box", "footer_message", "reason_message"]
+        
         for key, value in context.items():
-            # Échapper HTML pour éviter XSS
-            if isinstance(value, str):
-                # Échapper les caractères HTML dangereux
+            if value is None:
+                value = ""
+            
+            # Ne pas échapper les variables HTML
+            if key in html_vars and isinstance(value, str):
+                safe_value = value  # HTML déjà formaté
+            elif isinstance(value, str):
+                # Échapper HTML pour éviter XSS (sauf pour HTML déjà formaté)
                 safe_value = (
                     value.replace("&", "&amp;")
                          .replace("<", "&lt;")
@@ -78,12 +126,13 @@ def render_template(template_name: str, context: Dict[str, Any]) -> str:
             else:
                 safe_value = str(value)
             
+            # Remplacer avec et sans espaces
             content = content.replace(f"{{{{ {key} }}}}", safe_value)
-            content = content.replace(f"{{{{{key}}}}}", safe_value)  # Sans espaces aussi
+            content = content.replace(f"{{{{{key}}}}}", safe_value)
         
         return content
     except Exception as e:
-        logger.error(f"Erreur lors du rendu du template {template_name}: {str(e)}")
+        logger.error(f"Erreur lors du rendu du template {template_name}: {str(e)}", exc_info=True)
         return ""
 
 

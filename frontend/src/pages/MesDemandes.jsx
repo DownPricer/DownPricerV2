@@ -199,7 +199,9 @@ export const MesDemandes = () => {
                       Détails
                     </Button>
 
-                    {demande.can_cancel && demande.status !== 'CANCELLED' && (
+                    {demande.status !== 'CANCELLED' && demande.status !== 'COMPLETED' && 
+                     demande.status !== 'PROPOSAL_FOUND' && demande.status !== 'PURCHASE_LAUNCHED' && 
+                     demande.status !== 'AWAITING_BALANCE' && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button

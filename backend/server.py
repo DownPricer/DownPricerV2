@@ -178,6 +178,10 @@ async def get_me(current_user = Depends(get_current_user)):
 
 @api_router.post("/upload/image")
 async def upload_image(file: UploadFile = File(...), current_user = Depends(get_current_user)):
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB max
+    COMPRESSION_THRESHOLD = 1 * 1024 * 1024  # 1MB - déclenche compression
+    TARGET_SIZE = 400 * 1024  # 400KB cible après compression
+    
     try:
         if not file.content_type.startswith("image/"):
             raise HTTPException(status_code=400, detail="Le fichier doit être une image")
@@ -186,12 +190,23 @@ async def upload_image(file: UploadFile = File(...), current_user = Depends(get_
         if file_ext not in ["jpg", "jpeg", "png", "webp", "gif"]:
             raise HTTPException(status_code=400, detail="Format d'image non supporté")
         
+        # Lire le contenu du fichier
+        contents = await file.read()
+        file_size = len(contents)
+        
+        # Vérifier la taille maximale
+        if file_size > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413, 
+                detail=f"Le fichier est trop volumineux. Taille maximale autorisée : 10MB (fichier reçu : {file_size / (1024*1024):.2f}MB)"
+            )
+        
         # Toujours convertir en WebP pour de meilleures performances
         unique_filename = f"{uuid.uuid4()}.webp"
         file_path = UPLOAD_DIR / unique_filename
         
-        contents = await file.read()
         image = Image.open(io.BytesIO(contents))
+        original_size = image.size
         
         # Convertir en RGB si nécessaire (pour les PNG avec alpha)
         if image.mode in ('RGBA', 'P'):
@@ -203,22 +218,72 @@ async def upload_image(file: UploadFile = File(...), current_user = Depends(get_
         elif image.mode != 'RGB':
             image = image.convert('RGB')
         
-        # Redimensionner - max 800px pour une meilleure performance
-        max_size = (800, 800)
-        image.thumbnail(max_size, Image.Resampling.LANCZOS)
+        # Si le fichier dépasse 1MB, appliquer une compression agressive
+        if file_size > COMPRESSION_THRESHOLD:
+            # Calculer un facteur de redimensionnement pour atteindre ~400KB
+            # Estimation: qualité 75 WebP ~= 0.1-0.2 bytes par pixel selon complexité
+            # On vise ~400KB = 400000 bytes, donc ~2-4M pixels max
+            target_pixels = TARGET_SIZE * 8  # Estimation conservatrice
+            current_pixels = image.size[0] * image.size[1]
+            
+            if current_pixels > target_pixels:
+                # Calculer le ratio de redimensionnement
+                scale_factor = (target_pixels / current_pixels) ** 0.5
+                new_size = (int(image.size[0] * scale_factor), int(image.size[1] * scale_factor))
+                # S'assurer que la taille minimale est respectée
+                new_size = (max(new_size[0], 400), max(new_size[1], 400))
+                image = image.resize(new_size, Image.Resampling.LANCZOS)
+                logger.info(f"Image redimensionnée de {original_size} à {new_size} pour compression")
+            
+            # Compression agressive avec qualité ajustée
+            quality = 60  # Qualité réduite pour fichiers > 1MB
+            method = 6  # Méthode de compression maximale
+            
+            # Essayer différentes qualités jusqu'à atteindre ~400KB
+            for attempt_quality in [quality, 50, 40, 30]:
+                temp_buffer = io.BytesIO()
+                image.save(temp_buffer, "WEBP", quality=attempt_quality, method=method)
+                temp_size = temp_buffer.tell()
+                
+                if temp_size <= TARGET_SIZE * 1.2:  # Accepter jusqu'à 480KB
+                    image.save(file_path, "WEBP", quality=attempt_quality, method=method)
+                    logger.info(f"Image compressée à {temp_size / 1024:.2f}KB avec qualité {attempt_quality}")
+                    break
+            else:
+                # Si même avec qualité 30 on dépasse, sauvegarder quand même
+                image.save(file_path, "WEBP", quality=30, method=method)
+                logger.warning(f"Image compressée mais taille finale > 400KB")
+        else:
+            # Fichier < 1MB : compression normale
+            max_size = (800, 800)
+            image.thumbnail(max_size, Image.Resampling.LANCZOS)
+            image.save(file_path, "WEBP", quality=75, method=4)
         
-        # Sauvegarder en WebP avec qualité optimisée
-        image.save(file_path, "WEBP", quality=75, method=4)
+        # Construire l'URL - utiliser le domaine downpricer.com en production
+        base_url_setting = await db.settings.find_one({"key": "base_url"}, {"_id": 0})
+        backend_public_url = os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")
         
-        # Retourner une URL relative (le navigateur résoudra automatiquement)
-        # Nginx servira les fichiers depuis /api/uploads/ via le proxy ou directement
-        # En production, cela évitera les problèmes de certificat SSL avec les IPs
-        image_url = f"/api/uploads/{unique_filename}"
+        if base_url_setting:
+            base_url = base_url_setting.get("value", backend_public_url)
+        else:
+            base_url = backend_public_url
+        
+        # Si base_url contient une IP, utiliser downpricer.com à la place
+        if "51.210" in base_url or "downpricer.com" not in base_url:
+            # En production, utiliser https://downpricer.com
+            image_url = f"https://downpricer.com/api/uploads/{unique_filename}"
+        else:
+            # Utiliser le base_url configuré
+            if base_url.endswith("/"):
+                base_url = base_url[:-1]
+            image_url = f"{base_url}/api/uploads/{unique_filename}"
         
         return {"success": True, "url": image_url, "filename": unique_filename}
     
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Upload error: {str(e)}")
+        logger.error(f"Upload error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erreur lors de l'upload: {str(e)}")
 
 @api_router.get("/settings/public")
@@ -434,7 +499,12 @@ async def get_demande(demande_id: str, current_user = Depends(get_current_user))
     return demande
 
 @api_router.post("/demandes/{demande_id}/cancel", dependencies=[Depends(require_roles([UserRole.CLIENT, UserRole.ADMIN]))])
-async def cancel_demande(demande_id: str, current_user = Depends(get_current_user)):
+async def cancel_demande(
+    demande_id: str, 
+    background_tasks: BackgroundTasks,
+    data: dict = Body(default={}),
+    current_user = Depends(get_current_user)
+):
     demande = await db.demandes.find_one({"id": demande_id}, {"_id": 0})
     
     if not demande:
@@ -446,7 +516,10 @@ async def cancel_demande(demande_id: str, current_user = Depends(get_current_use
     if demande["client_id"] != user_doc["id"] and not is_admin:
         raise HTTPException(status_code=403, detail="Accès interdit")
     
-    # Statuts qui bloquent l'annulation côté client (mais pas admin)
+    if demande["status"] == DemandeStatus.CANCELLED:
+        raise HTTPException(status_code=400, detail="Cette demande est déjà annulée")
+    
+    # Statuts qui bloquent l'annulation côté client uniquement (admin peut toujours annuler)
     blocking_statuses = [
         DemandeStatus.PROPOSAL_FOUND, 
         DemandeStatus.PURCHASE_LAUNCHED, 
@@ -464,25 +537,103 @@ async def cancel_demande(demande_id: str, current_user = Depends(get_current_use
             detail=f"Il n'est pas possible d'annuler cette commande. Veuillez contacter {support_email}"
         )
     
-    if demande["status"] == DemandeStatus.CANCELLED:
-        raise HTTPException(status_code=400, detail="Cette demande est déjà annulée")
+    # Récupérer la raison d'annulation
+    cancel_reason = data.get("reason", "")
     
+    # Conserver les informations de paiement lors de l'annulation
+    update_data = {
+        "status": DemandeStatus.CANCELLED,
+        "can_cancel": False,
+        "cancelled_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Conserver les champs deposit même après annulation
+    if demande.get("deposit_paid_at"):
+        update_data["deposit_paid_at"] = demande["deposit_paid_at"]
+    if demande.get("deposit_stripe_session_id"):
+        update_data["deposit_stripe_session_id"] = demande["deposit_stripe_session_id"]
+    
+    if cancel_reason:
+        update_data["cancellation_reason"] = cancel_reason
+    
+    # Tentative de remboursement si acompte payé (optionnel, ne bloque pas l'annulation)
     billing_mode = await get_billing_mode()
-    
+    refund_status = None
     if demande["status"] == DemandeStatus.DEPOSIT_PAID and billing_mode == BillingMode.STRIPE_PROD:
         provider = get_billing_provider(billing_mode)
         try:
             await provider.refund_deposit(
-                payment_id=demande.get("payment_id", ""),
+                payment_id=demande.get("deposit_stripe_session_id", demande.get("payment_id", "")),
                 amount=demande["deposit_amount"]
             )
+            refund_status = "refunded"
+            logger.info(f"Remboursement réussi pour demande {demande_id}")
         except Exception as e:
-            logger.error(f"Refund error: {str(e)}")
+            logger.error(f"Refund error pour demande {demande_id}: {str(e)}")
+            refund_status = "refund_failed"
+    
+    if refund_status:
+        update_data["refund_status"] = refund_status
     
     await db.demandes.update_one(
         {"id": demande_id},
-        {"$set": {"status": DemandeStatus.CANCELLED, "can_cancel": False}}
+        {"$set": update_data}
     )
+    
+    # Récupérer le client pour les notifications
+    client_doc = await db.users.find_one({"id": demande["client_id"]}, {"_id": 0})
+    client_email = client_doc["email"] if client_doc else None
+    client_name = f"{client_doc.get('first_name', '')} {client_doc.get('last_name', '')}".strip() if client_doc else "Client"
+    
+    # Notification admin : demande annulée
+    try:
+        await notify_admin(
+            db,
+            EventType.ADMIN_NEW_CLIENT_REQUEST,  # Réutiliser le template existant
+            {
+                "title": "Demande annulée",
+                "message": f"La demande '{demande['name']}' a été annulée{' par l\'admin' if is_admin else ' par le client'}.",
+                "demande_id": demande_id,
+                "demande_name": demande["name"],
+                "client_name": client_name,
+                "client_email": client_email or "N/A",
+                "status": "CANCELLED",
+                "cancellation_reason": cancel_reason or "Non spécifiée",
+                "details": f"<table class='details-table'><tr><td>Demande</td><td>{demande['name']}</td></tr><tr><td>Statut</td><td>Annulée</td></tr><tr><td>Raison</td><td>{cancel_reason or 'Non spécifiée'}</td></tr><tr><td>Client</td><td>{client_name}<br><span style='font-size:12px; color:#71717a;'>{client_email or 'N/A'}</span></td></tr></table>"
+            },
+            background_tasks
+        )
+    except Exception as e:
+        logger.error(f"Erreur notification admin annulation: {str(e)}")
+    
+    # Notification client : demande annulée
+    if client_email:
+        try:
+            # Construire le message de statut formaté
+            status_label = "Annulée"
+            status_message = f'<div class="error-box">Votre demande a été annulée.</div>'
+            reason_message = f"Raison : {cancel_reason}" if cancel_reason else None
+            
+            await notify_user(
+                db,
+                EventType.USER_REQUEST_STATUS_CHANGED,
+                client_email,
+                {
+                    "title": "Votre demande a été annulée",
+                    "message": f"Votre demande '{demande['name']}' a été annulée.",
+                    "demande_id": demande_id,
+                    "demande_name": demande["name"],
+                    "status": "CANCELLED",
+                    "status_label": status_label,
+                    "status_message": status_message,
+                    "reason": cancel_reason or "Non spécifiée",
+                    "reason_message": reason_message,
+                    "base_url": base_url_setting.get("value", os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")) if base_url_setting else os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")
+                },
+                background_tasks
+            )
+        except Exception as e:
+            logger.error(f"Erreur notification user annulation: {str(e)}")
     
     return {"success": True, "message": "Demande annulée avec succès"}
 
@@ -788,8 +939,134 @@ async def create_category(category_data: CategoryCreate):
 
 # ===== ROUTES ADMIN MANQUANTES =====
 
+@api_router.patch("/admin/demandes/{demande_id}/cancel", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
+async def admin_cancel_demande(
+    demande_id: str,
+    background_tasks: BackgroundTasks,
+    data: dict = Body(default={})
+):
+    """
+    Endpoint admin spécifique pour annuler une demande même après acompte payé.
+    Conserve toutes les informations de paiement.
+    """
+    demande = await db.demandes.find_one({"id": demande_id}, {"_id": 0})
+    
+    if not demande:
+        raise HTTPException(status_code=404, detail="Demande non trouvée")
+    
+    if demande["status"] == DemandeStatus.CANCELLED:
+        raise HTTPException(status_code=400, detail="Cette demande est déjà annulée")
+    
+    cancel_reason = data.get("reason", "")
+    
+    # Conserver les informations de paiement lors de l'annulation
+    update_data = {
+        "status": DemandeStatus.CANCELLED,
+        "can_cancel": False,
+        "cancelled_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Conserver les champs deposit même après annulation
+    if demande.get("deposit_paid_at"):
+        update_data["deposit_paid_at"] = demande["deposit_paid_at"]
+    if demande.get("deposit_stripe_session_id"):
+        update_data["deposit_stripe_session_id"] = demande["deposit_stripe_session_id"]
+    if demande.get("deposit_requested_at"):
+        update_data["deposit_requested_at"] = demande["deposit_requested_at"]
+    
+    if cancel_reason:
+        update_data["cancellation_reason"] = cancel_reason
+    
+    # Tentative de remboursement si acompte payé (optionnel)
+    billing_mode = await get_billing_mode()
+    refund_status = None
+    if demande["status"] == DemandeStatus.DEPOSIT_PAID and billing_mode == BillingMode.STRIPE_PROD:
+        provider = get_billing_provider(billing_mode)
+        try:
+            await provider.refund_deposit(
+                payment_id=demande.get("deposit_stripe_session_id", demande.get("payment_id", "")),
+                amount=demande["deposit_amount"]
+            )
+            refund_status = "refunded"
+            logger.info(f"Remboursement réussi pour demande {demande_id}")
+        except Exception as e:
+            logger.error(f"Refund error pour demande {demande_id}: {str(e)}")
+            refund_status = "refund_failed"
+    
+    if refund_status:
+        update_data["refund_status"] = refund_status
+    
+    await db.demandes.update_one(
+        {"id": demande_id},
+        {"$set": update_data}
+    )
+    
+    # Récupérer le client pour les notifications
+    client_doc = await db.users.find_one({"id": demande["client_id"]}, {"_id": 0})
+    client_email = client_doc["email"] if client_doc else None
+    client_name = f"{client_doc.get('first_name', '')} {client_doc.get('last_name', '')}".strip() if client_doc else "Client"
+    
+    # Notification admin
+    try:
+        await notify_admin(
+            db,
+            EventType.ADMIN_NEW_CLIENT_REQUEST,
+            {
+                "title": "Demande annulée par l'admin",
+                "message": f"La demande '{demande['name']}' a été annulée par l'admin.",
+                "demande_id": demande_id,
+                "demande_name": demande["name"],
+                "client_name": client_name,
+                "client_email": client_email or "N/A",
+                "status": "CANCELLED",
+                "cancellation_reason": cancel_reason or "Non spécifiée",
+                "details": f"<table class='details-table'><tr><td>Demande</td><td>{demande['name']}</td></tr><tr><td>Statut</td><td>Annulée</td></tr><tr><td>Raison</td><td>{cancel_reason or 'Non spécifiée'}</td></tr><tr><td>Client</td><td>{client_name}<br><span style='font-size:12px; color:#71717a;'>{client_email or 'N/A'}</span></td></tr></table>"
+            },
+            background_tasks
+        )
+    except Exception as e:
+        logger.error(f"Erreur notification admin annulation: {str(e)}")
+    
+    # Notification client
+    if client_email:
+        try:
+            # Construire le message de statut formaté
+            status_label = "Annulée"
+            status_message = f'<div class="error-box">Votre demande a été annulée par l\'administrateur.</div>'
+            reason_message = f"Raison : {cancel_reason}" if cancel_reason else None
+            
+            base_url_setting = await db.settings.find_one({"key": "base_url"}, {"_id": 0})
+            base_url = base_url_setting.get("value", os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")) if base_url_setting else os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")
+            
+            await notify_user(
+                db,
+                EventType.USER_REQUEST_STATUS_CHANGED,
+                client_email,
+                {
+                    "title": "Votre demande a été annulée",
+                    "message": f"Votre demande '{demande['name']}' a été annulée par l'administrateur.",
+                    "demande_id": demande_id,
+                    "demande_name": demande["name"],
+                    "status": "CANCELLED",
+                    "status_label": status_label,
+                    "status_message": status_message,
+                    "reason": cancel_reason or "Non spécifiée",
+                    "reason_message": reason_message,
+                    "base_url": base_url
+                },
+                background_tasks
+            )
+        except Exception as e:
+            logger.error(f"Erreur notification user annulation: {str(e)}")
+    
+    return {"success": True, "message": "Demande annulée avec succès"}
+
 @api_router.put("/admin/demandes/{demande_id}/status", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
-async def admin_update_demande_status(demande_id: str, data: dict):
+async def admin_update_demande_status(
+    demande_id: str, 
+    background_tasks: BackgroundTasks,
+    data: dict
+):
     new_status = data.get("status")
     reason = data.get("reason", "")
     
@@ -801,11 +1078,16 @@ async def admin_update_demande_status(demande_id: str, data: dict):
     except ValueError:
         raise HTTPException(status_code=400, detail="Statut invalide")
     
+    demande = await db.demandes.find_one({"id": demande_id}, {"_id": 0})
+    if not demande:
+        raise HTTPException(status_code=404, detail="Demande non trouvée")
+    
     can_cancel = new_status not in [DemandeStatus.PURCHASE_LAUNCHED, DemandeStatus.COMPLETED, DemandeStatus.CANCELLED]
     
     update_data = {"status": new_status, "can_cancel": can_cancel}
     if new_status == DemandeStatus.CANCELLED and reason:
         update_data["cancellation_reason"] = reason
+        update_data["cancelled_at"] = datetime.now(timezone.utc).isoformat()
     
     result = await db.demandes.update_one(
         {"id": demande_id},
@@ -814,6 +1096,65 @@ async def admin_update_demande_status(demande_id: str, data: dict):
     
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Demande non trouvée")
+    
+    # Notification client si le statut change (sauf si déjà annulé)
+    if new_status != demande.get("status") and new_status != DemandeStatus.CANCELLED:
+        client_doc = await db.users.find_one({"id": demande["client_id"]}, {"_id": 0})
+        if client_doc:
+            # Construire le message de statut formaté
+            # Mapping des statuts vers libellés lisibles
+            status_labels = {
+                "ANALYSIS": "En analyse",
+                "DEPOSIT_PENDING": "En attente d'acompte",
+                "DEPOSIT_PAID": "Acompte payé",
+                "ANALYSIS_AFTER_DEPOSIT": "En analyse (après acompte)",
+                "AWAITING_DEPOSIT": "En attente d'acompte",
+                "ACCEPTED": "Acceptée",
+                "IN_ANALYSIS": "En analyse",
+                "PROPOSAL_FOUND": "Proposition trouvée",
+                "AWAITING_BALANCE": "En attente du solde",
+                "COMPLETED": "Terminée",
+                "CANCELLED": "Annulée",
+                "PURCHASE_LAUNCHED": "Achat lancé"
+            }
+            status_label = status_labels.get(new_status, new_status)
+            
+            # Déterminer le type de message selon le statut
+            if new_status in [DemandeStatus.ACCEPTED, DemandeStatus.PROPOSAL_FOUND]:
+                status_message = f'<div class="success-box">Votre demande a été acceptée !</div>'
+            elif new_status == DemandeStatus.DEPOSIT_PAID:
+                status_message = f'<div class="info-box">Votre acompte a été reçu et validé.</div>'
+            elif new_status == DemandeStatus.COMPLETED:
+                status_message = f'<div class="success-box">Votre demande est terminée !</div>'
+            else:
+                status_message = f'<div class="info-box">Le statut de votre demande a été mis à jour.</div>'
+            
+            reason_message = f"Raison : {reason}" if reason else None
+            
+            base_url_setting = await db.settings.find_one({"key": "base_url"}, {"_id": 0})
+            base_url = base_url_setting.get("value", os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")) if base_url_setting else os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")
+            
+            try:
+                await notify_user(
+                    db,
+                    EventType.USER_REQUEST_STATUS_CHANGED,
+                    client_doc["email"],
+                    {
+                        "title": "Mise à jour de votre demande",
+                        "message": f"Le statut de votre demande '{demande['name']}' a été mis à jour.",
+                        "demande_id": demande_id,
+                        "demande_name": demande["name"],
+                        "status": new_status,
+                        "status_label": status_label,
+                        "status_message": status_message,
+                        "reason": reason or "",
+                        "reason_message": reason_message,
+                        "base_url": base_url
+                    },
+                    background_tasks
+                )
+            except Exception as e:
+                logger.error(f"Erreur notification user changement statut: {str(e)}")
     
     return {"success": True, "message": f"Statut mis à jour: {new_status}"}
 

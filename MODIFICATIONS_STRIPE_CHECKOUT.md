@@ -164,3 +164,4 @@ STRIPE_CANCEL_URL=https://downpricer.com/minisite?stripe=cancel
 3. Ajouter des tests unitaires pour `get_stripe_customer_id()` et `create_checkout_session()`
 
 
+

@@ -40,7 +40,25 @@ export const MinisiteLanding = () => {
           return;
         }
       } catch (error) {
-        // Pas de mini-site, afficher la page pricing
+        // Pas de mini-site : vérifier si l'utilisateur a un rôle plan
+        if (error.response?.status === 404) {
+          try {
+            const userResponse = await api.get('/auth/me');
+            const user = userResponse.data;
+            const hasPlanRole = user.roles?.some(role => 
+              ['SITE_PLAN_1', 'SITE_PLAN_10', 'SITE_PLAN_15'].includes(role)
+            );
+            
+            if (hasPlanRole) {
+              // L'utilisateur a un plan mais pas de minisite => rediriger vers dashboard qui affichera le CTA
+              navigate('/minisite/dashboard');
+              return;
+            }
+          } catch (userError) {
+            // Erreur lors de la vérification, continuer normalement
+          }
+        }
+        // Pas de mini-site et pas de plan, afficher la page pricing
       }
       setCheckingMinisite(false);
 

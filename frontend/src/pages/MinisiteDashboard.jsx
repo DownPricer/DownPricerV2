@@ -649,6 +649,7 @@ import {
   AlertTriangle, Zap, Crown, Grid, List, LayoutGrid, Columns, 
   ArrowUpRight, Loader2, ExternalLink, BarChart3, Palette, Box, CheckCircle2
 } from 'lucide-react';
+import { Header } from '../components/Header';
 import { ImageUpload } from '../components/ImageUpload';
 import { SafeImage } from '../components/SafeImage';
 import api from '../utils/api';
@@ -755,7 +756,7 @@ export const MinisiteDashboard = () => {
         const subResponse = await api.get('/billing/subscription');
         const subscription = subResponse.data;
         
-        // Vérifier l'utilisateur (rôles)
+        // Vérifier l'utilisateur (rôles) - rafraîchir les données
         const userResponse = await api.get('/auth/me');
         const user = userResponse.data;
         
@@ -764,14 +765,37 @@ export const MinisiteDashboard = () => {
         );
         
         if (subscription?.has_subscription && hasPlanRole) {
-          // Abonnement activé !
-          toast.success('Abonnement activé avec succès !');
-          fetchMinisiteData();
-          fetchSubscription();
-          return;
-        }
-        
-        if (attempts < maxAttempts) {
+          // Abonnement activé ! Vérifier si le minisite a été créé
+          try {
+            const siteRes = await api.get('/minisites/my');
+            if (siteRes.data && siteRes.data.id) {
+              // Minisite créé !
+              toast.success('Abonnement activé avec succès !');
+              fetchMinisiteData();
+              fetchSubscription();
+              return;
+            } else {
+              // Pas encore de minisite créé, continuer à poller
+              if (attempts < maxAttempts) {
+                setTimeout(poll, pollInterval);
+              } else {
+                // Après plusieurs tentatives, proposer de créer le minisite
+                toast.info('Abonnement activé ! Vous pouvez maintenant configurer votre mini-site.');
+                fetchMinisiteData(); // Recharger pour afficher le CTA
+                fetchSubscription();
+              }
+            }
+          } catch (siteError) {
+            // Pas de minisite encore, continuer à poller
+            if (attempts < maxAttempts) {
+              setTimeout(poll, pollInterval);
+            } else {
+              toast.info('Abonnement activé ! Vous pouvez maintenant configurer votre mini-site.');
+              fetchMinisiteData();
+              fetchSubscription();
+            }
+          }
+        } else if (attempts < maxAttempts) {
           setTimeout(poll, pollInterval);
         } else {
           toast.warning('L\'activation prend plus de temps que prévu. Veuillez rafraîchir la page dans quelques instants.');
@@ -805,7 +829,25 @@ export const MinisiteDashboard = () => {
       setArticles(articlesResponse.data);
     } catch (error) {
       if (error.response?.status === 404) {
-        navigate('/minisite');
+        // Pas de minisite : vérifier si l'utilisateur a un rôle plan
+        try {
+          const userRes = await api.get('/auth/me');
+          const user = userRes.data;
+          const hasPlanRole = user.roles?.some(role => 
+            ['SITE_PLAN_1', 'SITE_PLAN_10', 'SITE_PLAN_15'].includes(role)
+          );
+          
+          if (hasPlanRole) {
+            // L'utilisateur a un plan mais pas de minisite => proposer de créer
+            setMinisite(null); // Indique qu'il faut créer le minisite
+          } else {
+            // Pas de plan => rediriger vers la landing
+            navigate('/minisite');
+          }
+        } catch (userError) {
+          // Erreur lors de la vérification de l'utilisateur => rediriger vers landing
+          navigate('/minisite');
+        }
       } else {
         toast.error('Erreur lors du chargement du dashboard');
       }
@@ -945,7 +987,37 @@ export const MinisiteDashboard = () => {
   const handleUpgrade = () => navigate('/minisite/upgrade');
 
   if (loading) return <div className="min-h-screen bg-zinc-950 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-orange-500" /></div>;
-  if (!minisite) return null;
+  
+  // Si pas de minisite mais l'utilisateur a un rôle plan => afficher CTA pour créer
+  if (!minisite) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-orange-500/30">
+        <Header />
+        <main className="container mx-auto px-4 py-16">
+          <Card className="bg-gradient-to-r from-orange-900/20 to-red-900/20 border-orange-500/50 max-w-2xl mx-auto">
+            <CardContent className="p-8 text-center space-y-6">
+              <div className="h-16 w-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto">
+                <Globe className="h-8 w-8 text-orange-500" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-2">Configurez votre mini-site</h2>
+                <p className="text-zinc-400">
+                  Votre abonnement est actif ! Il est temps de créer et configurer votre mini-site pour commencer à vendre.
+                </p>
+              </div>
+              <Button
+                onClick={() => navigate('/minisite/create')}
+                className="bg-orange-600 hover:bg-orange-700 text-white px-8 py-6 text-lg"
+              >
+                <Settings className="h-5 w-5 mr-2" />
+                Configurer mon mini-site
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
 
   const siteUrl = `${window.location.origin}/s/${minisite.slug}`;
   const quota = getPlanQuota(minisite.plan_id);

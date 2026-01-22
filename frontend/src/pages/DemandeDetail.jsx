@@ -243,7 +243,9 @@ export const DemandeDetail = () => {
 
                 {/* Bouton d'action contextuel (Annulation) */}
                 <div className="pt-2">
-                  {demande.can_cancel && demande.status !== 'CANCELLED' && demande.status !== 'DEPOSIT_PENDING' ? (
+                  {demande.status !== 'CANCELLED' && demande.status !== 'COMPLETED' && 
+                   demande.status !== 'PROPOSAL_FOUND' && demande.status !== 'PURCHASE_LAUNCHED' && 
+                   demande.status !== 'AWAITING_BALANCE' ? (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button 
@@ -259,7 +261,11 @@ export const DemandeDetail = () => {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
                           <AlertDialogDescription className="text-zinc-400">
-                            Cette action annulera définitivement votre demande. L'acompte sera remboursé selon nos CGV.
+                            {demande.status === 'DEPOSIT_PAID' || demande.status === 'DEPOSIT_PENDING' ? (
+                              <>Cette action annulera définitivement votre demande. Si l'acompte a été payé, il sera remboursé selon nos CGV.</>
+                            ) : (
+                              <>Cette action annulera définitivement votre demande.</>
+                            )}
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -280,7 +286,7 @@ export const DemandeDetail = () => {
                   ) : (
                     <div className="w-full p-3 bg-blue-900/10 rounded-lg border border-blue-900/20 text-center text-blue-400 text-sm flex items-center justify-center gap-2">
                       <Package className="h-4 w-4" />
-                      Achat en cours, annulation impossible
+                      Achat en cours, annulation impossible. Contactez le support.
                     </div>
                   )}
                 </div>
