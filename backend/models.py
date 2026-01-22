@@ -51,6 +51,7 @@ class User(BaseModel):
     last_name: str
     phone: Optional[str] = None
     roles: List[UserRole] = [UserRole.VISITOR]
+    site_plan: Optional[str] = None  # SITE_PLAN_1, SITE_PLAN_10, SITE_PLAN_15
     created_at: str
 
 class UserCreate(BaseModel):

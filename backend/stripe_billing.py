@@ -351,6 +351,10 @@ async def handle_checkout_session_completed(db, session: Dict[str, Any]) -> None
             "minisite_active": subscription.status in ["active", "trialing"]
         }
         
+        # Ajouter site_plan (SITE_PLAN_1/2/3) comme source de vérité unique
+        if internal_plan:
+            user_update["site_plan"] = internal_plan
+        
         # Ajouter le rôle si nécessaire
         roles = roles_before.copy()
         if internal_plan and internal_plan not in roles:
@@ -458,6 +462,10 @@ async def handle_subscription_updated(db, subscription: Dict[str, Any]) -> None:
         
         if plan:
             user_update["minisite_plan"] = plan
+        
+        # Ajouter site_plan (SITE_PLAN_1/2/3) comme source de vérité unique
+        if internal_plan:
+            user_update["site_plan"] = internal_plan
         
         # Gérer les rôles (upgrade/downgrade)
         roles = roles_before.copy()

@@ -47,8 +47,20 @@ export const ImageUpload = ({
       onChange([...images, ...uploadedUrls]);
       toast.success(`${uploadedUrls.length} image(s) uploadée(s)`);
     } catch (error) {
-      toast.error('Erreur lors de l\'upload');
-      console.error('Upload error:', error);
+      // Améliorer le logging des erreurs serveur
+      const errorDetail = error.response?.data?.detail;
+      const errorMessage = typeof errorDetail === 'object' && errorDetail?.detail 
+        ? errorDetail.detail 
+        : (typeof errorDetail === 'string' ? errorDetail : error.message || 'Erreur lors de l\'upload');
+      
+      console.error('Upload error:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        detail: errorDetail,
+        message: errorMessage
+      });
+      
+      toast.error(errorMessage);
     }
 
     setUploading(false);

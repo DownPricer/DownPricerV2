@@ -178,17 +178,30 @@ async def get_me(current_user = Depends(get_current_user)):
 
 @api_router.post("/upload/image")
 async def upload_image(file: UploadFile = File(...), current_user = Depends(get_current_user)):
-    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB max
+    MAX_FILE_SIZE = 12 * 1024 * 1024  # 12MB max (augmenté pour correspondre à nginx)
     COMPRESSION_THRESHOLD = 1 * 1024 * 1024  # 1MB - déclenche compression
     TARGET_SIZE = 400 * 1024  # 400KB cible après compression
     
     try:
-        if not file.content_type.startswith("image/"):
-            raise HTTPException(status_code=400, detail="Le fichier doit être une image")
+        # Vérifier que le fichier est présent
+        if not file or not file.filename:
+            raise HTTPException(
+                status_code=400, 
+                detail={"error": "missing_file", "detail": "Aucun fichier fourni. Le champ 'file' est requis."}
+            )
+        
+        if not file.content_type or not file.content_type.startswith("image/"):
+            raise HTTPException(
+                status_code=400, 
+                detail={"error": "invalid_type", "detail": "Le fichier doit être une image. Type reçu: " + (file.content_type or "inconnu")}
+            )
         
         file_ext = file.filename.split(".")[-1].lower()
         if file_ext not in ["jpg", "jpeg", "png", "webp", "gif"]:
-            raise HTTPException(status_code=400, detail="Format d'image non supporté")
+            raise HTTPException(
+                status_code=400, 
+                detail={"error": "unsupported_format", "detail": f"Format d'image non supporté: .{file_ext}. Formats acceptés: jpg, jpeg, png, webp, gif"}
+            )
         
         # Lire le contenu du fichier
         contents = await file.read()
@@ -198,7 +211,10 @@ async def upload_image(file: UploadFile = File(...), current_user = Depends(get_
         if file_size > MAX_FILE_SIZE:
             raise HTTPException(
                 status_code=413, 
-                detail=f"Le fichier est trop volumineux. Taille maximale autorisée : 10MB (fichier reçu : {file_size / (1024*1024):.2f}MB)"
+                detail={
+                    "error": "file_too_large",
+                    "detail": f"Le fichier est trop volumineux. Taille maximale autorisée : {MAX_FILE_SIZE / (1024*1024):.0f}MB (fichier reçu : {file_size / (1024*1024):.2f}MB)"
+                }
             )
         
         # Toujours convertir en WebP pour de meilleures performances
@@ -284,7 +300,13 @@ async def upload_image(file: UploadFile = File(...), current_user = Depends(get_
         raise
     except Exception as e:
         logger.error(f"Upload error: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Erreur lors de l'upload: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail={
+                "error": "upload_failed",
+                "detail": f"Erreur lors de l'upload: {str(e)}"
+            }
+        )
 
 @api_router.get("/settings/public")
 async def get_public_settings():
@@ -1034,7 +1056,7 @@ async def admin_cancel_demande(
         try:
             # Construire le message de statut formaté
             status_label = "Annulée"
-            status_message = f'<div class="error-box">Votre demande a été annulée par l'administrateur.</div>'
+            status_message = f'<div class="error-box">Votre demande a été annulée par l\'administrateur.</div>'
             reason_message = f"Raison : {cancel_reason}" if cancel_reason else None
             
             base_url_setting = await db.settings.find_one({"key": "base_url"}, {"_id": 0})
@@ -1046,7 +1068,7 @@ async def admin_cancel_demande(
                 client_email,
                 {
                     "title": "Votre demande a été annulée",
-                    "message": f"Votre demande '{demande['name']}' a été annulée par l'administrateur.",
+                    "message": f"Votre demande '{demande['name']}' a été annulée par l\'administrateur.",
                     "demande_id": demande_id,
                     "demande_name": demande["name"],
                     "status": "CANCELLED",
@@ -1243,8 +1265,8 @@ async def admin_request_deposit(
                     "demande_name": demande["name"],
                     "deposit_amount": demande["deposit_amount"],
                     "deposit_payment_url": deposit_payment_url,
-                    "action_button": f'<a href="{deposit_payment_url}" style="display: inline-block; padding: 12px 24px; background-color: #FF5722; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Payer l'acompte</a>',
-                    "details": f"<p>Veuillez cliquer sur le lien ci-dessous pour procéder au paiement de l'acompte :</p><p><a href='{deposit_payment_url}'>{deposit_payment_url}</a></p>"
+                    "action_button": f'<a href="{deposit_payment_url}" style="display: inline-block; padding: 12px 24px; background-color: #FF5722; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Payer l\'acompte</a>',
+                    "details": f"<p>Veuillez cliquer sur le lien ci-dessous pour procéder au paiement de l\'acompte :</p><p><a href=\'{deposit_payment_url}\'>{deposit_payment_url}</a></p>"
                 },
                 background_tasks
             )
@@ -1362,6 +1384,14 @@ async def create_minisite(
     if existing_user_site:
         raise HTTPException(status_code=400, detail="Vous avez déjà un mini-site")
     
+    # Utiliser site_plan de l'utilisateur comme source de vérité unique si disponible
+    user_site_plan = user_doc.get("site_plan")
+    final_plan_id = user_site_plan if user_site_plan else site_data.plan_id
+    
+    # Valider que le plan est valide
+    if final_plan_id not in ["SITE_PLAN_1", "SITE_PLAN_10", "SITE_PLAN_15"]:
+        raise HTTPException(status_code=400, detail=f"Plan invalide: {final_plan_id}")
+    
     site_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     
@@ -1369,7 +1399,7 @@ async def create_minisite(
         "id": site_id,
         "user_id": user_doc["id"],
         "user_email": user_doc["email"],
-        "plan_id": site_data.plan_id,
+        "plan_id": final_plan_id,
         "site_name": site_data.site_name,
         "slug": site_data.slug,
         "logo_url": None,
@@ -2192,10 +2222,34 @@ async def get_my_subscription(
             "minisite_active": user_doc.get("minisite_active", False)
         }
     
+    # Récupérer site_plan depuis le user document (source de vérité unique)
+    site_plan = user_doc.get("site_plan")
+    
+    # Mapper le plan Stripe vers site_plan si nécessaire (fallback)
+    if not site_plan:
+        plan_mapping = {
+            "starter": "SITE_PLAN_1",
+            "standard": "SITE_PLAN_10",
+            "premium": "SITE_PLAN_15"
+        }
+        stripe_plan = subscription.get("plan")
+        site_plan = plan_mapping.get(stripe_plan) if stripe_plan else None
+    
+    # Calculer le prix en EUR depuis site_plan
+    site_plan_price_eur = None
+    if site_plan == "SITE_PLAN_1":
+        site_plan_price_eur = 1
+    elif site_plan == "SITE_PLAN_10":
+        site_plan_price_eur = 10
+    elif site_plan == "SITE_PLAN_15":
+        site_plan_price_eur = 15
+    
     return {
         "has_subscription": True,
         "subscription_id": subscription_id,
         "plan": subscription.get("plan"),
+        "site_plan": site_plan,
+        "site_plan_price_eur": site_plan_price_eur,
         "status": subscription.get("status"),
         "current_period_end": subscription.get("current_period_end"),
         "minisite_active": user_doc.get("minisite_active", False)

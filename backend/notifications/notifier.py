@@ -165,7 +165,13 @@ async def notify_admin(
         
         brand_name = brand_name_setting.get("value", "DownPricer") if brand_name_setting else "DownPricer"
         support_email = support_email_setting.get("value", "support@downpricer.com") if support_email_setting else "support@downpricer.com"
-        base_url = base_url_setting.get("value", os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")) if base_url_setting else os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")
+        base_url_raw = base_url_setting.get("value", os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")) if base_url_setting else os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")
+        
+        # S'assurer que base_url utilise toujours downpricer.com et pas l'IP du serveur
+        if "51.210" in base_url_raw or ("downpricer.com" not in base_url_raw and not base_url_raw.startswith("http://localhost")):
+            base_url = "https://downpricer.com"
+        else:
+            base_url = base_url_raw
         
         # Déterminer le template à utiliser
         template_map = {
@@ -247,7 +253,13 @@ async def notify_user(
         
         brand_name = brand_name_setting.get("value", "DownPricer") if brand_name_setting else "DownPricer"
         support_email = support_email_setting.get("value", "support@downpricer.com") if support_email_setting else "support@downpricer.com"
-        base_url = base_url_setting.get("value", os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")) if base_url_setting else os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")
+        base_url_raw = base_url_setting.get("value", os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")) if base_url_setting else os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")
+        
+        # S'assurer que base_url utilise toujours downpricer.com et pas l'IP du serveur
+        if "51.210" in base_url_raw or ("downpricer.com" not in base_url_raw and not base_url_raw.startswith("http://localhost")):
+            base_url = "https://downpricer.com"
+        else:
+            base_url = base_url_raw
         
         # Déterminer le template à utiliser
         template_map = {

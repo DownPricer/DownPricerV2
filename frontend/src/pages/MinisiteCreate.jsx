@@ -15,15 +15,52 @@ export const MinisiteCreate = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [creating, setCreating] = useState(false);
+  const [loadingPlan, setLoadingPlan] = useState(true);
   const [formData, setFormData] = useState({
     site_name: '',
     slug: '',
-    plan_id: searchParams.get('plan') || 'SITE_PLAN_1',
+    plan_id: null, // Sera rempli depuis l'API
     welcome_text: '',
     template: 'template1',
     primary_color: '#FF5722',
     font_family: 'Arial'
   });
+
+  // Charger le plan depuis l'API au montage du composant
+  useEffect(() => {
+    const fetchPlan = async () => {
+      try {
+        const response = await api.get('/billing/subscription');
+        if (response.data.has_subscription && response.data.site_plan) {
+          // Auto-sélectionner le plan depuis l'API (source de vérité unique)
+          setFormData(prev => ({ ...prev, plan_id: response.data.site_plan }));
+        } else {
+          // Pas d'abonnement actif, utiliser le plan depuis l'URL ou défaut
+          const planFromUrl = searchParams.get('plan');
+          if (planFromUrl && ['SITE_PLAN_1', 'SITE_PLAN_10', 'SITE_PLAN_15'].includes(planFromUrl)) {
+            setFormData(prev => ({ ...prev, plan_id: planFromUrl }));
+          } else {
+            // Pas de plan valide, rediriger vers la landing
+            navigate('/minisite');
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching subscription:', error);
+        // En cas d'erreur, utiliser le plan depuis l'URL ou rediriger
+        const planFromUrl = searchParams.get('plan');
+        if (planFromUrl && ['SITE_PLAN_1', 'SITE_PLAN_10', 'SITE_PLAN_15'].includes(planFromUrl)) {
+          setFormData(prev => ({ ...prev, plan_id: planFromUrl }));
+        } else {
+          navigate('/minisite');
+          return;
+        }
+      } finally {
+        setLoadingPlan(false);
+      }
+    };
+    fetchPlan();
+  }, [navigate, searchParams]);
 
   const generateSlug = (name) => {
     return name
@@ -61,6 +98,21 @@ export const MinisiteCreate = () => {
     
     setCreating(false);
   };
+
+  if (loadingPlan) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-zinc-400">Chargement de votre plan...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!formData.plan_id) {
+    return null; // Redirection en cours
+  }
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -128,11 +180,12 @@ export const MinisiteCreate = () => {
                 <div className="space-y-2">
                   <Label className="text-zinc-300">Plan sélectionné</Label>
                   <Select 
-                    value={formData.plan_id} 
+                    value={formData.plan_id || ''} 
                     onValueChange={(value) => setFormData({...formData, plan_id: value})}
+                    disabled={loadingPlan || !!formData.plan_id} // Désactiver si chargement ou plan déjà défini depuis l'API
                   >
                     <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white">
-                      <SelectValue />
+                      <SelectValue placeholder={loadingPlan ? "Chargement..." : "Sélectionner un plan"} />
                     </SelectTrigger>
                     <SelectContent className="bg-zinc-800 border-zinc-700 text-white">
                       <SelectItem value="SITE_PLAN_1">Plan Starter (1€/mois)</SelectItem>
@@ -140,6 +193,9 @@ export const MinisiteCreate = () => {
                       <SelectItem value="SITE_PLAN_15">Plan Premium (15€/mois)</SelectItem>
                     </SelectContent>
                   </Select>
+                  {formData.plan_id && (
+                    <p className="text-xs text-zinc-500">Plan automatiquement sélectionné selon votre abonnement</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
