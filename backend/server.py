@@ -1041,7 +1041,9 @@ async def admin_cancel_demande(
         try:
             # Construire le message de statut formaté
             status_label = "Annulée"
-            status_message = f'<div class="error-box">Votre demande a été annulée par l\'administrateur.</div>'
+            
+            status_message = '<div class="error-box">Votre demande a été annulée par l\'administrateur.</div>'
+
             reason_message = f"Raison : {cancel_reason}" if cancel_reason else None
             
             base_url = await get_base_url(db)
@@ -1249,7 +1251,10 @@ async def admin_request_deposit(
                     "deposit_amount": demande["deposit_amount"],
                     "deposit_payment_url": deposit_payment_url,
                     "action_button": f'<a href="{deposit_payment_url}" style="display: inline-block; padding: 12px 24px; background-color: #FF5722; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Payer l\'acompte</a>',
-                    "details": f"<p>Veuillez cliquer sur le lien ci-dessous pour procéder au paiement de l\'acompte :</p><p><a href=\'{deposit_payment_url}\'>{deposit_payment_url}</a></p>"
+
+
+                    "details": f"<p>Veuillez cliquer sur le lien ci-dessous pour procéder au paiement de l'acompte :</p><p><a href='{deposit_payment_url}'>{deposit_payment_url}</a></p>"
+
                 },
                 background_tasks
             )
