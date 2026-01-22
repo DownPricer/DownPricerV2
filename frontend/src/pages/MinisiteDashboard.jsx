@@ -649,7 +649,6 @@ import {
   AlertTriangle, Zap, Crown, Grid, List, LayoutGrid, Columns, 
   ArrowUpRight, Loader2, ExternalLink, BarChart3, Palette, Box, CheckCircle2
 } from 'lucide-react';
-import { Header } from '../components/Header';
 import { ImageUpload } from '../components/ImageUpload';
 import { SafeImage } from '../components/SafeImage';
 import api from '../utils/api';
