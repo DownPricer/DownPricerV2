@@ -587,12 +587,14 @@ async def cancel_demande(
     
     # Notification admin : demande annulée
     try:
+        # Calculer le suffixe avant pour éviter backslash dans f-string
+        who_cancelled = " par l'admin" if is_admin else " par le client"
         await notify_admin(
             db,
             EventType.ADMIN_NEW_CLIENT_REQUEST,  # Réutiliser le template existant
             {
                 "title": "Demande annulée",
-                "message": f"La demande '{demande['name']}' a été annulée{' par l\'admin' if is_admin else ' par le client'}.",
+                "message": f"La demande '{demande['name']}' a été annulée{who_cancelled}.",
                 "demande_id": demande_id,
                 "demande_name": demande["name"],
                 "client_name": client_name,
@@ -1032,7 +1034,7 @@ async def admin_cancel_demande(
         try:
             # Construire le message de statut formaté
             status_label = "Annulée"
-            status_message = f'<div class="error-box">Votre demande a été annulée par l\'administrateur.</div>'
+            status_message = f'<div class="error-box">Votre demande a été annulée par l'administrateur.</div>'
             reason_message = f"Raison : {cancel_reason}" if cancel_reason else None
             
             base_url_setting = await db.settings.find_one({"key": "base_url"}, {"_id": 0})
@@ -1241,7 +1243,7 @@ async def admin_request_deposit(
                     "demande_name": demande["name"],
                     "deposit_amount": demande["deposit_amount"],
                     "deposit_payment_url": deposit_payment_url,
-                    "action_button": f'<a href="{deposit_payment_url}" style="display: inline-block; padding: 12px 24px; background-color: #FF5722; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Payer l\'acompte</a>',
+                    "action_button": f'<a href="{deposit_payment_url}" style="display: inline-block; padding: 12px 24px; background-color: #FF5722; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Payer l'acompte</a>',
                     "details": f"<p>Veuillez cliquer sur le lien ci-dessous pour procéder au paiement de l'acompte :</p><p><a href='{deposit_payment_url}'>{deposit_payment_url}</a></p>"
                 },
                 background_tasks

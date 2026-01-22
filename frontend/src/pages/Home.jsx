@@ -185,8 +185,7 @@ import { Badge } from '../components/ui/badge';
 import { Card, CardContent, CardFooter } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Button } from '../components/ui/button';
-import { Search, Filter, ArrowUpDown, ShoppingBag, X, ChevronDown } from 'lucide-react';
+import { Search, Filter, ArrowUpDown, ShoppingBag } from 'lucide-react';
 import api from '../utils/api';
 import { resolveImageUrl } from '../utils/images';
 
@@ -202,34 +201,17 @@ export const Home = () => {
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'all');
   const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'recent');
   
-  // État du bandeau "Bons plans du moment"
-  const [bannerVisible, setBannerVisible] = useState(true);
-  const [bannerCollapsed, setBannerCollapsed] = useState(false);
+  // État du HERO pour auto-repli après 5 secondes
+  const [heroCollapsed, setHeroCollapsed] = useState(false);
   
-  // Vérifier si le bandeau a été masqué dans localStorage
+  // Auto-repli du HERO après 5 secondes
   useEffect(() => {
-    const bannerDismissed = localStorage.getItem('home_banner_dismissed');
-    if (bannerDismissed === 'true') {
-      setBannerVisible(false);
-      return;
-    }
-    
-    // Auto-repli après 5 secondes
     const timer = setTimeout(() => {
-      setBannerCollapsed(true);
+      setHeroCollapsed(true);
     }, 5000);
     
     return () => clearTimeout(timer);
   }, []);
-  
-  const handleDismissBanner = () => {
-    setBannerVisible(false);
-    localStorage.setItem('home_banner_dismissed', 'true');
-  };
-  
-  const handleToggleBanner = () => {
-    setBannerCollapsed(!bannerCollapsed);
-  };
 
   // 1. Chargement des catégories une seule fois
   useEffect(() => {
@@ -288,57 +270,19 @@ export const Home = () => {
     <div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-orange-500/30">
       <Header />
       
-      {/* --- BANDEAU "BONS PLANS DU MOMENT" --- */}
-      {bannerVisible && (
-        <div 
-          className={`bg-gradient-to-r from-orange-900/40 via-orange-800/30 to-red-900/40 border-b border-orange-500/20 transition-all duration-500 ease-in-out overflow-hidden ${
-            bannerCollapsed ? 'max-h-0 opacity-0' : 'max-h-32 opacity-100'
-          }`}
-        >
-          <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
-            <div className="flex-1 text-center">
-              <p className="text-sm md:text-base font-semibold text-orange-300 mb-1">
-                Bons plans du moment
-              </p>
-              <p className="text-xs md:text-sm text-zinc-300">
-                Découvrez notre sélection d'articles. Cliquez pour acheter ou demander une remise en main propre.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {bannerCollapsed && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleToggleBanner}
-                  className="text-orange-300 hover:text-orange-200 hover:bg-orange-500/10 h-8 w-8 p-0"
-                  title="Afficher le bandeau"
-                >
-                  <ChevronDown className="h-4 w-4 rotate-180" />
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleDismissBanner}
-                className="text-zinc-400 hover:text-white hover:bg-zinc-800/50 h-8 w-8 p-0"
-                title="Masquer définitivement"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-      
       {/* --- HERO SECTION --- */}
-      <div className="relative border-b border-zinc-800/50 bg-zinc-900/30">
-        <div className="container mx-auto px-4 py-12 md:py-16 text-center">
-          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-4 drop-shadow-sm" style={{ fontFamily: 'Outfit, sans-serif' }}>
-            Les bons plans <span className="text-orange-500">du moment</span>
-          </h1>
-          <p className="text-zinc-400 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
-            Découvrez notre sélection d'articles. Cliquez pour acheter ou demander une remise en main propre.
-          </p>
+      <div className={`overflow-hidden transition-all duration-500 ease-in-out ${
+        heroCollapsed ? 'max-h-0 opacity-0' : 'max-h-96 opacity-100'
+      }`}>
+        <div className="relative border-b border-zinc-800/50 bg-zinc-900/30">
+          <div className="container mx-auto px-4 py-12 md:py-16 text-center">
+            <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-4 drop-shadow-sm" style={{ fontFamily: 'Outfit, sans-serif' }}>
+              Les bons plans <span className="text-orange-500">du moment</span>
+            </h1>
+            <p className="text-zinc-400 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
+              Découvrez notre sélection d'articles. Cliquez pour acheter ou demander une remise en main propre.
+            </p>
+          </div>
         </div>
       </div>
 
