@@ -16,6 +16,30 @@ logger = logging.getLogger(__name__)
 TEMPLATES_DIR = Path(__file__).parent / "email_templates"
 
 
+async def get_base_url(db) -> str:
+    """
+    Fonction centralisée pour obtenir l'URL de base pour les emails.
+    Retourne dans l'ordre de priorité :
+    1. db.settings key "base_url" si défini
+    2. env BACKEND_PUBLIC_URL
+    3. "https://downpricer.com" (fallback)
+    
+    Retire toujours le slash final.
+    """
+    base_url_setting = await db.settings.find_one({"key": "base_url"}, {"_id": 0})
+    
+    if base_url_setting and base_url_setting.get("value"):
+        base_url = base_url_setting.get("value")
+    else:
+        base_url = os.environ.get("BACKEND_PUBLIC_URL", "https://downpricer.com")
+    
+    # Retirer le slash final
+    if base_url.endswith("/"):
+        base_url = base_url[:-1]
+    
+    return base_url
+
+
 class EventType(str, Enum):
     """Types d'événements pour les notifications"""
     # Admin notifications
@@ -161,17 +185,10 @@ async def notify_admin(
         # Récupérer les settings pour le contexte
         brand_name_setting = await db.settings.find_one({"key": "brand_name"}, {"_id": 0})
         support_email_setting = await db.settings.find_one({"key": "support_email"}, {"_id": 0})
-        base_url_setting = await db.settings.find_one({"key": "base_url"}, {"_id": 0})
         
         brand_name = brand_name_setting.get("value", "DownPricer") if brand_name_setting else "DownPricer"
         support_email = support_email_setting.get("value", "support@downpricer.com") if support_email_setting else "support@downpricer.com"
-        base_url_raw = base_url_setting.get("value", os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")) if base_url_setting else os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")
-        
-        # S'assurer que base_url utilise toujours downpricer.com et pas l'IP du serveur
-        if "51.210" in base_url_raw or ("downpricer.com" not in base_url_raw and not base_url_raw.startswith("http://localhost")):
-            base_url = "https://downpricer.com"
-        else:
-            base_url = base_url_raw
+        base_url = await get_base_url(db)
         
         # Déterminer le template à utiliser
         template_map = {
@@ -196,6 +213,7 @@ async def notify_admin(
             "action_button": payload.get("action_button", ""),
             "brand_name": brand_name,
             "support_email": support_email,
+            "base_url": base_url,
             **payload  # Ajouter toutes les autres variables du payload
         }
         
@@ -249,17 +267,10 @@ async def notify_user(
         # Récupérer les settings pour le contexte
         brand_name_setting = await db.settings.find_one({"key": "brand_name"}, {"_id": 0})
         support_email_setting = await db.settings.find_one({"key": "support_email"}, {"_id": 0})
-        base_url_setting = await db.settings.find_one({"key": "base_url"}, {"_id": 0})
         
         brand_name = brand_name_setting.get("value", "DownPricer") if brand_name_setting else "DownPricer"
         support_email = support_email_setting.get("value", "support@downpricer.com") if support_email_setting else "support@downpricer.com"
-        base_url_raw = base_url_setting.get("value", os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")) if base_url_setting else os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")
-        
-        # S'assurer que base_url utilise toujours downpricer.com et pas l'IP du serveur
-        if "51.210" in base_url_raw or ("downpricer.com" not in base_url_raw and not base_url_raw.startswith("http://localhost")):
-            base_url = "https://downpricer.com"
-        else:
-            base_url = base_url_raw
+        base_url = await get_base_url(db)
         
         # Déterminer le template à utiliser
         template_map = {
@@ -284,6 +295,7 @@ async def notify_user(
             "action_button": payload.get("action_button", ""),
             "brand_name": brand_name,
             "support_email": support_email,
+            "base_url": base_url,
             **payload  # Ajouter toutes les autres variables du payload
         }
         

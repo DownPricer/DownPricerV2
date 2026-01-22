@@ -15,8 +15,8 @@ const ALL_ROLES = [
   { value: 'CLIENT', label: 'Client', description: 'Peut créer des demandes' },
   { value: 'SELLER', label: 'Vendeur', description: 'Accès espace vendeur' },
   { value: 'SITE_PLAN_1', label: 'Mini-site 1€', description: 'Plan mini-site basique' },
-  { value: 'SITE_PLAN_10', label: 'Mini-site 10€', description: 'Plan mini-site standard' },
-  { value: 'SITE_PLAN_15', label: 'Mini-site 15€', description: 'Plan mini-site premium' },
+  { value: 'SITE_PLAN_2', label: 'Mini-site 10€', description: 'Plan mini-site standard' },
+  { value: 'SITE_PLAN_3', label: 'Mini-site 15€', description: 'Plan mini-site premium' },
   { value: 'S_PLAN_5', label: 'S-Plan 5€', description: 'Abonnement communauté 5€' },
   { value: 'S_PLAN_15', label: 'S-Plan 15€', description: 'Abonnement communauté 15€' },
   { value: 'ADMIN', label: 'Admin', description: 'Accès complet admin' }

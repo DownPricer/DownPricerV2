@@ -59,7 +59,7 @@
 //       ]
 //     },
 //     {
-//       id: 'SITE_PLAN_10',
+//       id: 'SITE_PLAN_2',
 //       name: 'Standard',
 //       price: 10,
 //       colorClass: 'text-blue-500',
@@ -76,7 +76,7 @@
 //       ]
 //     },
 //     {
-//       id: 'SITE_PLAN_15',
+//       id: 'SITE_PLAN_3',
 //       name: 'Premium',
 //       price: 15,
 //       colorClass: 'text-purple-500',
@@ -96,7 +96,7 @@
 //   ];
 
 //   const getPlanOrder = (planId) => {
-//     const order = { 'SITE_PLAN_1': 1, 'SITE_PLAN_10': 2, 'SITE_PLAN_15': 3 };
+//     const order = { 'SITE_PLAN_1': 1, 'SITE_PLAN_2': 2, 'SITE_PLAN_3': 3 };
 //     return order[planId] || 0;
 //   };
 
@@ -290,7 +290,7 @@ export const MinisiteUpgrade = () => {
       style: { border: 'border-zinc-700', bg: 'bg-zinc-900', badge: 'bg-zinc-700' }
     },
     {
-      id: 'SITE_PLAN_10',
+      id: 'SITE_PLAN_2',
       name: 'Standard',
       price: 10,
       description: "L'essentiel pour vendre.",
@@ -306,7 +306,7 @@ export const MinisiteUpgrade = () => {
       style: { border: 'border-blue-500', bg: 'bg-blue-950/10', badge: 'bg-blue-500' }
     },
     {
-      id: 'SITE_PLAN_15',
+      id: 'SITE_PLAN_3',
       name: 'Premium',
       price: 15,
       description: "Pour les vendeurs sérieux.",
@@ -351,7 +351,7 @@ export const MinisiteUpgrade = () => {
   }, [navigate]);
 
   const getPlanOrder = (planId) => {
-    const order = { 'SITE_PLAN_1': 1, 'SITE_PLAN_10': 2, 'SITE_PLAN_15': 3 };
+    const order = { 'SITE_PLAN_1': 1, 'SITE_PLAN_2': 2, 'SITE_PLAN_3': 3 };
     return order[planId] || 0;
   };
 
@@ -388,8 +388,8 @@ export const MinisiteUpgrade = () => {
       // Mapper les plan IDs vers les noms de plan Stripe
       const planMapping = {
         'SITE_PLAN_1': 'starter',
-        'SITE_PLAN_10': 'standard',
-        'SITE_PLAN_15': 'premium'
+        'SITE_PLAN_2': 'standard',
+        'SITE_PLAN_3': 'premium'
       };
       
       const stripePlan = planMapping[selectedPlanId];
@@ -543,7 +543,7 @@ export const MinisiteUpgrade = () => {
                           ? 'bg-orange-600 hover:bg-orange-700 ring-2 ring-orange-400' 
                           : plan.popular 
                             ? 'bg-blue-600 hover:bg-blue-700' 
-                            : plan.id === 'SITE_PLAN_15' 
+                            : plan.id === 'SITE_PLAN_3' 
                               ? 'bg-purple-600 hover:bg-purple-700' 
                               : 'bg-white text-black hover:bg-zinc-200'
                       }`}

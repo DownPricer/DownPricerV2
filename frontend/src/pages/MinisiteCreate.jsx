@@ -37,7 +37,7 @@ export const MinisiteCreate = () => {
         } else {
           // Pas d'abonnement actif, utiliser le plan depuis l'URL ou défaut
           const planFromUrl = searchParams.get('plan');
-          if (planFromUrl && ['SITE_PLAN_1', 'SITE_PLAN_10', 'SITE_PLAN_15'].includes(planFromUrl)) {
+          if (planFromUrl && ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(planFromUrl)) {
             setFormData(prev => ({ ...prev, plan_id: planFromUrl }));
           } else {
             // Pas de plan valide, rediriger vers la landing
@@ -49,7 +49,7 @@ export const MinisiteCreate = () => {
         console.error('Error fetching subscription:', error);
         // En cas d'erreur, utiliser le plan depuis l'URL ou rediriger
         const planFromUrl = searchParams.get('plan');
-        if (planFromUrl && ['SITE_PLAN_1', 'SITE_PLAN_10', 'SITE_PLAN_15'].includes(planFromUrl)) {
+        if (planFromUrl && ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(planFromUrl)) {
           setFormData(prev => ({ ...prev, plan_id: planFromUrl }));
         } else {
           navigate('/minisite');
@@ -182,19 +182,19 @@ export const MinisiteCreate = () => {
                   <Select 
                     value={formData.plan_id || ''} 
                     onValueChange={(value) => setFormData({...formData, plan_id: value})}
-                    disabled={loadingPlan || !!formData.plan_id} // Désactiver si chargement ou plan déjà défini depuis l'API
+                    disabled={true} // Toujours désactivé - plan pré-sélectionné depuis l'API
                   >
                     <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white">
-                      <SelectValue placeholder={loadingPlan ? "Chargement..." : "Sélectionner un plan"} />
+                      <SelectValue placeholder={loadingPlan ? "Chargement..." : "Plan sélectionné"} />
                     </SelectTrigger>
                     <SelectContent className="bg-zinc-800 border-zinc-700 text-white">
                       <SelectItem value="SITE_PLAN_1">Plan Starter (1€/mois)</SelectItem>
-                      <SelectItem value="SITE_PLAN_10">Plan Standard (10€/mois)</SelectItem>
-                      <SelectItem value="SITE_PLAN_15">Plan Premium (15€/mois)</SelectItem>
+                      <SelectItem value="SITE_PLAN_2">Plan Standard (10€/mois)</SelectItem>
+                      <SelectItem value="SITE_PLAN_3">Plan Premium (15€/mois)</SelectItem>
                     </SelectContent>
                   </Select>
                   {formData.plan_id && (
-                    <p className="text-xs text-zinc-500">Plan automatiquement sélectionné selon votre abonnement</p>
+                    <p className="text-xs text-zinc-500">Plan automatiquement sélectionné selon votre abonnement (non modifiable)</p>
                   )}
                 </div>
               </CardContent>

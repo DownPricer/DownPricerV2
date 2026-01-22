@@ -8,8 +8,8 @@ class UserRole(str, Enum):
     CLIENT = "CLIENT"
     SELLER = "SELLER"
     SITE_PLAN_1 = "SITE_PLAN_1"
-    SITE_PLAN_10 = "SITE_PLAN_10"
-    SITE_PLAN_15 = "SITE_PLAN_15"
+    SITE_PLAN_2 = "SITE_PLAN_2"
+    SITE_PLAN_3 = "SITE_PLAN_3"
     S_PLAN_5 = "S_PLAN_5"
     S_PLAN_15 = "S_PLAN_15"
     ADMIN = "ADMIN"
@@ -51,7 +51,7 @@ class User(BaseModel):
     last_name: str
     phone: Optional[str] = None
     roles: List[UserRole] = [UserRole.VISITOR]
-    site_plan: Optional[str] = None  # SITE_PLAN_1, SITE_PLAN_10, SITE_PLAN_15
+    site_plan: Optional[str] = None  # SITE_PLAN_1, SITE_PLAN_2, SITE_PLAN_3
     created_at: str
 
 class UserCreate(BaseModel):

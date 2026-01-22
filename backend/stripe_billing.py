@@ -324,8 +324,8 @@ async def handle_checkout_session_completed(db, session: Dict[str, Any]) -> None
         # Mapper le plan vers le format interne
         plan_mapping = {
             "starter": "SITE_PLAN_1",
-            "standard": "SITE_PLAN_10",
-            "premium": "SITE_PLAN_15"
+            "standard": "SITE_PLAN_2",
+            "premium": "SITE_PLAN_3"
         }
         internal_plan = plan_mapping.get(plan)
         
@@ -470,7 +470,7 @@ async def handle_subscription_updated(db, subscription: Dict[str, Any]) -> None:
         # Gérer les rôles (upgrade/downgrade)
         roles = roles_before.copy()
         # Retirer les anciens rôles de plan
-        roles = [r for r in roles if r not in ["SITE_PLAN_1", "SITE_PLAN_10", "SITE_PLAN_15"]]
+        roles = [r for r in roles if r not in ["SITE_PLAN_1", "SITE_PLAN_2", "SITE_PLAN_3"]]
         # Ajouter le nouveau rôle
         if internal_plan:
             roles.append(internal_plan)

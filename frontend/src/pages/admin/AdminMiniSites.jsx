@@ -118,7 +118,7 @@ export const AdminMiniSitesPage = () => {
 
   const activeSites = miniSites.filter(s => s.status === 'active');
   const monthlyRevenue = activeSites.reduce((acc, site) => {
-    const planPrices = { 'SITE_PLAN_1': 1, 'SITE_PLAN_10': 10, 'SITE_PLAN_15': 15 };
+    const planPrices = { 'SITE_PLAN_1': 1, 'SITE_PLAN_2': 10, 'SITE_PLAN_3': 15 };
     return acc + (planPrices[site.plan_id] || 0);
   }, 0);
 
@@ -189,8 +189,8 @@ export const AdminMiniSitesPage = () => {
                             <p className="text-xs text-slate-400">/{site.slug}</p>
                           </div>
                           <div className="flex flex-col items-end gap-1 ml-2">
-                            <Badge className={site.plan_id === 'SITE_PLAN_15' ? 'bg-purple-100 text-purple-800' : site.plan_id === 'SITE_PLAN_10' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}>
-                              {site.plan_id === 'SITE_PLAN_15' ? '15€' : site.plan_id === 'SITE_PLAN_10' ? '10€' : '1€'}
+                            <Badge className={site.plan_id === 'SITE_PLAN_3' ? 'bg-purple-100 text-purple-800' : site.plan_id === 'SITE_PLAN_2' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}>
+                              {site.plan_id === 'SITE_PLAN_3' ? '15€' : site.plan_id === 'SITE_PLAN_2' ? '10€' : '1€'}
                             </Badge>
                           </div>
                         </div>

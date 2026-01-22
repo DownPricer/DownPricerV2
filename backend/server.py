@@ -23,7 +23,7 @@ from models import (
 from auth import verify_password, get_password_hash, create_access_token
 from dependencies import get_current_user, require_roles
 from billing_provider import get_billing_provider
-from notifications import EventType, notify_admin, notify_user
+from notifications import EventType, notify_admin, notify_user, get_base_url
 from stripe_billing import (
     create_checkout_session,
     create_portal_session,
@@ -275,24 +275,9 @@ async def upload_image(file: UploadFile = File(...), current_user = Depends(get_
             image.thumbnail(max_size, Image.Resampling.LANCZOS)
             image.save(file_path, "WEBP", quality=75, method=4)
         
-        # Construire l'URL - utiliser le domaine downpricer.com en production
-        base_url_setting = await db.settings.find_one({"key": "base_url"}, {"_id": 0})
-        backend_public_url = os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")
-        
-        if base_url_setting:
-            base_url = base_url_setting.get("value", backend_public_url)
-        else:
-            base_url = backend_public_url
-        
-        # Si base_url contient une IP, utiliser downpricer.com à la place
-        if "51.210" in base_url or "downpricer.com" not in base_url:
-            # En production, utiliser https://downpricer.com
-            image_url = f"https://downpricer.com/api/uploads/{unique_filename}"
-        else:
-            # Utiliser le base_url configuré
-            if base_url.endswith("/"):
-                base_url = base_url[:-1]
-            image_url = f"{base_url}/api/uploads/{unique_filename}"
+        # Construire l'URL - utiliser get_base_url pour cohérence
+        base_url = await get_base_url(db)
+        image_url = f"{base_url}/api/uploads/{unique_filename}"
         
         return {"success": True, "url": image_url, "filename": unique_filename}
     
@@ -652,7 +637,7 @@ async def cancel_demande(
                     "status_message": status_message,
                     "reason": cancel_reason or "Non spécifiée",
                     "reason_message": reason_message,
-                    "base_url": base_url_setting.get("value", os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")) if base_url_setting else os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")
+                    "base_url": await get_base_url(db)
                 },
                 background_tasks
             )
@@ -1059,8 +1044,7 @@ async def admin_cancel_demande(
             status_message = f'<div class="error-box">Votre demande a été annulée par l\'administrateur.</div>'
             reason_message = f"Raison : {cancel_reason}" if cancel_reason else None
             
-            base_url_setting = await db.settings.find_one({"key": "base_url"}, {"_id": 0})
-            base_url = base_url_setting.get("value", os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")) if base_url_setting else os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")
+            base_url = await get_base_url(db)
             
             await notify_user(
                 db,
@@ -1155,8 +1139,7 @@ async def admin_update_demande_status(
             
             reason_message = f"Raison : {reason}" if reason else None
             
-            base_url_setting = await db.settings.find_one({"key": "base_url"}, {"_id": 0})
-            base_url = base_url_setting.get("value", os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")) if base_url_setting else os.environ.get("BACKEND_PUBLIC_URL", "http://localhost:8001")
+            base_url = await get_base_url(db)
             
             try:
                 await notify_user(
@@ -1389,7 +1372,7 @@ async def create_minisite(
     final_plan_id = user_site_plan if user_site_plan else site_data.plan_id
     
     # Valider que le plan est valide
-    if final_plan_id not in ["SITE_PLAN_1", "SITE_PLAN_10", "SITE_PLAN_15"]:
+    if final_plan_id not in ["SITE_PLAN_1", "SITE_PLAN_2", "SITE_PLAN_3"]:
         raise HTTPException(status_code=400, detail=f"Plan invalide: {final_plan_id}")
     
     site_id = str(uuid.uuid4())
@@ -1514,8 +1497,8 @@ async def update_minisite(site_id: str, updates: dict, current_user = Depends(ge
     # Gérer les limites de modification selon le plan
     plan_limits = {
         "SITE_PLAN_1": {"logo_changes_per_month": 1, "name_changes_per_month": 1},
-        "SITE_PLAN_10": {"logo_changes_per_month": 10, "name_changes_per_month": 10},
-        "SITE_PLAN_15": {"logo_changes_per_month": 999, "name_changes_per_month": 999}
+        "SITE_PLAN_2": {"logo_changes_per_month": 10, "name_changes_per_month": 10},
+        "SITE_PLAN_3": {"logo_changes_per_month": 999, "name_changes_per_month": 999}
     }
     
     limits = plan_limits.get(minisite["plan_id"], {"logo_changes_per_month": 1, "name_changes_per_month": 1})
@@ -1575,8 +1558,8 @@ async def add_minisite_article(site_id: str, article_data: MiniSiteArticleCreate
     # Vérifier quotas d'articles selon le plan
     plan_quotas = {
         "SITE_PLAN_1": 5,
-        "SITE_PLAN_10": 10,
-        "SITE_PLAN_15": 20
+        "SITE_PLAN_2": 10,
+        "SITE_PLAN_3": 20
     }
     
     max_articles = plan_quotas.get(minisite["plan_id"], 5)
@@ -2229,8 +2212,8 @@ async def get_my_subscription(
     if not site_plan:
         plan_mapping = {
             "starter": "SITE_PLAN_1",
-            "standard": "SITE_PLAN_10",
-            "premium": "SITE_PLAN_15"
+            "standard": "SITE_PLAN_2",
+            "premium": "SITE_PLAN_3"
         }
         stripe_plan = subscription.get("plan")
         site_plan = plan_mapping.get(stripe_plan) if stripe_plan else None
@@ -2239,9 +2222,9 @@ async def get_my_subscription(
     site_plan_price_eur = None
     if site_plan == "SITE_PLAN_1":
         site_plan_price_eur = 1
-    elif site_plan == "SITE_PLAN_10":
+    elif site_plan == "SITE_PLAN_2":
         site_plan_price_eur = 10
-    elif site_plan == "SITE_PLAN_15":
+    elif site_plan == "SITE_PLAN_3":
         site_plan_price_eur = 15
     
     return {

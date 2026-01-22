@@ -46,7 +46,7 @@ export const MinisiteLanding = () => {
             const userResponse = await api.get('/auth/me');
             const user = userResponse.data;
             const hasPlanRole = user.roles?.some(role => 
-              ['SITE_PLAN_1', 'SITE_PLAN_10', 'SITE_PLAN_15'].includes(role)
+              ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(role)
             );
             
             if (hasPlanRole) {

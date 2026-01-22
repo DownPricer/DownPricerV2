@@ -1,57 +1,128 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>Nouvel utilisateur enregistré</title>
-    <!--[if mso]>
-    <style type="text/css">
-        body, table, td {font-family: Arial, sans-serif !important;}
+    <meta name="x-apple-disable-message-reformatting">
+    <title>Nouvel utilisateur inscrit</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        /* RESET */
+        html, body { margin: 0 auto !important; padding: 0 !important; height: 100% !important; width: 100% !important; background-color: #09090b; }
+        * { -ms-text-size-adjust: 100%; -webkit-text-size-adjust: 100%; }
+        div[style*="margin: 16px 0"] { margin: 0 !important; }
+        table, td { mso-table-lspace: 0pt !important; mso-table-rspace: 0pt !important; }
+        table { border-spacing: 0 !important; border-collapse: collapse !important; table-layout: fixed !important; margin: 0 auto !important; }
+        img { -ms-interpolation-mode: bicubic; }
+        a { text-decoration: none; }
+
+        /* TYPOGRAPHY */
+        .outfit { font-family: 'Outfit', Arial, sans-serif; }
+        
+        /* MOBILE */
+        @media only screen and (max-width: 600px) {
+            .email-container { width: 100% !important; max-width: 100% !important; }
+            .mobile-padding { padding-left: 20px !important; padding-right: 20px !important; }
+        }
     </style>
-    <![endif]-->
 </head>
-<body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;">
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
-        <tr>
-            <td align="center" style="padding: 20px 0;">
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <!-- Header -->
-                    <tr>
-                        <td style="background-color: #18181b; padding: 30px 20px; text-align: center;">
-                            <h1 style="margin: 0; font-size: 24px; font-weight: 900; color: #f97316; font-family: 'Outfit', 'Arial Black', Arial, sans-serif; letter-spacing: -0.5px;">{{ brand_name }}</h1>
-                        </td>
-                    </tr>
-                    <!-- Body -->
-                    <tr>
-                        <td style="padding: 30px 20px;">
-<h2 style="color: #18181b; margin-top: 0; font-size: 20px; font-weight: 700;">Nouvel utilisateur enregistré</h2>
-                            <p style="color: #374151; line-height: 1.6; margin: 0 0 20px 0;">Un nouvel utilisateur s'est inscrit sur la plateforme.</p>
-                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden;">
-                                <tr><td style="padding: 12px; background-color: #f9fafb; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Nom</td><td style="padding: 12px; background-color: #ffffff; color: #111827; border-bottom: 1px solid #e5e7eb;">{{{{ user_name }}}}</td></tr>
-                                <tr><td style="padding: 12px; background-color: #f9fafb; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">Email</td><td style="padding: 12px; background-color: #ffffff; color: #111827; border-bottom: 1px solid #e5e7eb;">{{{{ user_email }}}}</td></tr>
-                                <tr><td style="padding: 12px; background-color: #f9fafb; font-weight: 600; color: #374151;">Date</td><td style="padding: 12px; background-color: #ffffff; color: #111827;">{{{{ created_at }}}}</td></tr>
-                            </table>
-                            <div style="margin: 25px 0; text-align: center;">
-                                <a href="{{{{ base_url }}}}/admin/users" style="display: inline-block; padding: 12px 24px; background-color: {EMAIL_STYLE['button_bg']}; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 500;">Voir les utilisateurs</a>
-                            </div>
-                        </td>
-                    </tr>
-                    <!-- Footer -->
-                    <tr>
-                        <td style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
-                            <p style="margin: 0 0 10px 0; font-size: 12px; color: #6b7280; line-height: 1.6;">
-                                <strong style="color: #18181b;">{{ brand_name }}</strong><br>
-                                Pour toute question, contactez-nous à <a href="mailto:{{ support_email }}" style="color: #f97316; text-decoration: none;">{{ support_email }}</a>
-                            </p>
-                            <p style="margin: 10px 0 0 0; font-size: 11px; color: #9ca3af;">
-                                Cet email a été envoyé automatiquement. Merci de ne pas y répondre.
-                            </p>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
+<body width="100%" style="margin: 0; padding: 0 !important; mso-line-height-rule: exactly; background-color: #09090b;">
+    <center style="width: 100%; background-color: #09090b;">
+        
+        <div style="height: 40px; line-height: 40px; font-size: 10px;">&nbsp;</div>
+
+        <table align="center" role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto;" class="email-container">
+            
+            <tr>
+                <td align="center" style="padding: 30px 0; background-color: #09090b;">
+                    <h1 class="outfit" style="margin: 0; font-size: 28px; font-weight: 800; color: #ffffff; letter-spacing: -1px; text-transform: uppercase;">
+                        Down<span style="color: #f97316;">Pricer</span>
+                    </h1>
+                </td>
+            </tr>
+
+            <tr>
+                <td bgcolor="#18181b" style="border-radius: 12px; border: 1px solid #27272a; padding: 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        
+                        <tr>
+                            <td class="outfit" style="font-size: 24px; font-weight: 700; color: #ffffff; padding-bottom: 10px; line-height: 1.3;">
+                                Nouvel utilisateur inscrit 🚀
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td class="outfit" style="font-size: 15px; line-height: 24px; color: #a1a1aa; padding-bottom: 25px;">
+                                La communauté s'agrandit ! Un nouvel utilisateur vient de créer son compte sur la plateforme.
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="padding-bottom: 30px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border: 1px solid #27272a; border-radius: 8px; overflow: hidden;">
+                                    <tr>
+                                        <td class="outfit" width="30%" style="padding: 15px; background-color: #202023; color: #a1a1aa; font-weight: 600; font-size: 14px; border-bottom: 1px solid #27272a; border-right: 1px solid #27272a;">
+                                            Nom
+                                        </td>
+                                        <td class="outfit" style="padding: 15px; background-color: #18181b; color: #ffffff; font-size: 14px; border-bottom: 1px solid #27272a;">
+                                            <strong>{{ user_name }}</strong>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="outfit" style="padding: 15px; background-color: #202023; color: #a1a1aa; font-weight: 600; font-size: 14px; border-bottom: 1px solid #27272a; border-right: 1px solid #27272a;">
+                                            Email
+                                        </td>
+                                        <td style="padding: 15px; background-color: #18181b; color: #f97316; font-family: 'Courier New', monospace; font-size: 13px; border-bottom: 1px solid #27272a;">
+                                            {{ user_email }}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="outfit" style="padding: 15px; background-color: #202023; color: #a1a1aa; font-weight: 600; font-size: 14px; border-right: 1px solid #27272a;">
+                                            Date
+                                        </td>
+                                        <td class="outfit" style="padding: 15px; background-color: #18181b; color: #e4e4e7; font-size: 14px;">
+                                            {{ created_at }}
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td align="center" style="padding-bottom: 10px;">
+                                <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                                    <tr>
+                                        <td style="border-radius: 50px; background-color: #f97316; box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);">
+                                            <a href="{{ base_url }}/admin/users" target="_blank" class="outfit" style="padding: 14px 30px; border-radius: 50px; background-color: #f97316; color: #ffffff; display: inline-block; font-weight: 600; font-size: 15px; text-decoration: none; border: 1px solid #f97316;">
+                                                Voir les utilisateurs
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+
+                    </table>
+                </td>
+            </tr>
+
+            <tr>
+                <td class="outfit" style="padding: 30px; text-align: center; font-size: 12px; color: #52525b;">
+                    <p style="margin: 0 0 10px 0;"><strong>{{ brand_name }}</strong> Admin Notification</p>
+                    <p style="margin: 0;">Besoin d'assistance ? <a href="mailto:{{ support_email }}" style="color: #f97316; text-decoration: none;">{{ support_email }}</a></p>
+                    <p style="margin: 15px 0 0 0; font-size: 11px; opacity: 0.6;">Message automatique, ne pas répondre.</p>
+                </td>
+            </tr>
+
+        </table>
+        
+        <div style="height: 40px; line-height: 40px; font-size: 10px;">&nbsp;</div>
+
+    </center>
 </body>
 </html>

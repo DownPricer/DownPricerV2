@@ -32,15 +32,15 @@ export const AdminAbonnementsPage = () => {
 
   const miniSiteSubscriptions = subscriptions.filter(s => s.product === 'minisite');
   const miniSiteUsers = users.filter(u => 
-    u.roles.includes('SITE_PLAN_1') || u.roles.includes('SITE_PLAN_10') || u.roles.includes('SITE_PLAN_15')
+    u.roles.includes('SITE_PLAN_1') || u.roles.includes('SITE_PLAN_2') || u.roles.includes('SITE_PLAN_3')
   );
   const sPlanUsers = users.filter(u => 
     u.roles.includes('S_PLAN_5') || u.roles.includes('S_PLAN_15')
   );
 
   const getPlanBadge = (roles) => {
-    if (roles.includes('SITE_PLAN_15')) return <Badge className="bg-purple-100 text-purple-800">Mini-site 15€</Badge>;
-    if (roles.includes('SITE_PLAN_10')) return <Badge className="bg-blue-100 text-blue-800">Mini-site 10€</Badge>;
+    if (roles.includes('SITE_PLAN_3')) return <Badge className="bg-purple-100 text-purple-800">Mini-site 15€</Badge>;
+    if (roles.includes('SITE_PLAN_2')) return <Badge className="bg-blue-100 text-blue-800">Mini-site 10€</Badge>;
     if (roles.includes('SITE_PLAN_1')) return <Badge className="bg-green-100 text-green-800">Mini-site 1€</Badge>;
     if (roles.includes('S_PLAN_15')) return <Badge className="bg-orange-100 text-orange-800">S-Plan 15€</Badge>;
     if (roles.includes('S_PLAN_5')) return <Badge className="bg-yellow-100 text-yellow-800">S-Plan 5€</Badge>;
@@ -96,8 +96,8 @@ export const AdminAbonnementsPage = () => {
                   <p className="text-sm text-slate-500">Revenus mensuels</p>
                   <p className="text-3xl font-bold text-green-600">
                     {miniSiteUsers.filter(u => u.roles.includes('SITE_PLAN_1')).length * 1 +
-                     miniSiteUsers.filter(u => u.roles.includes('SITE_PLAN_10')).length * 10 +
-                     miniSiteUsers.filter(u => u.roles.includes('SITE_PLAN_15')).length * 15 +
+                     miniSiteUsers.filter(u => u.roles.includes('SITE_PLAN_2')).length * 10 +
+                     miniSiteUsers.filter(u => u.roles.includes('SITE_PLAN_3')).length * 15 +
                      sPlanUsers.filter(u => u.roles.includes('S_PLAN_5')).length * 5 +
                      sPlanUsers.filter(u => u.roles.includes('S_PLAN_15')).length * 15}€
                   </p>

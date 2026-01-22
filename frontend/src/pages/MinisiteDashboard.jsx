@@ -124,14 +124,14 @@
 //   const getPlanLabel = (planId) => {
 //     const plans = {
 //       'SITE_PLAN_1': 'Starter (1€/mois)',
-//       'SITE_PLAN_10': 'Standard (10€/mois)',
-//       'SITE_PLAN_15': 'Premium (15€/mois)'
+//       'SITE_PLAN_2': 'Standard (10€/mois)',
+//       'SITE_PLAN_3': 'Premium (15€/mois)'
 //     };
 //     return plans[planId] || planId;
 //   };
 
 //   const getPlanQuota = (planId) => {
-//     const quotas = { 'SITE_PLAN_1': 5, 'SITE_PLAN_10': 10, 'SITE_PLAN_15': 20 };
+//     const quotas = { 'SITE_PLAN_1': 5, 'SITE_PLAN_2': 10, 'SITE_PLAN_3': 20 };
 //     return quotas[planId] || 5;
 //   };
 
@@ -143,13 +143,13 @@
 //         customColors: false,
 //         canShowInResellerCatalog: false
 //       },
-//       'SITE_PLAN_10': {
+//       'SITE_PLAN_2': {
 //         templates: ALL_TEMPLATES.slice(0, 10),
 //         fonts: ALL_FONTS.slice(0, 10),
 //         customColors: true,
 //         canShowInResellerCatalog: true
 //       },
-//       'SITE_PLAN_15': {
+//       'SITE_PLAN_3': {
 //         templates: ALL_TEMPLATES,
 //         fonts: ALL_FONTS,
 //         customColors: true,
@@ -260,7 +260,7 @@
 //           </div>
 //           <div className="flex flex-wrap gap-2">
 //             <Badge className="bg-zinc-800 text-orange-400">{getPlanLabel(minisite.plan_id)}</Badge>
-//             {minisite.plan_id !== 'SITE_PLAN_15' && (
+//             {minisite.plan_id !== 'SITE_PLAN_3' && (
 //               <Button size="sm" className="bg-purple-600 hover:bg-purple-700" onClick={handleUpgrade}>
 //                 <Crown className="h-4 w-4 mr-1" /> Upgrade
 //               </Button>
@@ -375,7 +375,7 @@
 //                 <CardContent className="p-6">
 //                   <p className="text-sm text-orange-400 font-medium mb-1">Plan actuel</p>
 //                   <p className="text-lg font-bold text-white">{getPlanLabel(minisite.plan_id)}</p>
-//                   {minisite.plan_id !== 'SITE_PLAN_15' && (
+//                   {minisite.plan_id !== 'SITE_PLAN_3' && (
 //                     <Button size="sm" className="mt-2 bg-purple-600 hover:bg-purple-700" onClick={handleUpgrade}>
 //                       <Crown className="h-4 w-4 mr-1" /> Upgrade
 //                     </Button>
@@ -492,7 +492,7 @@
 //                     <p className="font-medium text-white">{getPlanLabel(minisite.plan_id)}</p>
 //                     <p className="text-sm text-zinc-400">{articles.length}/{quota} articles utilisés</p>
 //                   </div>
-//                   {minisite.plan_id !== 'SITE_PLAN_15' && (
+//                   {minisite.plan_id !== 'SITE_PLAN_3' && (
 //                     <Button className="bg-purple-600 hover:bg-purple-700" onClick={handleUpgrade}>
 //                       <Crown className="h-4 w-4 mr-1" /> Upgrade
 //                     </Button>
@@ -760,7 +760,7 @@ export const MinisiteDashboard = () => {
         const user = userResponse.data;
         
         const hasPlanRole = user.roles?.some(role => 
-          ['SITE_PLAN_1', 'SITE_PLAN_10', 'SITE_PLAN_15'].includes(role)
+          ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(role)
         );
         
         if (subscription?.has_subscription && hasPlanRole) {
@@ -833,7 +833,7 @@ export const MinisiteDashboard = () => {
           const userRes = await api.get('/auth/me');
           const user = userRes.data;
           const hasPlanRole = user.roles?.some(role => 
-            ['SITE_PLAN_1', 'SITE_PLAN_10', 'SITE_PLAN_15'].includes(role)
+            ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(role)
           );
           
           if (hasPlanRole) {
@@ -896,20 +896,20 @@ export const MinisiteDashboard = () => {
 
   // --- Helpers ---
   const getPlanLabel = (planId) => {
-    const plans = { 'SITE_PLAN_1': 'Starter', 'SITE_PLAN_10': 'Standard', 'SITE_PLAN_15': 'Premium' };
+    const plans = { 'SITE_PLAN_1': 'Starter', 'SITE_PLAN_2': 'Standard', 'SITE_PLAN_3': 'Premium' };
     return plans[planId] || planId;
   };
 
   const getPlanQuota = (planId) => {
-    const quotas = { 'SITE_PLAN_1': 5, 'SITE_PLAN_10': 10, 'SITE_PLAN_15': 20 };
+    const quotas = { 'SITE_PLAN_1': 5, 'SITE_PLAN_2': 10, 'SITE_PLAN_3': 20 };
     return quotas[planId] || 5;
   };
 
   const getPlanFeatures = (planId) => {
     const features = {
       'SITE_PLAN_1': { templates: ALL_TEMPLATES.slice(0, 3), fonts: ALL_FONTS.slice(0, 3), customColors: false, canShowInResellerCatalog: false },
-      'SITE_PLAN_10': { templates: ALL_TEMPLATES.slice(0, 10), fonts: ALL_FONTS.slice(0, 10), customColors: true, canShowInResellerCatalog: true },
-      'SITE_PLAN_15': { templates: ALL_TEMPLATES, fonts: ALL_FONTS, customColors: true, canShowInResellerCatalog: true }
+      'SITE_PLAN_2': { templates: ALL_TEMPLATES.slice(0, 10), fonts: ALL_FONTS.slice(0, 10), customColors: true, canShowInResellerCatalog: true },
+      'SITE_PLAN_3': { templates: ALL_TEMPLATES, fonts: ALL_FONTS, customColors: true, canShowInResellerCatalog: true }
     };
     return features[planId] || features['SITE_PLAN_1'];
   };
@@ -1102,7 +1102,7 @@ export const MinisiteDashboard = () => {
                    />
                 </div>
               </div>
-              {minisite.plan_id !== 'SITE_PLAN_15' && (
+              {minisite.plan_id !== 'SITE_PLAN_3' && (
                 <Button size="sm" onClick={handleUpgrade} className="bg-purple-600 hover:bg-purple-700 text-white shrink-0 w-full md:w-auto">
                   <Crown className="h-3 w-3 mr-2" /> Augmenter la limite
                 </Button>
@@ -1190,7 +1190,7 @@ export const MinisiteDashboard = () => {
                    </CardHeader>
                    <CardContent>
                       <div className="text-2xl font-bold text-orange-500">{getPlanLabel(minisite.plan_id)}</div>
-                      {minisite.plan_id !== 'SITE_PLAN_15' && (
+                      {minisite.plan_id !== 'SITE_PLAN_3' && (
                          <Button variant="link" onClick={handleUpgrade} className="text-purple-400 h-auto p-0 text-xs mt-1 hover:text-purple-300">
                             Passer au niveau supérieur →
                          </Button>
