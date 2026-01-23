@@ -332,7 +332,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from './components/ui/sonner';
-import { getUser } from './utils/auth';
+import { getUser, hasSTier } from './utils/auth';
 
 // --- IMPORTS DES PAGES ---
 import { Home } from './pages/Home';
@@ -382,6 +382,11 @@ import { MinisiteDashboard } from './pages/MinisiteDashboard';
 import { MinisitePublic } from './pages/MinisitePublic';
 import { MinisiteUpgrade } from './pages/MinisiteUpgrade'; // Importé ici
 
+// --- PRO MODULE IMPORTS ---
+import { ProDashboard } from './pages/pro/Dashboard';
+import { ProArticles } from './pages/pro/Articles';
+import { ProAddArticle } from './pages/pro/AddArticle';
+
 const ProtectedRoute = ({ children, requiredRole }) => {
   const user = getUser();
   
@@ -390,6 +395,20 @@ const ProtectedRoute = ({ children, requiredRole }) => {
   }
   
   if (requiredRole && !user.roles.includes(requiredRole)) {
+    return <Navigate to="/" />;
+  }
+  
+  return children;
+};
+
+const ProtectedSTierRoute = ({ children }) => {
+  const user = getUser();
+  
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+  
+  if (!hasSTier()) {
     return <Navigate to="/" />;
   }
   
@@ -672,6 +691,32 @@ function App() {
               <ProtectedRoute requiredRole="ADMIN">
                 <AdminExportsPage />
               </ProtectedRoute>
+            }
+          />
+          
+          {/* Pro Module Routes (S-tier uniquement) */}
+          <Route
+            path="/pro/dashboard"
+            element={
+              <ProtectedSTierRoute>
+                <ProDashboard />
+              </ProtectedSTierRoute>
+            }
+          />
+          <Route
+            path="/pro/articles"
+            element={
+              <ProtectedSTierRoute>
+                <ProArticles />
+              </ProtectedSTierRoute>
+            }
+          />
+          <Route
+            path="/pro/articles/new"
+            element={
+              <ProtectedSTierRoute>
+                <ProAddArticle />
+              </ProtectedSTierRoute>
             }
           />
         </Routes>

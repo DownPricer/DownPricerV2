@@ -30,6 +30,15 @@ export const hasRole = (role) => {
   return user && user.roles && user.roles.includes(role);
 };
 
+// Vérifier si l'utilisateur a un rôle S-tier (accès module Pro)
+export const hasSTier = () => {
+  const user = getUser();
+  if (!user || !user.roles) return false;
+  
+  const sTierRoles = ['S_PLAN_5', 'S_PLAN_10', 'S_PLAN_15', 'SITE_PLAN_10'];
+  return user.roles.some(role => sTierRoles.includes(role));
+};
+
 export const logout = () => {
   removeToken();
   removeUser();

@@ -93,3 +93,17 @@ backend/uploads/*
 # Build directories
 frontend/build/
 dist/
+
+# --- Imports (dossiers temporaires de référence, ex: Emergent) ---
+_imports/
+_imports/**
+
+# Optionnel: si tu as aussi un dossier "fichier emergent" à la racine
+fichier_emergent/
+fichier_emergent/**
+
+# Optionnel: archives / exports
+*.zip
+*.tar
+*.tar.gz
+*.7z

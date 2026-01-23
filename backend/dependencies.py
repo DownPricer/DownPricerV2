@@ -40,3 +40,37 @@ def require_roles(required_roles: List[UserRole]):
         return current_user
     
     return role_checker
+
+def require_s_tier():
+    """
+    Middleware pour vérifier l'accès S-tier (S_PLAN_5, S_PLAN_10, S_PLAN_15, SITE_PLAN_10 legacy).
+    Utilisé pour le module Pro achat/revente.
+    """
+    async def s_tier_checker(current_user: TokenData = Depends(get_current_user)):
+        # Rôles S-tier autorisés
+        s_tier_roles = [
+            UserRole.S_PLAN_5,
+            UserRole.S_PLAN_10,
+            UserRole.S_PLAN_15,
+            UserRole.SITE_PLAN_10  # Legacy, toléré pour backward compatibility
+        ]
+        
+        # Convertir les rôles string en UserRole (avec gestion d'erreur pour rôles non définis)
+        user_roles = []
+        for role_str in current_user.roles:
+            try:
+                user_roles.append(UserRole(role_str))
+            except ValueError:
+                # Rôle non défini dans l'Enum, ignorer
+                continue
+        
+        # Vérifier si l'utilisateur a au moins un rôle S-tier
+        if not any(role in user_roles for role in s_tier_roles):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Accès interdit : module Pro réservé aux utilisateurs S-tier (S_PLAN_5, S_PLAN_10, S_PLAN_15)"
+            )
+        
+        return current_user
+    
+    return s_tier_checker

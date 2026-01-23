@@ -4,7 +4,7 @@ import { Search, Menu, X, User } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
-import { getUser, logout, hasRole, refreshUser } from '../utils/auth';
+import { getUser, logout, hasRole, hasSTier, refreshUser } from '../utils/auth';
 
 export const Header = () => {
   const navigate = useNavigate();
@@ -152,6 +152,16 @@ export const Header = () => {
                     Devenir vendeur
                   </Button>
                 )}
+                {hasSTier() && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => navigate('/pro/dashboard')}
+                    className={isMarketplace ? 'text-white hover:text-orange-500' : ''}
+                    data-testid="header-pro-btn"
+                  >
+                    Achat / Revente
+                  </Button>
+                )}
                 {hasRole('ADMIN') && (
                   <Button
                     variant="ghost"
@@ -270,6 +280,15 @@ export const Header = () => {
                     onClick={() => { navigate('/devenir-vendeur'); setMobileMenuOpen(false); }}
                   >
                     Devenir vendeur
+                  </Button>
+                )}
+                {hasSTier() && (
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start"
+                    onClick={() => { navigate('/pro/dashboard'); setMobileMenuOpen(false); }}
+                  >
+                    Achat / Revente
                   </Button>
                 )}
                 {hasRole('ADMIN') && (

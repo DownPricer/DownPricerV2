@@ -23,6 +23,7 @@ from models import (
 from auth import verify_password, get_password_hash, create_access_token
 from dependencies import get_current_user, require_roles
 from billing_provider import get_billing_provider
+from pro_router import pro_router
 from notifications import EventType, notify_admin, notify_user, get_base_url
 from stripe_billing import (
     create_checkout_session,
@@ -2433,6 +2434,9 @@ async def stripe_webhook(request: Request):
 
 
 app.include_router(api_router)
+
+# Router Pro pour module achat/revente (S-tier uniquement)
+app.include_router(pro_router)
 
 @app.get("/health")
 @app.get("/api/health")

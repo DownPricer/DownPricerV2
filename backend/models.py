@@ -11,7 +11,9 @@ class UserRole(str, Enum):
     SITE_PLAN_2 = "SITE_PLAN_2"
     SITE_PLAN_3 = "SITE_PLAN_3"
     S_PLAN_5 = "S_PLAN_5"
+    S_PLAN_10 = "S_PLAN_10"
     S_PLAN_15 = "S_PLAN_15"
+    SITE_PLAN_10 = "SITE_PLAN_10"  # Legacy role, backward compatible
     ADMIN = "ADMIN"
 
 class DemandeStatus(str, Enum):
