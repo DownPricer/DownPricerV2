@@ -333,6 +333,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from './components/ui/sonner';
 import { getUser, hasSTier } from './utils/auth';
+import { AppLayout } from './components/AppLayout';
 
 // --- IMPORTS DES PAGES ---
 import { Home } from './pages/Home';
@@ -419,15 +420,16 @@ function App() {
   return (
     <div className="App">
       <BrowserRouter>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/cgu" element={<CGU />} />
-          <Route path="/article/:id" element={<ArticleDetail />} />
-          <Route path="/faire-demande" element={<FaireDemande />} />
-          <Route path="/devenir-vendeur" element={<DevenirVendeur />} />
+        <AppLayout>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/cgu" element={<CGU />} />
+            <Route path="/article/:id" element={<ArticleDetail />} />
+            <Route path="/faire-demande" element={<FaireDemande />} />
+            <Route path="/devenir-vendeur" element={<DevenirVendeur />} />
           
           {/* Client routes */}
           <Route
@@ -719,7 +721,8 @@ function App() {
               </ProtectedSTierRoute>
             }
           />
-        </Routes>
+          </Routes>
+        </AppLayout>
         <Toaster position="top-right" />
       </BrowserRouter>
     </div>
