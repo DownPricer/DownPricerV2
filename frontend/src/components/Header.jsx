@@ -37,7 +37,8 @@ export const Header = () => {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-black/80 backdrop-blur-xl" data-testid="main-header">
+    /* CHANGEMENT : bg-black solide (100%) et suppression du blur pour éviter le gris */
+    <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-black" data-testid="main-header">
       <div className="container mx-auto px-6">
         <div className="flex h-16 items-center justify-between gap-8">
           
@@ -47,17 +48,16 @@ export const Header = () => {
             </div>
           </Link>
 
+          {/* Barre de recherche - On utilise un fond très légèrement surélevé (#0A0A0A) */}
           <div className="hidden md:flex flex-1 max-w-md">
             <form onSubmit={handleSearch} className="w-full relative group">
-              {/* Icône passée en white/20 */}
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/20 group-focus-within:text-orange-500 transition-colors" />
               <Input
                 type="text"
                 placeholder="Rechercher un article..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                /* Suppression du zinc-900 pour du white/5, bordure white/10 */
-                className="pl-10 w-full bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-orange-500/20 focus:border-orange-500/50 rounded-full transition-all h-10 border"
+                className="pl-10 w-full bg-[#0A0A0A] border-white/5 text-white placeholder:text-white/20 focus:ring-orange-500/20 focus:border-orange-500/50 rounded-full transition-all h-10 border"
                 data-testid="header-search-input"
               />
             </form>
@@ -72,52 +72,58 @@ export const Header = () => {
                 <div className="h-4 w-[1px] bg-white/10 mx-2" />
                 <Button
                   onClick={() => navigate('/login')}
-                  className="bg-white hover:bg-white/90 text-black font-bold rounded-full px-6 h-9 text-xs transition-all active:scale-95"
+                  className="bg-white hover:bg-white/90 text-black font-extrabold rounded-full px-5 h-8 text-[11px] uppercase tracking-wider transition-all active:scale-95"
                   data-testid="header-login-btn"
                 >
                   Connexion
                 </Button>
               </>
             ) : (
-              <>
+              <div className="flex items-center gap-1">
                 {hasRole('CLIENT') && <NavLink onClick={() => navigate('/mes-demandes')}>Mes demandes</NavLink>}
                 <NavLink onClick={() => navigate('/minisite')}>Mon Site</NavLink>
                 {hasRole('SELLER') ? (
-                  <NavLink onClick={() => navigate('/seller/dashboard')} active>Espace Vendeur</NavLink>
+                  <NavLink onClick={() => navigate('/seller/dashboard')} active>Vendeur</NavLink>
                 ) : (
-                  <NavLink onClick={() => navigate('/devenir-vendeur')}>Devenir vendeur</NavLink>
+                  <NavLink onClick={() => navigate('/devenir-vendeur')}>Vendre</NavLink>
                 )}
                 {hasSTier() && <NavLink onClick={() => navigate('/pro/dashboard')}>Pro</NavLink>}
-                {hasRole('ADMIN') && <NavLink onClick={() => navigate('/admin/dashboard')} className="text-orange-500">Admin</NavLink>}
+                {hasRole('ADMIN') && (
+                  <button 
+                    onClick={() => navigate('/admin/dashboard')}
+                    className="px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-orange-500 hover:bg-white/5 rounded-full transition-colors"
+                  >
+                    Admin
+                  </button>
+                )}
                 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    {/* Icône user en white/40 */}
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="ml-2 text-white/40 hover:text-white hover:bg-white/5 rounded-full"
+                      className="ml-2 text-white/40 hover:text-white hover:bg-white/5 rounded-full transition-colors h-9 w-9"
                       data-testid="header-account-menu-btn"
                     >
                       <User className="h-5 w-5" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-black border-white/10 text-white min-w-[180px] p-2 shadow-2xl">
-                    <DropdownMenuItem onClick={() => navigate('/mon-compte')} className="rounded-md focus:bg-white/10 focus:text-white cursor-pointer">
+                  <DropdownMenuContent align="end" className="bg-[#0A0A0A] border-white/10 text-white min-w-[180px] p-2 shadow-2xl">
+                    <DropdownMenuItem onClick={() => navigate('/mon-compte')} className="rounded-md focus:bg-white/10 cursor-pointer">
                       Mon compte
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="bg-white/10" />
-                    <DropdownMenuItem onClick={handleLogout} className="rounded-md focus:bg-red-500/10 text-red-400 focus:text-red-400 cursor-pointer">
+                    <DropdownMenuItem onClick={handleLogout} className="rounded-md text-red-400 focus:bg-red-500/10 cursor-pointer">
                       Déconnexion
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              </>
+              </div>
             )}
           </nav>
 
           <button
-            className="md:hidden text-white/40 hover:text-white"
+            className="md:hidden text-white/60 hover:text-white"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             data-testid="header-mobile-menu-toggle"
           >
@@ -125,15 +131,16 @@ export const Header = () => {
           </button>
         </div>
 
+        {/* Menu Mobile - Noir Solide également */}
         {mobileMenuOpen && (
-          <div className="md:hidden py-6 space-y-4 border-t border-white/5 bg-black animate-in slide-in-from-top-4 duration-200">
+          <div className="md:hidden py-6 space-y-4 border-t border-white/5 bg-black animate-in fade-in slide-in-from-top-4 duration-300">
             <form onSubmit={handleSearch} className="px-2">
               <Input
                 type="text"
                 placeholder="Rechercher..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-white/5 border-white/10 text-white rounded-xl placeholder:text-white/20"
+                className="bg-[#0A0A0A] border-white/10 text-white rounded-xl placeholder:text-white/20 h-11"
               />
             </form>
             <div className="grid gap-1 px-2">
@@ -157,8 +164,8 @@ export const Header = () => {
 const NavLink = ({ children, onClick, active, className }) => (
   <button
     onClick={onClick}
-    className={`px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-full hover:text-white ${
-      active ? 'text-orange-500' : 'text-white/50 hover:bg-white/5'
+    className={`px-4 py-2 text-[11px] font-bold uppercase tracking-[0.1em] transition-all rounded-full ${
+      active ? 'text-orange-500 bg-white/5' : 'text-white/40 hover:text-white hover:bg-white/5'
     } ${className}`}
   >
     {children}
@@ -168,7 +175,7 @@ const NavLink = ({ children, onClick, active, className }) => (
 const MobileNavLink = ({ children, onClick }) => (
   <button
     onClick={onClick}
-    className="flex items-center justify-between w-full p-4 text-sm font-semibold text-white/70 hover:bg-white/5 rounded-xl transition-colors"
+    className="flex items-center justify-between w-full p-4 text-sm font-semibold text-white/70 hover:bg-white/5 rounded-xl transition-all"
   >
     {children}
     <ChevronRight className="h-4 w-4 text-white/20" />
