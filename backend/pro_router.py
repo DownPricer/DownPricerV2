@@ -43,7 +43,7 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[db_name]
 
 # Router avec préfixe /api/pro
-pro_router = APIRouter(prefix="/pro", tags=["Pro"])
+pro_router = APIRouter(prefix="/api/pro", tags=["Pro"])
 
 # ============================================================================
 # MODÈLES PYDANTIC POUR LE MODULE PRO
