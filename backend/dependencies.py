@@ -45,30 +45,40 @@ def require_s_tier():
     """
     Middleware pour vérifier l'accès S-tier (S_PLAN_5, S_PLAN_10, S_PLAN_15, SITE_PLAN_10 legacy).
     Utilisé pour le module Pro achat/revente.
+    Autorise aussi ADMIN pour l'accès complet.
     """
     async def s_tier_checker(current_user: TokenData = Depends(get_current_user)):
-        # Rôles S-tier autorisés
-        s_tier_roles = [
-            UserRole.S_PLAN_5,
-            UserRole.S_PLAN_10,
-            UserRole.S_PLAN_15,
-            UserRole.SITE_PLAN_10  # Legacy, toléré pour backward compatibility
+        # Normaliser current_user.roles en liste si ce n'est pas déjà le cas
+        roles_list = current_user.roles if isinstance(current_user.roles, list) else [current_user.roles]
+        
+        # Rôles S-tier autorisés (en string pour comparaison robuste)
+        s_tier_role_strings = [
+            "S_PLAN_5",
+            "S_PLAN_10",
+            "S_PLAN_15",
+            "SITE_PLAN_10",  # Legacy, toléré pour backward compatibility
+            "ADMIN"  # Admin a accès complet
         ]
         
-        # Convertir les rôles string en UserRole (avec gestion d'erreur pour rôles non définis)
-        user_roles = []
-        for role_str in current_user.roles:
-            try:
-                user_roles.append(UserRole(role_str))
-            except ValueError:
-                # Rôle non défini dans l'Enum, ignorer
-                continue
+        # Vérifier si l'utilisateur a au moins un rôle autorisé
+        # Comparaison en string pour robustesse (peut être Enum ou str)
+        user_role_strings = []
+        for role in roles_list:
+            if isinstance(role, UserRole):
+                user_role_strings.append(role.value)
+            elif isinstance(role, str):
+                user_role_strings.append(role)
+            else:
+                # Essayer de convertir en string
+                user_role_strings.append(str(role))
         
-        # Vérifier si l'utilisateur a au moins un rôle S-tier
-        if not any(role in user_roles for role in s_tier_roles):
+        # Vérifier si l'utilisateur a au moins un rôle autorisé
+        has_access = any(role_str in s_tier_role_strings for role_str in user_role_strings)
+        
+        if not has_access:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Accès interdit : module Pro réservé aux utilisateurs S-tier (S_PLAN_5, S_PLAN_10, S_PLAN_15)"
+                detail="Accès interdit : module Pro réservé aux utilisateurs S-tier (S_PLAN_5, S_PLAN_10, S_PLAN_15) ou ADMIN"
             )
         
         return current_user

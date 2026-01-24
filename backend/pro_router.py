@@ -402,7 +402,7 @@ async def get_pro_admin_stats(
     Statistiques globales pour tous les utilisateurs du module Pro.
     Accessible uniquement aux administrateurs.
     """
-    db_conn = get_db()
+    db_conn = db  # Utiliser la connexion MongoDB locale
     
     # Récupérer tous les articles (tous users)
     all_articles = await db_conn.pro_articles.find({}).to_list(length=None)
@@ -428,12 +428,23 @@ async def get_pro_admin_stats(
     
     # Alertes retour globales (dans les 3 prochains jours)
     three_days_from_now = datetime.utcnow() + timedelta(days=3)
-    alerts_count = len([
-        a for a in all_articles 
-        if a.get("return_deadline") 
-        and datetime.fromisoformat(a["return_deadline"].replace("Z", "+00:00")) <= three_days_from_now
-        and a.get("status") != "Vendu"
-    ])
+    alerts_count = 0
+    for a in all_articles:
+        return_deadline = a.get("return_deadline")
+        if return_deadline and a.get("status") != "Vendu":
+            # Gérer les différents formats de datetime (datetime object ou string)
+            if isinstance(return_deadline, datetime):
+                deadline_dt = return_deadline
+            elif isinstance(return_deadline, str):
+                try:
+                    deadline_dt = datetime.fromisoformat(return_deadline.replace("Z", "+00:00"))
+                except (ValueError, AttributeError):
+                    continue
+            else:
+                continue
+            
+            if deadline_dt <= three_days_from_now:
+                alerts_count += 1
     
     # Compter les users uniques
     unique_user_ids = set()
@@ -466,7 +477,7 @@ async def get_pro_admin_users(
     Liste des utilisateurs ayant utilisé le module Pro.
     Accessible uniquement aux administrateurs.
     """
-    db_conn = get_db()
+    db_conn = db  # Utiliser la connexion MongoDB locale
     
     # Récupérer tous les user_ids uniques depuis les articles et transactions
     user_ids_from_articles = await db_conn.pro_articles.distinct("user_id")
