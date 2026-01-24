@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, Menu, X, User, ChevronRight, LogOut, LayoutDashboard, ShieldCheck } from 'lucide-react';
+import { Search, Menu, X, User, ChevronRight, LogOut, LayoutDashboard, ShieldCheck, Zap, Star } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
@@ -50,7 +50,7 @@ export const Header = () => {
             </div>
           </Link>
 
-          {/* DESKTOP SEARCH */}
+          {/* --- DESKTOP SEARCH --- */}
           <div className="hidden md:flex flex-1 max-w-md">
             <form onSubmit={handleSearch} className="w-full relative group">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/20 group-focus-within:text-orange-500 transition-colors" />
@@ -64,7 +64,7 @@ export const Header = () => {
             </form>
           </div>
 
-          {/* DESKTOP NAV */}
+          {/* --- DESKTOP NAV --- */}
           <nav className="hidden md:flex items-center gap-1">
             {!user ? (
               <>
@@ -88,11 +88,20 @@ export const Header = () => {
                 ) : (
                   <NavLink onClick={() => navigate('/devenir-vendeur')}>Vendre</NavLink>
                 )}
-                {hasSTier() && <NavLink onClick={() => navigate('/pro/dashboard')}>Pro</NavLink>}
+                {/* PRO DESKTOP */}
+                {hasSTier() && (
+                  <button 
+                    onClick={() => navigate('/pro/dashboard')}
+                    className="px-4 py-2 text-[11px] font-black uppercase tracking-widest text-emerald-400 hover:bg-emerald-500/5 rounded-full transition-colors flex items-center gap-2"
+                  >
+                    <Star size={12} className="fill-emerald-400" /> Pro
+                  </button>
+                )}
+                {/* ADMIN DESKTOP */}
                 {hasRole('ADMIN') && (
                   <button 
                     onClick={() => navigate('/admin/dashboard')}
-                    className="px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-orange-500 hover:bg-white/5 rounded-full transition-colors"
+                    className="px-4 py-2 text-[11px] font-black uppercase tracking-widest text-orange-500 hover:bg-orange-500/5 rounded-full transition-colors"
                   >
                     Admin
                   </button>
@@ -105,12 +114,12 @@ export const Header = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-[#0A0A0A] border-white/10 text-white min-w-[180px] p-2 shadow-2xl">
-                    <DropdownMenuItem onClick={() => navigate('/mon-compte')} className="rounded-md focus:bg-white/10 cursor-pointer text-xs uppercase font-bold tracking-widest">
+                    <DropdownMenuItem onClick={() => navigate('/mon-compte')} className="rounded-md focus:bg-white/10 cursor-pointer text-xs uppercase font-black tracking-widest p-3">
                       Mon compte
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator className="bg-white/10" />
-                    <DropdownMenuItem onClick={handleLogout} className="rounded-md text-red-400 focus:bg-red-500/10 cursor-pointer text-xs uppercase font-bold tracking-widest">
-                      Déconnexion
+                    <DropdownMenuSeparator className="bg-white/5" />
+                    <DropdownMenuItem onClick={handleLogout} className="rounded-md text-red-500 focus:bg-red-500/10 cursor-pointer text-xs uppercase font-black tracking-widest p-3">
+                      <LogOut size={14} className="mr-2" /> Déconnexion
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -127,57 +136,90 @@ export const Header = () => {
           </button>
         </div>
 
-        {/* MOBILE MENU - CORRIGÉ AVEC LOGIQUE USER */}
+        {/* --- MOBILE MENU --- */}
         {mobileMenuOpen && (
           <div className="md:hidden py-6 space-y-6 border-t border-white/5 bg-black animate-in fade-in slide-in-from-top-4 duration-300">
-            <form onSubmit={handleSearch} className="px-2">
+            <form onSubmit={handleSearch} className="px-4">
               <input
                 type="text"
-                placeholder="Rechercher..."
+                placeholder="Rechercher un produit..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#0A0A0A] border border-white/10 text-white rounded-xl placeholder:text-white/20 h-12 px-4 outline-none focus:border-orange-500/50 transition-all"
+                className="w-full bg-[#0A0A0A] border border-white/10 text-white rounded-xl placeholder:text-white/20 h-12 px-4 outline-none focus:border-orange-500/50 transition-all text-sm"
               />
             </form>
 
             <div className="grid gap-1 px-2">
-              <MobileNavLink onClick={() => { navigate('/faire-demande'); setMobileMenuOpen(false); }}>Faire une demande</MobileNavLink>
+              {/* Liens de base toujours visibles */}
+              {!user && <MobileNavLink onClick={() => { navigate('/faire-demande'); setMobileMenuOpen(false); }}>Faire une demande</MobileNavLink>}
               <MobileNavLink onClick={() => { navigate('/minisite'); setMobileMenuOpen(false); }}>Mon Site</MobileNavLink>
               
               {user ? (
                 <>
-                  {/* Liens spécifiques si connecté */}
+                  {/* Section Utilisateur Connecté */}
                   <div className="h-[1px] bg-white/5 my-2 mx-4" />
-                  {hasRole('CLIENT') && <MobileNavLink onClick={() => { navigate('/mes-demandes'); setMobileMenuOpen(false); }}>Mes demandes</MobileNavLink>}
-                  {hasRole('SELLER') ? (
-                    <MobileNavLink onClick={() => { navigate('/seller/dashboard'); setMobileMenuOpen(false); }}>Espace Vendeur</MobileNavLink>
-                  ) : (
-                    <MobileNavLink onClick={() => { navigate('/devenir-vendeur'); setMobileMenuOpen(false); }}>Devenir Vendeur</MobileNavLink>
-                  )}
-                  {hasRole('ADMIN') && (
-                    <MobileNavLink onClick={() => { navigate('/admin/dashboard'); setMobileMenuOpen(false); }} className="text-orange-500">
-                      Panel Administration
+                  
+                  {hasRole('CLIENT') && (
+                    <MobileNavLink onClick={() => { navigate('/mes-demandes'); setMobileMenuOpen(false); }}>
+                      Mes demandes sourcing
                     </MobileNavLink>
                   )}
+
+                  {hasRole('SELLER') ? (
+                    <MobileNavLink onClick={() => { navigate('/seller/dashboard'); setMobileMenuOpen(false); }}>
+                      Dashboard Vendeur
+                    </MobileNavLink>
+                  ) : (
+                    <MobileNavLink onClick={() => { navigate('/devenir-vendeur'); setMobileMenuOpen(false); }}>
+                      Devenir Vendeur
+                    </MobileNavLink>
+                  )}
+
+                  {/* --- LE PRO OUBLIÉ EST ICI --- */}
+                  {hasSTier() && (
+                    <MobileNavLink 
+                      onClick={() => { navigate('/pro/dashboard'); setMobileMenuOpen(false); }}
+                      className="text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 mb-1"
+                    >
+                      <span className="flex items-center gap-2 italic font-black">
+                        <Star size={14} className="fill-emerald-400" /> Accès Pro S-Tier
+                      </span>
+                    </MobileNavLink>
+                  )}
+
+                  {/* ACCÈS ADMIN MOBILE */}
+                  {hasRole('ADMIN') && (
+                    <MobileNavLink 
+                      onClick={() => { navigate('/admin/dashboard'); setMobileMenuOpen(false); }}
+                      className="text-orange-500 bg-orange-500/5 border border-orange-500/10"
+                    >
+                      Console Administration
+                    </MobileNavLink>
+                  )}
+
                   <MobileNavLink onClick={() => { navigate('/mon-compte'); setMobileMenuOpen(false); }}>Mon compte</MobileNavLink>
                   
-                  <Button
-                    className="w-full mt-4 bg-white/5 hover:bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl h-12 font-black uppercase text-[10px] tracking-widest"
-                    onClick={handleLogout}
-                  >
-                    <LogOut className="h-4 w-4 mr-2" /> Déconnexion
-                  </Button>
+                  <div className="px-4 pt-4">
+                    <Button
+                      className="w-full bg-white/5 hover:bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl h-12 font-black uppercase text-[10px] tracking-[0.2em]"
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="h-4 w-4 mr-2" /> Terminer la session
+                    </Button>
+                  </div>
                 </>
               ) : (
                 <>
-                  {/* Liens si déconnecté */}
+                  {/* Section Déconnecté */}
                   <MobileNavLink onClick={() => { navigate('/devenir-vendeur'); setMobileMenuOpen(false); }}>Devenir vendeur</MobileNavLink>
-                  <Button
-                    className="w-full mt-4 bg-orange-600 hover:bg-orange-500 text-white rounded-xl h-12 font-black uppercase text-[10px] tracking-widest shadow-lg shadow-orange-900/20"
-                    onClick={() => { navigate('/login'); setMobileMenuOpen(false); }}
-                  >
-                    Connexion / Inscription
-                  </Button>
+                  <div className="px-4 pt-4">
+                    <Button
+                      className="w-full bg-orange-600 hover:bg-orange-500 text-white rounded-xl h-12 font-black uppercase text-[10px] tracking-[0.2em] shadow-lg shadow-orange-900/20"
+                      onClick={() => { navigate('/login'); setMobileMenuOpen(false); }}
+                    >
+                      Connexion / S'inscrire
+                    </Button>
+                  </div>
                 </>
               )}
             </div>
@@ -188,10 +230,12 @@ export const Header = () => {
   );
 };
 
+// --- COMPOSANTS DE NAVIGATION INTERNES ---
+
 const NavLink = ({ children, onClick, active, className }) => (
   <button
     onClick={onClick}
-    className={`px-4 py-2 text-[11px] font-bold uppercase tracking-[0.1em] transition-all rounded-full ${
+    className={`px-4 py-2 text-[11px] font-black uppercase tracking-[0.1em] transition-all rounded-full ${
       active ? 'text-orange-500 bg-white/5' : 'text-white/40 hover:text-white hover:bg-white/5'
     } ${className}`}
   >
@@ -202,7 +246,7 @@ const NavLink = ({ children, onClick, active, className }) => (
 const MobileNavLink = ({ children, onClick, className }) => (
   <button
     onClick={onClick}
-    className={`flex items-center justify-between w-full p-4 text-[11px] font-black uppercase tracking-[0.15em] text-white/70 hover:bg-white/5 rounded-xl transition-all ${className}`}
+    className={`flex items-center justify-between w-full p-4 text-[10px] font-black uppercase tracking-[0.2em] text-white/70 hover:bg-white/5 rounded-xl transition-all ${className}`}
   >
     {children}
     <ChevronRight className="h-4 w-4 text-white/20" />
