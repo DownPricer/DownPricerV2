@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { ArrowLeft, User, Package, DollarSign, Truck, Calendar, CheckCircle, XCircle, AlertCircle, Loader2, CreditCard } from 'lucide-react';
+import { ArrowLeft, User, Package, DollarSign, Truck, Calendar, CheckCircle, XCircle, AlertCircle, Loader2, CreditCard, Hash, Info, MapPin, Eye } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
 import { Textarea } from '../../components/ui/textarea';
@@ -33,7 +33,6 @@ export const AdminDemandeDetail = () => {
     try {
       const response = await api.get(`/demandes/${id}`);
       setDemande(response.data);
-      
       const usersResponse = await api.get('/admin/users');
       const userFound = usersResponse.data.find(u => u.id === response.data.client_id);
       setClient(userFound);
@@ -50,472 +49,365 @@ export const AdminDemandeDetail = () => {
       toast.success('Statut mis à jour');
       fetchDemandeDetail();
     } catch (error) {
-      toast.error('Erreur lors de la mise à jour');
+      toast.error('Erreur technique');
     }
     setUpdating(false);
   };
 
   const handleQuickAction = async (action) => {
     setUpdating(true);
-    let newStatus;
-    switch (action) {
-      case 'accept':
-        newStatus = 'ACCEPTED';
-        break;
-      case 'analysis':
-        newStatus = 'IN_ANALYSIS';
-        break;
-      case 'proposal':
-        newStatus = 'PROPOSAL_FOUND';
-        break;
-      case 'complete':
-        newStatus = 'COMPLETED';
-        break;
-      default:
-        return;
-    }
+    const statusMap = {
+      accept: 'ACCEPTED',
+      analysis: 'IN_ANALYSIS',
+      proposal: 'PROPOSAL_FOUND',
+      complete: 'COMPLETED'
+    };
     try {
-      await api.put(`/admin/demandes/${id}/status`, { status: newStatus });
-      toast.success(`Demande ${action === 'accept' ? 'acceptée' : action === 'analysis' ? 'en analyse' : action === 'proposal' ? 'avec proposition' : 'terminée'}`);
+      await api.put(`/admin/demandes/${id}/status`, { status: statusMap[action] });
+      toast.success(`Action : ${action} validée`);
       fetchDemandeDetail();
     } catch (error) {
-      toast.error('Erreur lors de la mise à jour');
+      toast.error('Erreur de mise à jour');
     }
     setUpdating(false);
   };
 
   const handleCancel = async () => {
-    if (!cancelReason.trim()) {
-      toast.error('Veuillez saisir une raison d\'annulation');
-      return;
-    }
+    if (!cancelReason.trim()) { toast.error('Raison obligatoire'); return; }
     setUpdating(true);
     try {
-      // Utiliser le nouvel endpoint PATCH /admin/demandes/{id}/cancel qui conserve les infos de paiement
-      await api.patch(`/admin/demandes/${id}/cancel`, { 
-        reason: cancelReason 
-      });
-      toast.success('Demande annulée avec succès');
+      await api.patch(`/admin/demandes/${id}/cancel`, { reason: cancelReason });
+      toast.success('Demande annulée');
       setShowCancelModal(false);
       setCancelReason('');
       fetchDemandeDetail();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur lors de l\'annulation');
+      toast.error('Erreur lors de l\'annulation');
     }
     setUpdating(false);
   };
 
   const handleRequestDeposit = async () => {
-    if (!depositPaymentUrl.trim()) {
-      toast.error('Veuillez saisir un lien Stripe');
-      return;
-    }
-    
-    // Validation basique du format URL
-    try {
-      new URL(depositPaymentUrl);
-    } catch {
-      toast.error('Veuillez saisir une URL valide');
-      return;
-    }
-    
+    if (!depositPaymentUrl.trim()) { toast.error('Lien Stripe manquant'); return; }
     setUpdating(true);
     try {
-      await api.patch(`/admin/demandes/${id}/request-deposit`, {
-        deposit_payment_url: depositPaymentUrl.trim()
-      });
-      toast.success('Demande d\'acompte envoyée');
+      await api.patch(`/admin/demandes/${id}/request-deposit`, { deposit_payment_url: depositPaymentUrl.trim() });
+      toast.success('Acompte réclamé');
       setShowDepositModal(false);
       setDepositPaymentUrl('');
       fetchDemandeDetail();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur lors de la demande d\'acompte');
+      toast.error('Erreur Stripe');
     }
     setUpdating(false);
-  };
-
-  const getStatusColor = (status) => {
-    const colors = {
-      'ANALYSIS': 'bg-purple-100 text-purple-800',
-      'DEPOSIT_PENDING': 'bg-yellow-100 text-yellow-800',
-      'DEPOSIT_PAID': 'bg-blue-100 text-blue-800',
-      'ANALYSIS_AFTER_DEPOSIT': 'bg-indigo-100 text-indigo-800',
-      'AWAITING_DEPOSIT': 'bg-yellow-100 text-yellow-800',
-      'ACCEPTED': 'bg-emerald-100 text-emerald-800',
-      'IN_ANALYSIS': 'bg-purple-100 text-purple-800',
-      'PROPOSAL_FOUND': 'bg-green-100 text-green-800',
-      'AWAITING_BALANCE': 'bg-orange-100 text-orange-800',
-      'COMPLETED': 'bg-green-100 text-green-800',
-      'CANCELLED': 'bg-red-100 text-red-800'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
-  };
-  
-  const getStatusLabel = (status) => {
-    const labels = {
-      'ANALYSIS': 'En analyse',
-      'DEPOSIT_PENDING': 'En attente acompte',
-      'DEPOSIT_PAID': 'Acompte payé',
-      'ANALYSIS_AFTER_DEPOSIT': 'En analyse (après acompte)',
-      'AWAITING_DEPOSIT': 'En attente acompte',
-      'ACCEPTED': 'Acceptée',
-      'IN_ANALYSIS': 'En analyse',
-      'PROPOSAL_FOUND': 'Proposition trouvée',
-      'AWAITING_BALANCE': 'En attente solde',
-      'COMPLETED': 'Terminée',
-      'CANCELLED': 'Annulée'
-    };
-    return labels[status] || status;
   };
 
   if (loading) {
     return (
       <AdminLayout>
-        <div className="p-8">
-          <p className="text-slate-500">Chargement...</p>
+        <div className="min-h-screen bg-black flex items-center justify-center">
+          <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
         </div>
       </AdminLayout>
     );
   }
 
-  if (!demande) {
-    return (
-      <AdminLayout>
-        <div className="p-8">
-          <p className="text-red-500">Demande non trouvée</p>
-        </div>
-      </AdminLayout>
-    );
-  }
+  if (!demande) return null;
 
   return (
     <AdminLayout>
-      <div className="p-8">
-        <Button
-          variant="ghost"
-          onClick={() => navigate('/admin/demandes')}
-          className="mb-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Retour aux demandes
-        </Button>
-
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <h2 className="text-3xl font-bold text-slate-900 mb-2">Détail de la demande</h2>
-            <Badge className={getStatusColor(demande.status)}>
-              {getStatusLabel(demande.status)}
-            </Badge>
-          </div>
+      <div className="min-h-screen bg-black text-white p-4 sm:p-6 md:p-12 selection:bg-orange-500/30">
+        
+        {/* Navigation & Header */}
+        <div className="max-w-6xl mx-auto mb-10">
+          <button 
+            onClick={() => navigate('/admin/demandes')}
+            className="group flex items-center gap-2 text-zinc-500 hover:text-white transition-colors mb-6"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Flux des Demandes</span>
+          </button>
           
-          <div className="flex flex-col gap-2">
-            {/* Boutons d'actions rapides */}
-            <div className="flex flex-wrap gap-2 mb-2">
+          <div className="flex flex-col xl:flex-row justify-between items-start gap-8">
+            <div className="w-full xl:w-auto">
+              <div className="flex flex-wrap items-center gap-3 mb-4">
+                <h1 className="text-3xl md:text-4xl font-black tracking-tighter uppercase italic" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  Détail <span className="text-orange-500">Sourcing</span>
+                </h1>
+                <Badge className={`${getStatusStyle(demande.status)} border rounded-full text-[9px] font-black uppercase px-3 py-1 whitespace-nowrap`}>
+                  {getStatusLabel(demande.status)}
+                </Badge>
+              </div>
+              <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest flex items-center gap-2">
+                <Hash size={12} /> ID: {id.slice(0, 12).toUpperCase()}
+              </p>
+            </div>
+
+            {/* Quick Actions Panel - Responsive Grid */}
+            <div className="w-full xl:w-auto grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
               {demande.status === 'ANALYSIS' && (
-                <Button 
-                  onClick={() => setShowDepositModal(true)}
-                  disabled={updating}
-                  className="bg-orange-600 hover:bg-orange-700 text-white"
-                >
-                  {updating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CreditCard className="h-4 w-4 mr-1" />}
-                  Demander un acompte
-                </Button>
+                <ActionButton icon={<CreditCard size={14}/>} label="Acompte" color="orange" onClick={() => setShowDepositModal(true)} className="w-full sm:w-auto" />
               )}
               {demande.status === 'DEPOSIT_PAID' && (
-                <Button 
-                  onClick={() => handleQuickAction('accept')}
-                  disabled={updating}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                >
-                  {updating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle className="h-4 w-4 mr-1" />}
-                  Accepter
-                </Button>
+                <ActionButton icon={<CheckCircle size={14}/>} label="Accepter" color="green" onClick={() => handleQuickAction('accept')} className="w-full sm:w-auto" />
               )}
               {demande.status === 'ACCEPTED' && (
-                <Button 
-                  onClick={() => handleQuickAction('analysis')}
-                  disabled={updating}
-                  className="bg-purple-600 hover:bg-purple-700 text-white"
-                >
-                  {updating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <AlertCircle className="h-4 w-4 mr-1" />}
-                  Passer en analyse
-                </Button>
+                <ActionButton icon={<AlertCircle size={14}/>} label="Analyser" color="purple" onClick={() => handleQuickAction('analysis')} className="w-full sm:w-auto" />
               )}
               {demande.status === 'IN_ANALYSIS' && (
-                <Button 
-                  onClick={() => handleQuickAction('proposal')}
-                  disabled={updating}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  {updating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <AlertCircle className="h-4 w-4 mr-1" />}
-                  Proposition trouvée
-                </Button>
+                <ActionButton icon={<Package size={14}/>} label="Trouvé" color="blue" onClick={() => handleQuickAction('proposal')} className="w-full sm:w-auto" />
               )}
-              {(demande.status === 'AWAITING_BALANCE' || demande.status === 'PROPOSAL_FOUND') && (
-                <Button 
-                  onClick={() => handleQuickAction('complete')}
-                  disabled={updating}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
-                  {updating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle className="h-4 w-4 mr-1" />}
-                  Terminer
-                </Button>
+              {['AWAITING_BALANCE', 'PROPOSAL_FOUND'].includes(demande.status) && (
+                <ActionButton icon={<CheckCircle size={14}/>} label="Clôturer" color="green" onClick={() => handleQuickAction('complete')} className="w-full sm:w-auto" />
               )}
-              {demande.status !== 'CANCELLED' && demande.status !== 'COMPLETED' && (
+              
+              {!['CANCELLED', 'COMPLETED'].includes(demande.status) && (
                 <Button 
                   onClick={() => setShowCancelModal(true)}
-                  disabled={updating}
-                  variant="outline"
-                  className="border-red-300 text-red-600 hover:bg-red-50"
-                  title="Annuler la demande (même après acompte payé)"
+                  variant="ghost"
+                  className="bg-red-500/5 hover:bg-red-500/10 text-red-500 border border-red-500/10 rounded-xl h-10 px-4 text-[10px] font-black uppercase tracking-widest w-full sm:w-auto"
                 >
-                  <XCircle className="h-4 w-4 mr-1" />
-                  Annuler
+                  <XCircle className="h-4 w-4 mr-2" /> Annuler
                 </Button>
               )}
             </div>
-            
-            {/* Sélecteur de statut manuel */}
-            <Select value={demande.status} onValueChange={handleStatusChange} disabled={updating}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ANALYSIS">En analyse</SelectItem>
-                <SelectItem value="DEPOSIT_PENDING">En attente acompte</SelectItem>
-                <SelectItem value="DEPOSIT_PAID">Acompte payé</SelectItem>
-                <SelectItem value="ANALYSIS_AFTER_DEPOSIT">En analyse (après acompte)</SelectItem>
-                <SelectItem value="AWAITING_DEPOSIT">En attente acompte (ancien)</SelectItem>
-                <SelectItem value="ACCEPTED">Acceptée</SelectItem>
-                <SelectItem value="IN_ANALYSIS">En analyse (ancien)</SelectItem>
-                <SelectItem value="PROPOSAL_FOUND">Proposition trouvée</SelectItem>
-                <SelectItem value="AWAITING_BALANCE">En attente solde</SelectItem>
-                <SelectItem value="COMPLETED">Terminée</SelectItem>
-                <SelectItem value="CANCELLED">Annulée</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Informations client
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {client && (
-                <>
-                  <div>
-                    <p className="text-sm text-slate-500">Nom</p>
-                    <p className="font-medium">{client.first_name} {client.last_name}</p>
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Main Info Column */}
+          <div className="lg:col-span-2 space-y-6">
+            
+            {/* Project Details */}
+            <Card className="bg-[#080808] border-white/5 rounded-[1.5rem] md:rounded-[2rem] overflow-hidden">
+              <CardHeader className="p-6 md:p-8 pb-0">
+                <CardTitle className="text-xs font-black uppercase tracking-[0.3em] text-zinc-500 flex items-center gap-3">
+                  <Package size={16} className="text-orange-500" /> Cahier des charges
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 md:p-8 space-y-6">
+                <div>
+                  <h3 className="text-xl font-bold text-white mb-3">{demande.name}</h3>
+                  <div className="text-sm text-zinc-400 leading-relaxed bg-black/40 p-4 rounded-2xl border border-white/[0.03] whitespace-pre-wrap">
+                    {demande.description || "Aucune description fournie."}
                   </div>
-                  <div>
-                    <p className="text-sm text-slate-500">Email</p>
-                    <p className="font-medium">{client.email}</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 pt-4">
+                  <DataPill icon={<Truck size={12}/>} label="Livraison" value={demande.prefer_delivery ? "OUI" : "NON"} />
+                  <DataPill icon={<User size={12}/>} label="Main Propre" value={demande.prefer_hand_delivery ? "OUI" : "NON"} />
+                  <DataPill icon={<Calendar size={12}/>} label="Date" value={new Date(demande.created_at).toLocaleDateString()} />
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest ml-1">Force Status</p>
+                    <Select value={demande.status} onValueChange={handleStatusChange} disabled={updating}>
+                      <SelectTrigger className="bg-black border-white/5 h-9 rounded-xl text-[9px] font-black uppercase">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#0A0A0A] border-white/10 text-white">
+                        <SelectItem value="ANALYSIS">En analyse</SelectItem>
+                        <SelectItem value="DEPOSIT_PAID">Acompte payé</SelectItem>
+                        <SelectItem value="PROPOSAL_FOUND">Proposition</SelectItem>
+                        <SelectItem value="COMPLETED">Terminée</SelectItem>
+                        <SelectItem value="CANCELLED">Annulée</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  {client.phone && (
-                    <div>
-                      <p className="text-sm text-slate-500">Téléphone</p>
-                      <p className="font-medium">{client.phone}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Photos Responsive Grid */}
+            {demande.photos && demande.photos.length > 0 && (
+              <Card className="bg-[#080808] border-white/5 rounded-[1.5rem] md:rounded-[2rem] overflow-hidden">
+                <CardHeader className="p-6 md:p-8 pb-0">
+                  <CardTitle className="text-xs font-black uppercase tracking-[0.3em] text-zinc-500">Références visuelles</CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 md:p-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {demande.photos.map((photo, index) => (
+                    <div key={index} className="aspect-square rounded-2xl overflow-hidden border border-white/10 bg-black group relative">
+                      <img src={photo} alt="Ref" className="w-full h-full object-cover transition-transform group-hover:scale-110" loading="lazy" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Eye className="text-white h-5 w-5" />
+                      </div>
                     </div>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Détails du produit
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
-                <p className="text-sm text-slate-500">Nom</p>
-                <p className="font-medium">{demande.name}</p>
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Description</p>
-                <p className="text-sm">{demande.description}</p>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Sidebar Column */}
+          <div className="space-y-6">
+            
+            {/* Financials Card */}
+            <Card className="bg-[#080808] border-white/5 rounded-[1.5rem] md:rounded-[2.5rem] shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full -mr-16 -mt-16" />
+              <CardHeader className="p-6 md:p-8 pb-4">
+                <CardTitle className="text-xs font-black uppercase tracking-[0.3em] text-orange-500 flex items-center gap-3">
+                  <DollarSign size={16} /> Data Finance
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 md:p-8 space-y-6">
+                <div className="flex justify-between items-end border-b border-white/[0.03] pb-4">
+                  <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Max Budget</span>
+                  <span className="text-3xl font-black text-white">{demande.max_price}€</span>
+                </div>
+                <div className="space-y-4">
+                  <SidebarRow label="Prix Référence" value={`${demande.reference_price}€`} />
+                  <SidebarRow label="Acompte S-Tier" value={`${demande.deposit_amount}€`} color="text-orange-500" />
+                </div>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Informations financières
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Prix maximum</span>
-                <span className="font-bold text-lg">{demande.max_price}€</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Prix de référence</span>
-                <span className="font-medium">{demande.reference_price}€</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Acompte</span>
-                <span className="font-medium text-blue-600">{demande.deposit_amount}€</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Truck className="h-5 w-5" />
-                Préférences de livraison
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center gap-2">
-                <input type="checkbox" checked={demande.prefer_delivery} disabled className="rounded" />
-                <span className="text-sm">Livraison à domicile</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" checked={demande.prefer_hand_delivery} disabled className="rounded" />
-                <span className="text-sm">Remise en main propre</span>
-              </div>
-            </CardContent>
-          </Card>
+            {/* Client Profile Card */}
+            <Card className="bg-[#080808] border-white/5 rounded-[1.5rem] md:rounded-[2.5rem]">
+              <CardHeader className="p-6 md:p-8 pb-4">
+                <CardTitle className="text-xs font-black uppercase tracking-[0.3em] text-zinc-500 flex items-center gap-3">
+                  <User size={16} /> Profil Client
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 md:p-8 space-y-6">
+                {client ? (
+                  <div className="space-y-5">
+                    <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 font-bold border border-white/5">
+                        {client.first_name?.[0]}{client.last_name?.[0]}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-white uppercase truncate">{client.first_name} {client.last_name}</p>
+                        <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Membre S-Tier</p>
+                      </div>
+                    </div>
+                    <div className="pt-4 border-t border-white/[0.03] space-y-3">
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Email Direct</span>
+                        <span className="text-xs font-medium text-zinc-300 truncate">{client.email}</span>
+                      </div>
+                      {client.phone && (
+                        <div className="flex flex-col">
+                          <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Contact GSM</span>
+                          <span className="text-xs font-medium text-zinc-300">{client.phone}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-zinc-700 font-bold uppercase italic animate-pulse">Lien client corrompu...</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
-        {demande.photos && demande.photos.length > 0 && (
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Photos du produit</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {demande.photos.map((photo, index) => (
-                  <img
-                    key={index}
-                    src={photo}
-                    alt={`Photo ${index + 1}`}
-                    className="w-full h-32 object-cover rounded-lg border"
-                    loading="lazy"
-                  />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* --- MODALS OLED --- */}
 
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Historique
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-slate-500">
-              Créé le {new Date(demande.created_at).toLocaleString('fr-FR')}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Modal d'annulation */}
-      <Dialog open={showCancelModal} onOpenChange={setShowCancelModal}>
-        <DialogContent className="bg-white">
-          <DialogHeader>
-            <DialogTitle className="text-red-600 flex items-center gap-2">
-              <XCircle className="h-5 w-5" />
-              Annuler la demande
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Raison de l'annulation *</Label>
+        <Dialog open={showCancelModal} onOpenChange={setShowCancelModal}>
+          <DialogContent className="bg-[#0A0A0A] border-white/10 text-white rounded-[2rem] p-6 md:p-10 w-[95vw] max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="text-red-500 font-black uppercase tracking-tighter text-xl flex items-center gap-2">
+                <XCircle /> Annuler Transaction
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-6 space-y-4">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Raison de l'interruption</Label>
               <Textarea
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="Expliquez la raison de l'annulation..."
-                rows={4}
-                className="border-slate-300"
+                placeholder="Ex: Rupture de stock chez le fournisseur..."
+                className="bg-black border-white/10 rounded-2xl min-h-[120px] focus:border-red-500/50 text-sm"
               />
-              <p className="text-xs text-slate-500">Cette raison sera enregistrée et potentiellement communiquée au client.</p>
             </div>
-          </div>
+            <DialogFooter className="flex flex-col sm:flex-row gap-3">
+              <Button variant="ghost" onClick={() => setShowCancelModal(false)} className="rounded-xl text-zinc-500 font-bold uppercase text-[10px] h-12">Abandonner</Button>
+              <Button onClick={handleCancel} className="bg-red-600 hover:bg-red-500 text-white font-black uppercase text-[10px] px-8 rounded-xl h-12">Confirmer</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowCancelModal(false);
-                setCancelReason('');
-              }}
-            >
-              Annuler
-            </Button>
-            <Button
-              onClick={handleCancel}
-              disabled={updating || !cancelReason.trim()}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              {updating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-              Confirmer l'annulation
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal demande acompte */}
-      <Dialog open={showDepositModal} onOpenChange={setShowDepositModal}>
-        <DialogContent className="bg-white">
-          <DialogHeader>
-            <DialogTitle className="text-orange-600 flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              Demander un acompte
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Lien Stripe de l'acompte *</Label>
+        <Dialog open={showDepositModal} onOpenChange={setShowDepositModal}>
+          <DialogContent className="bg-[#0A0A0A] border-white/10 text-white rounded-[2rem] p-6 md:p-10 w-[95vw] max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="text-orange-500 font-black uppercase tracking-tighter text-xl flex items-center gap-2">
+                <CreditCard /> Lien de Paiement
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-6 space-y-4">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Stripe Checkout URL</Label>
               <Input
                 type="url"
                 value={depositPaymentUrl}
                 onChange={(e) => setDepositPaymentUrl(e.target.value)}
                 placeholder="https://checkout.stripe.com/..."
-                className="border-slate-300"
+                className="bg-black border-white/10 h-12 rounded-xl text-sm focus:border-orange-500/50"
               />
-              <p className="text-xs text-slate-500">Collez ici le lien Stripe Checkout pour l'acompte. Un email sera envoyé au client avec ce lien.</p>
             </div>
-          </div>
+            <DialogFooter className="flex flex-col sm:flex-row gap-3">
+              <Button variant="ghost" onClick={() => setShowDepositModal(false)} className="rounded-xl text-zinc-500 font-bold uppercase text-[10px] h-12">Annuler</Button>
+              <Button onClick={handleRequestDeposit} className="bg-orange-600 hover:bg-orange-500 text-white font-black uppercase text-[10px] px-8 rounded-xl h-12">Envoyer au client</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowDepositModal(false);
-                setDepositPaymentUrl('');
-              }}
-            >
-              Annuler
-            </Button>
-            <Button
-              onClick={handleRequestDeposit}
-              disabled={updating || !depositPaymentUrl.trim()}
-              className="bg-orange-600 hover:bg-orange-700 text-white"
-            >
-              {updating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-              Valider
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      </div>
     </AdminLayout>
   );
+};
+
+// --- HELPERS STYLISÉS ---
+
+const ActionButton = ({ icon, label, color, onClick, className }) => {
+  const colors = {
+    orange: "bg-orange-500/10 text-orange-500 border-orange-500/20 hover:bg-orange-500 hover:text-white",
+    green: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500 hover:text-white",
+    purple: "bg-purple-500/10 text-purple-500 border-purple-500/20 hover:bg-purple-500 hover:text-white",
+    blue: "bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500 hover:text-white",
+  };
+  return (
+    <Button 
+      onClick={onClick}
+      className={`h-10 px-4 rounded-xl border font-black uppercase text-[10px] tracking-widest transition-all duration-300 ${colors[color]} ${className}`}
+    >
+      {icon} <span className="ml-2">{label}</span>
+    </Button>
+  );
+};
+
+const DataPill = ({ icon, label, value }) => (
+  <div className="bg-black border border-white/5 p-3 rounded-xl flex flex-col justify-center">
+    <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest flex items-center gap-1 mb-1">
+      {icon} {label}
+    </p>
+    <p className="text-[10px] font-bold text-white uppercase">{value}</p>
+  </div>
+);
+
+const SidebarRow = ({ label, value, color = "text-white" }) => (
+  <div className="flex justify-between items-center text-[11px] font-bold">
+    <span className="text-zinc-500 uppercase tracking-widest">{label}</span>
+    <span className={color}>{value}</span>
+  </div>
+);
+
+const getStatusStyle = (status) => {
+  const s = status.toUpperCase();
+  if (s.includes('COMPLETED') || s.includes('ACCEPTED')) return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+  if (s.includes('ANALYSIS') || s.includes('PROPOSAL')) return 'bg-purple-500/10 text-purple-500 border-purple-500/20';
+  if (s.includes('DEPOSIT') || s.includes('AWAITING')) return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
+  if (s.includes('CANCELLED')) return 'bg-red-500/10 text-red-500 border-red-500/20';
+  return 'bg-white/5 text-zinc-500 border-white/10';
+};
+
+const getStatusLabel = (status) => {
+  const labels = {
+    'ANALYSIS': 'En analyse',
+    'DEPOSIT_PENDING': 'Attente Acompte',
+    'DEPOSIT_PAID': 'Acompte OK',
+    'ACCEPTED': 'Validée',
+    'IN_ANALYSIS': 'Recherche',
+    'PROPOSAL_FOUND': 'Trouvé !',
+    'COMPLETED': 'Clôturée',
+    'CANCELLED': 'Annulée'
+  };
+  return labels[status] || status;
 };

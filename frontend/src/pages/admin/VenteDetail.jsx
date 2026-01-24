@@ -7,8 +7,8 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { Badge } from '../../components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
-import { CheckCircle, XCircle, Truck } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
+import { CheckCircle, XCircle, Truck, ArrowLeft, DollarSign, Package, User, Hash, ExternalLink, Calendar, Loader2, AlertCircle } from 'lucide-react';
 import api from '../../utils/api';
 import { toast } from 'sonner';
 import { resolveImageUrl } from '../../utils/images';
@@ -22,6 +22,7 @@ export const AdminVenteDetail = () => {
   const [trackingNumber, setTrackingNumber] = useState('');
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [showShipDialog, setShowShipDialog] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     fetchVenteDetail();
@@ -38,333 +39,337 @@ export const AdminVenteDetail = () => {
     setLoading(false);
   };
 
-  const handleValidate = async () => {
+  const handleAction = async (endpoint, payload = {}, successMsg) => {
+    setActionLoading(true);
     try {
-      await api.post(`/admin/sales/${id}/validate`);
-      toast.success('Vente validée');
+      await api.post(`/admin/sales/${id}/${endpoint}`, payload);
+      toast.success(successMsg);
       fetchVenteDetail();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur');
-    }
-  };
-
-  const handleReject = async () => {
-    try {
-      await api.post(`/admin/sales/${id}/reject`, { reason: rejectReason });
-      toast.success('Vente refusée');
       setShowRejectDialog(false);
-      setRejectReason('');
-      fetchVenteDetail();
-    } catch (error) {
-      toast.error('Erreur');
-    }
-  };
-
-  const handleConfirmPayment = async () => {
-    try {
-      await api.post(`/admin/sales/${id}/confirm-payment`);
-      toast.success('Paiement confirmé');
-      fetchVenteDetail();
-    } catch (error) {
-      toast.error('Erreur');
-    }
-  };
-
-  const handleRejectPayment = async () => {
-    try {
-      await api.post(`/admin/sales/${id}/reject-payment`, { reason: rejectReason });
-      toast.success('Paiement refusé');
-      setShowRejectDialog(false);
-      setRejectReason('');
-      fetchVenteDetail();
-    } catch (error) {
-      toast.error('Erreur');
-    }
-  };
-
-  const handleMarkShipped = async () => {
-    try {
-      await api.post(`/admin/sales/${id}/mark-shipped`, { tracking_number: trackingNumber });
-      toast.success('Vente marquée comme expédiée');
       setShowShipDialog(false);
-      fetchVenteDetail();
     } catch (error) {
-      toast.error('Erreur');
+      toast.error(error.response?.data?.detail || 'Erreur technique');
+    } finally {
+      setActionLoading(false);
     }
-  };
-
-  const handleComplete = async () => {
-    try {
-      await api.post(`/admin/sales/${id}/complete`);
-      toast.success('Vente terminée');
-      fetchVenteDetail();
-    } catch (error) {
-      toast.error('Erreur');
-    }
-  };
-
-  const getStatusBadge = (status) => {
-    const map = {
-      'WAITING_ADMIN_APPROVAL': { label: 'En attente validation', color: 'bg-orange-100 text-orange-800' },
-      'PAYMENT_PENDING': { label: 'Paiement requis', color: 'bg-red-100 text-red-800' },
-      'PAYMENT_SUBMITTED': { label: 'Paiement soumis', color: 'bg-blue-100 text-blue-800' },
-      'SHIPPING_PENDING': { label: 'Attente expédition', color: 'bg-purple-100 text-purple-800' },
-      'SHIPPED': { label: 'Expédié', color: 'bg-green-100 text-green-800' },
-      'COMPLETED': { label: 'Terminé', color: 'bg-green-100 text-green-800' },
-      'REJECTED': { label: 'Refusé', color: 'bg-red-100 text-red-800' }
-    };
-    const { label, color } = map[status] || { label: status, color: 'bg-gray-100 text-gray-800' };
-    return <Badge className={color}>{label}</Badge>;
   };
 
   if (loading) {
     return (
       <AdminLayout>
-        <div className="p-8 text-center">
-          <p className="text-slate-500">Chargement...</p>
+        <div className="min-h-screen bg-black flex items-center justify-center">
+          <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
         </div>
       </AdminLayout>
     );
   }
 
   if (!data) return null;
-
   const { sale, article, seller } = data;
 
   return (
     <AdminLayout>
-      <div className="p-8">
-        <Button variant="ghost" onClick={() => navigate('/admin/ventes')} className="mb-4">
-          ← Retour aux ventes
-        </Button>
+      <div className="min-h-screen bg-black text-white p-4 sm:p-6 md:p-12 selection:bg-orange-500/30">
+        
+        {/* Navigation & Header */}
+        <div className="max-w-6xl mx-auto mb-10">
+          <button 
+            onClick={() => navigate('/admin/ventes')}
+            className="group flex items-center gap-2 text-zinc-500 hover:text-white transition-colors mb-6"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Retour aux flux</span>
+          </button>
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-3xl md:text-4xl font-black tracking-tighter uppercase italic" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  Vente <span className="text-orange-500">#{sale.id.slice(0, 8).toUpperCase()}</span>
+                </h1>
+                <Badge className={`${getStatusStyle(sale.status)} border rounded-full text-[9px] font-black uppercase px-3 py-1`}>
+                  {getStatusLabel(sale.status)}
+                </Badge>
+              </div>
+              <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest flex items-center gap-2">
+                <Calendar size={12} /> {new Date(sale.created_at).toLocaleString('fr-FR')}
+              </p>
+            </div>
+          </div>
+        </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 space-y-6">
-            <Card className="bg-white border-slate-200">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <CardTitle>Détail de la vente</CardTitle>
-                  {getStatusBadge(sale.status)}
-                </div>
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Main Info Column */}
+          <div className="lg:col-span-2 space-y-6">
+            
+            {/* Financial Overview Card */}
+            <Card className="bg-[#080808] border-white/5 rounded-[2rem] overflow-hidden shadow-2xl relative">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 blur-3xl rounded-full -mr-16 -mt-16" />
+              <CardHeader className="p-8 pb-0">
+                <CardTitle className="text-xs font-black uppercase tracking-[0.3em] text-zinc-500 flex items-center gap-3">
+                  <DollarSign size={16} className="text-orange-500" /> Bilan de Transaction
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+              <CardContent className="p-8">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
                   <div>
-                    <Label className="text-slate-600">Prix de vente</Label>
-                    <p className="text-2xl font-bold text-slate-900">{sale.sale_price}€</p>
+                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">C.A Brut</p>
+                    <p className="text-3xl font-black text-white">{sale.sale_price}€</p>
                   </div>
                   <div>
-                    <Label className="text-slate-600">Coût vendeur</Label>
-                    <p className="text-2xl font-bold text-slate-900">{sale.seller_cost}€</p>
+                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Coût Vendeur</p>
+                    <p className="text-3xl font-black text-zinc-400">{sale.seller_cost}€</p>
                   </div>
-                  <div>
-                    <Label className="text-slate-600">Profit vendeur</Label>
-                    <p className="text-2xl font-bold text-green-600">+{sale.profit}€</p>
-                  </div>
-                  <div>
-                    <Label className="text-slate-600">Date</Label>
-                    <p className="text-sm text-slate-700">{new Date(sale.created_at).toLocaleString()}</p>
+                  <div className="relative">
+                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Net DownPricer</p>
+                    <p className="text-3xl font-black text-green-500">+{sale.profit}€</p>
                   </div>
                 </div>
 
+                {/* Proof of Payment Section */}
                 {sale.payment_proof && (
-                  <div className="pt-4 border-t">
-                    <Label className="text-slate-600">Preuve de paiement</Label>
-                    <div className="mt-2 p-4 bg-slate-50 rounded-lg">
-                      <p><strong>Méthode :</strong> {sale.payment_method}</p>
+                  <div className="mt-10 pt-8 border-t border-white/[0.03] space-y-4">
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Preuve de Règlement</p>
+                    <div className="p-5 bg-black/40 border border-white/5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <p className="text-sm font-bold text-white uppercase">{sale.payment_method || 'Virement Manuel'}</p>
+                        {sale.payment_proof.note && <p className="text-xs text-zinc-500 italic">"{sale.payment_proof.note}"</p>}
+                      </div>
                       {sale.payment_proof.proof_url && (
-                        <p><strong>Preuve :</strong> <a href={sale.payment_proof.proof_url} target="_blank" rel="noopener noreferrer" className="text-blue-600">Voir la preuve</a></p>
-                      )}
-                      {sale.payment_proof.link && (
-                        <p><strong>Lien :</strong> {sale.payment_proof.link}</p>
-                      )}
-                      {sale.payment_proof.note && (
-                        <p><strong>Note :</strong> {sale.payment_proof.note}</p>
+                        <Button 
+                          variant="outline" 
+                          className="rounded-xl border-white/10 bg-white hover:bg-zinc-200 text-black font-black uppercase text-[10px] px-6 h-10 shadow-lg shadow-white/5"
+                          onClick={() => window.open(sale.payment_proof.proof_url, '_blank')}
+                        >
+                          <ExternalLink size={14} className="mr-2" /> Ouvrir Preuve
+                        </Button>
                       )}
                     </div>
                   </div>
                 )}
-
+                
                 {sale.tracking_number && (
-                  <div className="pt-4 border-t">
-                    <Label className="text-slate-600">Numéro de suivi</Label>
-                    <p className="text-slate-900">{sale.tracking_number}</p>
-                  </div>
-                )}
-
-                {sale.rejection_reason && (
-                  <div className="pt-4 border-t">
-                    <Label className="text-slate-600">Motif de refus</Label>
-                    <p className="text-red-600">{sale.rejection_reason}</p>
-                  </div>
+                   <div className="mt-6 p-4 bg-purple-500/5 border border-purple-500/10 rounded-2xl flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Truck className="text-purple-500" size={18} />
+                        <div>
+                          <p className="text-[8px] font-black text-purple-500/70 uppercase tracking-widest">Tracking Colis</p>
+                          <p className="text-sm font-mono font-bold text-white">{sale.tracking_number}</p>
+                        </div>
+                      </div>
+                   </div>
                 )}
               </CardContent>
             </Card>
 
-            <Card className="bg-white border-slate-200">
-              <CardHeader>
-                <CardTitle>Article</CardTitle>
-              </CardHeader>
-              <CardContent>
+            {/* Article Detail Card */}
+            <Card className="bg-[#080808] border-white/5 rounded-[2rem] overflow-hidden">
+              <CardContent className="p-8">
                 {article ? (
-                  <div className="flex gap-4">
-                    <div className="w-32 h-32 bg-slate-100 rounded-lg overflow-hidden">
-                      {(() => {
-                        const imageUrl = resolveImageUrl(article.photos?.[0]);
-                        if (!imageUrl) {
-                          return <div className="w-full h-full flex items-center justify-center text-slate-400">Pas de photo</div>;
-                        }
-                        return <img src={imageUrl} alt={article.name} className="w-full h-full object-cover" onError={(e) => e.target.style.display = 'none'} />;
-                      })()}
+                  <div className="flex flex-col sm:flex-row gap-8 items-center sm:items-start">
+                    <div className="w-32 h-32 md:w-40 md:h-40 shrink-0 bg-black rounded-3xl overflow-hidden border border-white/10">
+                      <img src={resolveImageUrl(article.photos?.[0])} alt={article.name} className="w-full h-full object-cover" />
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-lg text-slate-900">{article.name}</h3>
-                      <p className="text-sm text-slate-600 mt-1">{article.description?.substring(0, 150)}...</p>
-                      <div className="mt-3 flex gap-4">
-                        <div>
-                          <span className="text-xs text-slate-500">Prix vendeur</span>
-                          <p className="font-semibold text-slate-900">{article.price}€</p>
-                        </div>
-                        <div>
-                          <span className="text-xs text-slate-500">Prix référence</span>
-                          <p className="font-semibold text-slate-900">{article.reference_price}€</p>
-                        </div>
+                    <div className="flex-1 text-center sm:text-left">
+                      <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-1">Produit Vendu</p>
+                      <h3 className="text-2xl font-black text-white mb-3 uppercase tracking-tight">{article.name}</h3>
+                      <p className="text-sm text-zinc-500 leading-relaxed line-clamp-3">{article.description}</p>
+                      <div className="mt-6 flex flex-wrap justify-center sm:justify-start gap-4">
+                        <DataSnippet label="Ref. Price" value={`${article.reference_price}€`} />
+                        <DataSnippet label="Sale Price" value={`${article.price}€`} />
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-slate-500">Article non disponible</p>
+                  <p className="text-zinc-600 italic">Données de l'article archivées.</p>
                 )}
               </CardContent>
             </Card>
           </div>
 
+          {/* Sidebar: Seller & Actions */}
           <div className="space-y-6">
-            <Card className="bg-white border-slate-200">
-              <CardHeader>
-                <CardTitle>Vendeur</CardTitle>
+            
+            {/* Seller Info Card */}
+            <Card className="bg-[#080808] border-white/5 rounded-[2.5rem]">
+              <CardHeader className="p-8 pb-4">
+                <CardTitle className="text-xs font-black uppercase tracking-[0.3em] text-zinc-500 flex items-center gap-3">
+                  <User size={16} /> Identité Vendeur
+                </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-8">
                 {seller ? (
-                  <div className="space-y-2">
-                    <p className="font-semibold text-slate-900">{seller.first_name} {seller.last_name}</p>
-                    <p className="text-sm text-slate-600">{seller.email}</p>
-                    {seller.phone && <p className="text-sm text-slate-600">{seller.phone}</p>}
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Nom Complet</p>
+                      <p className="text-sm font-bold text-white uppercase">{seller.first_name} {seller.last_name}</p>
+                    </div>
+                    <div className="pt-4 border-t border-white/[0.03]">
+                      <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Contact</p>
+                      <p className="text-sm font-medium text-zinc-300 truncate">{seller.email}</p>
+                      {seller.phone && <p className="text-xs font-medium text-zinc-500 mt-1">{seller.phone}</p>}
+                    </div>
                   </div>
                 ) : (
-                  <p className="text-slate-500">Vendeur non disponible</p>
+                  <p className="text-xs text-zinc-700 font-bold uppercase italic">Utilisateur non lié</p>
                 )}
               </CardContent>
             </Card>
 
-            <Card className="bg-white border-slate-200">
-              <CardHeader>
-                <CardTitle>Actions</CardTitle>
+            {/* Admin Actions Panel */}
+            <Card className="bg-[#080808] border-orange-500/10 border rounded-[2.5rem] overflow-hidden">
+              <CardHeader className="p-8 pb-4 bg-orange-500/5 border-b border-orange-500/10">
+                <CardTitle className="text-xs font-black uppercase tracking-[0.3em] text-orange-500">Commandes Système</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="p-8 space-y-3">
+                
+                {/* Workflow: Validation Vente */}
                 {sale.status === 'WAITING_ADMIN_APPROVAL' && (
                   <>
-                    <Button onClick={handleValidate} className="w-full bg-green-600 hover:bg-green-700">
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Valider la vente
-                    </Button>
-                    <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" className="w-full border-red-300 text-red-600 hover:bg-red-50">
-                          <XCircle className="h-4 w-4 mr-2" />
-                          Refuser la vente
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Refuser la vente</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <Textarea
-                            placeholder="Motif du refus (optionnel)"
-                            value={rejectReason}
-                            onChange={(e) => setRejectReason(e.target.value)}
-                          />
-                          <Button onClick={handleReject} className="w-full bg-red-600 hover:bg-red-700">
-                            Confirmer le refus
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
+                    <MainAction label="Approuver la vente" color="green" icon={<CheckCircle />} onClick={handleValidate} loading={actionLoading} />
+                    <MainAction label="Refuser la vente" color="red" icon={<XCircle />} onClick={() => setShowRejectDialog(true)} />
                   </>
                 )}
 
+                {/* Workflow: Validation Paiement */}
                 {sale.status === 'PAYMENT_SUBMITTED' && (
                   <>
-                    <Button onClick={handleConfirmPayment} className="w-full bg-green-600 hover:bg-green-700">
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Valider le paiement
-                    </Button>
-                    <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" className="w-full border-red-300 text-red-600 hover:bg-red-50">
-                          <XCircle className="h-4 w-4 mr-2" />
-                          Refuser le paiement
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Refuser le paiement</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <Textarea
-                            placeholder="Motif du refus"
-                            value={rejectReason}
-                            onChange={(e) => setRejectReason(e.target.value)}
-                          />
-                          <Button onClick={handleRejectPayment} className="w-full bg-red-600 hover:bg-red-700">
-                            Confirmer le refus
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
+                    <MainAction label="Confirmer le paiement" color="green" icon={<DollarSign />} onClick={handleConfirmPayment} loading={actionLoading} />
+                    <MainAction label="Refuser le paiement" color="red" icon={<XCircle />} onClick={() => setShowRejectDialog(true)} />
                   </>
                 )}
 
+                {/* Workflow: Expédition */}
                 {sale.status === 'SHIPPING_PENDING' && (
-                  <Dialog open={showShipDialog} onOpenChange={setShowShipDialog}>
-                    <DialogTrigger asChild>
-                      <Button className="w-full bg-blue-600 hover:bg-blue-700">
-                        <Truck className="h-4 w-4 mr-2" />
-                        Marquer expédié
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Marquer comme expédié</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <Label>Numéro de suivi (optionnel)</Label>
-                          <Input
-                            placeholder="Ex: 1Z999AA10123456784"
-                            value={trackingNumber}
-                            onChange={(e) => setTrackingNumber(e.target.value)}
-                          />
-                        </div>
-                        <Button onClick={handleMarkShipped} className="w-full bg-blue-600 hover:bg-blue-700">
-                          Confirmer l'expédition
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                  <MainAction label="Confirmer l'envoi" color="blue" icon={<Truck />} onClick={() => setShowShipDialog(true)} />
                 )}
 
+                {/* Workflow: Clôture */}
                 {sale.status === 'SHIPPED' && (
-                  <Button onClick={handleComplete} className="w-full bg-green-600 hover:bg-green-700">
-                    Marquer terminé
-                  </Button>
+                  <MainAction label="Finaliser la vente" color="green" icon={<CheckCircle />} onClick={handleComplete} loading={actionLoading} />
+                )}
+
+                {sale.status === 'COMPLETED' && (
+                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center gap-3 text-emerald-500">
+                    <CheckCircle size={20} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Transaction Clôturée</span>
+                  </div>
                 )}
               </CardContent>
             </Card>
           </div>
         </div>
+
+        {/* --- MODALS OLED --- */}
+
+        {/* Reject Dialog */}
+        <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+          <DialogContent className="bg-[#0A0A0A] border-red-500/20 text-white rounded-[2rem] p-10 max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-black uppercase tracking-tighter flex items-center gap-3">
+                <AlertCircle className="text-red-500" /> Annuler l'opération
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-6 space-y-4">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Motif administratif (Obligatoire)</Label>
+              <Textarea
+                placeholder="Indiquez au vendeur pourquoi l'opération est refusée..."
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                className="bg-black border-white/10 rounded-2xl min-h-[120px] focus:border-red-500/50"
+              />
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="ghost" onClick={() => setShowRejectDialog(false)} className="rounded-xl text-zinc-500 uppercase text-[10px]">Abandonner</Button>
+              <Button 
+                onClick={sale.status === 'PAYMENT_SUBMITTED' ? handleRejectPayment : handleReject} 
+                className="bg-red-600 hover:bg-red-500 text-white font-black uppercase text-[10px] px-8 rounded-xl h-12"
+              >
+                Confirmer le refus
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Shipping Dialog */}
+        <Dialog open={showShipDialog} onOpenChange={setShowShipDialog}>
+          <DialogContent className="bg-[#0A0A0A] border-white/10 text-white rounded-[2rem] p-10 max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-black uppercase tracking-tighter">Confirmation <span className="text-orange-500">Expédition</span></DialogTitle>
+            </DialogHeader>
+            <div className="py-6 space-y-4">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Numéro de suivi (Tracking)</Label>
+              <Input
+                placeholder="Ex: 6A123456789..."
+                value={trackingNumber}
+                onChange={(e) => setTrackingNumber(e.target.value)}
+                className="bg-black border-white/10 h-12 rounded-xl"
+              />
+            </div>
+            <DialogFooter>
+              <Button onClick={handleMarkShipped} className="bg-orange-600 hover:bg-orange-500 text-white font-black uppercase text-[10px] w-full h-12 rounded-xl shadow-lg shadow-orange-900/10">
+                Déclencher l'envoi
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       </div>
     </AdminLayout>
   );
+};
+
+// --- STYLED SUB-COMPONENTS ---
+
+const DataSnippet = ({ label, value }) => (
+  <div className="bg-black/60 border border-white/5 px-4 py-2 rounded-xl">
+    <p className="text-[8px] font-black text-zinc-600 uppercase tracking-widest">{label}</p>
+    <p className="text-xs font-bold text-white">{value}</p>
+  </div>
+);
+
+const MainAction = ({ label, color, icon, onClick, loading }) => {
+  const colors = {
+    green: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500 hover:text-white shadow-emerald-900/5",
+    red: "bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500 hover:text-white shadow-red-900/5",
+    blue: "bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500 hover:text-white shadow-blue-900/5",
+    orange: "bg-orange-500/10 text-orange-500 border-orange-500/20 hover:bg-orange-500 hover:text-white shadow-orange-900/5",
+  };
+  return (
+    <Button 
+      onClick={onClick} 
+      disabled={loading}
+      className={`w-full justify-start h-12 px-6 rounded-2xl border font-black uppercase text-[10px] tracking-widest transition-all shadow-lg active:scale-[0.98] ${colors[color]}`}
+    >
+      {loading ? <Loader2 className="animate-spin h-4 w-4 mr-3" /> : React.cloneElement(icon, { size: 16, className: "mr-3 stroke-[3px]" })}
+      {label}
+    </Button>
+  );
+};
+
+const getStatusStyle = (status) => {
+  const map = {
+    'WAITING_ADMIN_APPROVAL': 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+    'PAYMENT_PENDING': 'bg-red-500/10 text-red-500 border-red-500/20',
+    'PAYMENT_SUBMITTED': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+    'SHIPPING_PENDING': 'bg-purple-500/10 text-purple-500 border-purple-500/20',
+    'SHIPPED': 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+    'COMPLETED': 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30',
+    'REJECTED': 'bg-red-500/10 text-red-500 border-red-500/20'
+  };
+  return map[status] || 'bg-white/5 text-zinc-500 border-white/5';
+};
+
+const getStatusLabel = (status) => {
+  const labels = {
+    'WAITING_ADMIN_APPROVAL': 'Validation Admin',
+    'PAYMENT_PENDING': 'Paiement Requis',
+    'PAYMENT_SUBMITTED': 'Paiement à vérifier',
+    'SHIPPING_PENDING': 'Prêt Envoi',
+    'SHIPPED': 'En Transit',
+    'COMPLETED': 'Soldée',
+    'REJECTED': 'Annulée'
+  };
+  return labels[status] || status;
 };

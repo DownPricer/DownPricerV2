@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/button';
 import { Checkbox } from '../../components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
 import { Label } from '../../components/ui/label';
-import { Trash2, AlertTriangle } from 'lucide-react';
+import { Trash2, AlertTriangle, Users, Search, ShieldCheck, UserCog, Loader2, X, Hash } from 'lucide-react';
 import api from '../../utils/api';
 import { toast } from 'sonner';
 
@@ -19,7 +19,7 @@ const ALL_ROLES = [
   { value: 'SITE_PLAN_3', label: 'Mini-site 15€', description: 'Plan mini-site premium' },
   { value: 'S_PLAN_5', label: 'S-Plan 5€', description: 'Abonnement communauté 5€' },
   { value: 'S_PLAN_15', label: 'S-Plan 15€', description: 'Abonnement communauté 15€' },
-  { value: 'ADMIN', label: 'Admin', description: 'Accès complet admin' }
+  { value: 'ADMIN', label: 'Admin', description: 'Accès complet système' }
 ];
 
 export const AdminUsersPage = () => {
@@ -42,7 +42,7 @@ export const AdminUsersPage = () => {
       const response = await api.get('/admin/users');
       setUsers(response.data);
     } catch (error) {
-      toast.error('Erreur lors du chargement');
+      toast.error('Erreur lors du chargement des comptes');
     }
     setLoading(false);
   };
@@ -54,21 +54,20 @@ export const AdminUsersPage = () => {
   };
 
   const toggleRole = (roleValue) => {
-    if (selectedRoles.includes(roleValue)) {
-      setSelectedRoles(selectedRoles.filter(r => r !== roleValue));
-    } else {
-      setSelectedRoles([...selectedRoles, roleValue]);
-    }
+    setSelectedRoles(prev => 
+      prev.includes(roleValue) ? prev.filter(r => r !== roleValue) : [...prev, roleValue]
+    );
   };
 
   const handleSaveRoles = async () => {
+    const tid = toast.loading("Mise à jour des privilèges...");
     try {
       await api.put(`/admin/users/${selectedUser.id}/roles`, selectedRoles);
-      toast.success('Rôles mis à jour');
+      toast.success('Rôles mis à jour', { id: tid });
       setShowRolesDialog(false);
       fetchUsers();
     } catch (error) {
-      toast.error('Erreur lors de la mise à jour');
+      toast.error('Erreur de mise à jour', { id: tid });
     }
   };
 
@@ -79,20 +78,15 @@ export const AdminUsersPage = () => {
   };
 
   const handleDeleteUser = async () => {
-    if (deleteConfirmText !== 'SUPPRIMER') {
-      toast.error('Veuillez taper "SUPPRIMER" pour confirmer');
-      return;
-    }
-
+    if (deleteConfirmText !== 'SUPPRIMER') return;
     setDeleting(true);
     try {
       await api.delete(`/admin/users/${selectedUser.id}`);
-      toast.success(`Utilisateur ${selectedUser.email} supprimé définitivement`);
+      toast.success(`Compte ${selectedUser.email} révoqué`);
       setShowDeleteDialog(false);
-      setDeleteConfirmText('');
       fetchUsers();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur lors de la suppression');
+      toast.error('Échec de la suppression');
     } finally {
       setDeleting(false);
     }
@@ -106,93 +100,79 @@ export const AdminUsersPage = () => {
 
   return (
     <AdminLayout>
-      <div className="p-4 md:p-8">
-        <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-4 md:mb-6">Utilisateurs</h2>
+      <div className="min-h-screen bg-black text-white p-4 sm:p-6 md:p-12 selection:bg-orange-500/30">
+        
+        {/* Header */}
+        <div className="mb-10 max-w-6xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[10px] font-black uppercase tracking-widest mb-4">
+            <ShieldCheck className="h-3 w-3" /> Identity Provider
+          </div>
+          <h2 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic leading-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            Gestion <span className="text-orange-500">Utilisateurs</span>
+          </h2>
+        </div>
 
-        <Card className="bg-white border-slate-200 mb-4 md:mb-6">
-          <CardContent className="p-3 md:p-4">
+        {/* Search Bar OLED */}
+        <div className="max-w-6xl mx-auto mb-8">
+          <div className="relative group max-w-xl">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-600 group-focus-within:text-orange-500 transition-colors" />
             <Input
-              placeholder="Rechercher un utilisateur..."
+              placeholder="Rechercher par nom, email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full"
+              className="bg-[#080808] border-white/5 pl-12 h-12 rounded-2xl focus:border-orange-500/50 focus:ring-orange-500/10 text-white placeholder:text-zinc-800"
             />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {loading ? (
-          <div className="text-center py-12"><p className="text-slate-500">Chargement...</p></div>
+          <div className="flex justify-center py-24"><Loader2 className="h-10 w-10 animate-spin text-orange-500" /></div>
         ) : (
-          <div className="space-y-2 md:space-y-3">
+          <div className="max-w-6xl mx-auto space-y-3">
             {filteredUsers.map((user) => (
-              <Card key={user.id} className="bg-white border-slate-200">
-                <CardContent className="p-3 md:p-4">
-                  {/* Mobile layout */}
-                  <div className="md:hidden space-y-2">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-slate-900 text-sm truncate">{user.first_name} {user.last_name}</p>
-                        <p className="text-xs text-slate-500 truncate">{user.email}</p>
+              <Card key={user.id} className="bg-[#080808] border-white/5 rounded-2xl hover:border-white/10 transition-all group overflow-hidden">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-black border border-white/10 flex items-center justify-center text-zinc-600 group-hover:border-orange-500/30 group-hover:text-orange-500 transition-colors shrink-0">
+                        <Users size={20} />
                       </div>
-                      <div className="flex gap-1">
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => openRolesDialog(user)}
-                          className="text-xs flex-shrink-0"
-                        >
-                          Rôles
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => openDeleteDialog(user)}
-                          className="text-xs flex-shrink-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-sm sm:text-base text-white group-hover:text-orange-500 transition-colors truncate">
+                          {user.first_name} {user.last_name}
+                        </h3>
+                        <p className="text-[10px] font-medium text-zinc-600 uppercase tracking-widest truncate">{user.email}</p>
                       </div>
                     </div>
-                    <div className="flex gap-1 flex-wrap">
-                      {user.roles?.slice(0, 3).map(role => (
-                        <Badge key={role} className="bg-blue-100 text-blue-800 text-xs">{role}</Badge>
-                      ))}
-                      {user.roles?.length > 3 && (
-                        <Badge className="bg-slate-100 text-slate-600 text-xs">+{user.roles.length - 3}</Badge>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Desktop layout */}
-                  <div className="hidden md:flex justify-between items-center">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-900">{user.first_name} {user.last_name}</p>
-                      <p className="text-sm text-slate-500">{user.email}</p>
-                      {user.phone && <p className="text-sm text-slate-500">{user.phone}</p>}
-                      <div className="flex gap-1 mt-2 flex-wrap">
-                        {user.roles?.map(role => (
-                          <Badge key={role} className="bg-blue-100 text-blue-800 text-xs">{role}</Badge>
-                        ))}
-                      </div>
+                    <div className="flex flex-wrap items-center gap-2 md:justify-center">
+                      {user.roles?.map(role => (
+                        <Badge key={role} className={`border rounded-full text-[8px] font-black uppercase tracking-tighter px-2 py-0.5 ${
+                          role === 'ADMIN' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' : 'bg-white/5 text-zinc-400 border-white/10'
+                        }`}>
+                          {role}
+                        </Badge>
+                      ))}
                     </div>
-                    <div className="flex gap-2">
+
+                    <div className="flex items-center gap-2 border-t border-white/[0.03] pt-4 md:pt-0 md:border-t-0 justify-end">
                       <Button 
-                        size="sm" 
-                        variant="outline"
+                        size="sm" variant="ghost"
                         onClick={() => openRolesDialog(user)}
-                        data-testid={`manage-roles-btn-${user.id}`}
+                        className="bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black uppercase px-4"
                       >
-                        Gérer rôles
+                        <UserCog className="h-3.5 w-3.5 mr-2" /> Privilèges
                       </Button>
                       <Button 
-                        size="sm" 
-                        variant="outline"
+                        size="icon" variant="ghost"
                         onClick={() => openDeleteDialog(user)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        className="bg-red-500/5 hover:bg-red-500/10 text-red-500 rounded-xl"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
+
                   </div>
                 </CardContent>
               </Card>
@@ -200,103 +180,90 @@ export const AdminUsersPage = () => {
           </div>
         )}
 
+        {/* DIALOG: ROLES */}
         <Dialog open={showRolesDialog} onOpenChange={setShowRolesDialog}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Gérer les rôles de {selectedUser?.first_name} {selectedUser?.last_name}</DialogTitle>
+          <DialogContent className="bg-[#0A0A0A] border-white/10 text-white rounded-[2rem] p-6 sm:p-10 w-[95vw] max-w-xl max-h-[90vh] flex flex-col">
+            <DialogHeader className="pb-4">
+              <DialogTitle className="text-xl font-black uppercase tracking-tighter flex items-center gap-3">
+                <UserCog className="text-orange-500" /> ACL <span className="text-orange-500">Matrix</span>
+              </DialogTitle>
+              <DialogDescription className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">
+                Modification des accès pour {selectedUser?.email}
+              </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 max-h-96 overflow-y-auto">
-              <p className="text-sm text-slate-600">
-                Les rôles sont cumulables. Sélectionnez tous les rôles que l'utilisateur doit avoir.
-              </p>
+
+            <div className="flex-1 overflow-y-auto pr-2 space-y-2 no-scrollbar py-4">
               {ALL_ROLES.map((role) => (
-                <div key={role.value} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-slate-50">
-                  <Checkbox
-                    id={role.value}
-                    checked={selectedRoles.includes(role.value)}
-                    onCheckedChange={() => toggleRole(role.value)}
-                  />
-                  <div className="flex-1">
-                    <Label htmlFor={role.value} className="font-medium cursor-pointer">
-                      {role.label}
-                    </Label>
-                    <p className="text-xs text-slate-500">{role.description}</p>
+                <div 
+                  key={role.value} 
+                  onClick={() => toggleRole(role.value)}
+                  className={`flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-all ${
+                    selectedRoles.includes(role.value) ? 'bg-orange-500/10 border-orange-500/20' : 'bg-black border-white/5 hover:border-white/10'
+                  }`}
+                >
+                  <div className="flex flex-col gap-1">
+                    <Label className="font-black text-[11px] uppercase tracking-widest text-white cursor-pointer">{role.label}</Label>
+                    <p className="text-[9px] font-medium text-zinc-600 uppercase">{role.description}</p>
                   </div>
+                  <Checkbox 
+                    checked={selectedRoles.includes(role.value)} 
+                    onCheckedChange={() => toggleRole(role.value)}
+                    className="border-white/20 data-[state=checked]:bg-orange-500"
+                  />
                 </div>
               ))}
             </div>
-            <div className="flex gap-2 pt-4">
-              <Button onClick={handleSaveRoles} className="flex-1 bg-blue-600 hover:bg-blue-700">
-                Enregistrer
-              </Button>
-              <Button variant="outline" onClick={() => setShowRolesDialog(false)}>
-                Annuler
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
 
-        <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-red-600">
-                <AlertTriangle className="h-5 w-5" />
-                Supprimer définitivement un compte
-              </DialogTitle>
-              <DialogDescription>
-                Cette action est irréversible et supprimera toutes les données associées à cet utilisateur.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p className="text-sm font-medium text-red-900 mb-2">
-                  ⚠️ Attention : Action irréversible
-                </p>
-                <p className="text-sm text-red-800 mb-2">
-                  L'utilisateur <strong>{selectedUser?.email}</strong> sera définitivement supprimé ainsi que :
-                </p>
-                <ul className="text-sm text-red-700 space-y-1 list-disc list-inside">
-                  <li>Tous ses mini-sites et articles</li>
-                  <li>Toutes ses demandes</li>
-                  <li>Toutes ses ventes vendeur</li>
-                  <li>Tous ses abonnements</li>
-                  <li>Toutes ses demandes d'accès vendeur</li>
-                </ul>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="delete-confirm" className="text-slate-700">
-                  Tapez <strong className="text-red-600">SUPPRIMER</strong> pour confirmer :
-                </Label>
-                <Input
-                  id="delete-confirm"
-                  value={deleteConfirmText}
-                  onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  placeholder="SUPPRIMER"
-                  className="font-mono"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setShowDeleteDialog(false);
-                  setDeleteConfirmText('');
-                }}
-                disabled={deleting}
-              >
-                Annuler
-              </Button>
-              <Button 
-                onClick={handleDeleteUser}
-                disabled={deleteConfirmText !== 'SUPPRIMER' || deleting}
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                {deleting ? 'Suppression...' : 'Supprimer définitivement'}
+            <DialogFooter className="pt-6 flex flex-col sm:flex-row gap-3 border-t border-white/[0.03]">
+              <Button variant="ghost" onClick={() => setShowRolesDialog(false)} className="rounded-xl text-zinc-500 font-bold uppercase text-[10px]">Annuler</Button>
+              <Button onClick={handleSaveRoles} className="bg-orange-600 hover:bg-orange-500 text-white font-black uppercase text-[10px] px-8 rounded-xl h-11">
+                Synchroniser les Rôles
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* DIALOG: DELETE (STRICT) */}
+        <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <DialogContent className="bg-[#0A0A0A] border-red-500/20 text-white rounded-[2rem] p-6 sm:p-10 w-[95vw] max-w-lg shadow-[0_0_50px_rgba(239,68,68,0.1)]">
+            <DialogHeader>
+              <DialogTitle className="text-red-500 font-black uppercase tracking-tighter text-xl flex items-center gap-3">
+                <AlertTriangle /> Révoquer l'accès
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-6 space-y-6">
+              <div className="bg-red-500/5 border border-red-500/10 p-5 rounded-2xl">
+                <p className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-2">Protocole d'effacement critique</p>
+                <p className="text-xs font-medium text-zinc-400 leading-relaxed uppercase">
+                  L'utilisateur <span className="text-white font-bold">{selectedUser?.email}</span> sera déconnecté et ses données seront purgées. Cette action est irréversible.
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-600 ml-1">
+                  Saisissez <span className="text-red-500">SUPPRIMER</span> pour authentifier
+                </Label>
+                <Input
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
+                  placeholder="---"
+                  className="bg-black border-red-500/20 h-12 rounded-xl text-center font-mono font-black tracking-[0.5em] focus:border-red-500"
+                />
+              </div>
+            </div>
+            <DialogFooter className="flex flex-col sm:flex-row gap-3">
+              <Button variant="ghost" onClick={() => setShowDeleteDialog(false)} className="rounded-xl text-zinc-500 font-bold uppercase text-[10px]">Annuler</Button>
+              <Button 
+                onClick={handleDeleteUser} 
+                disabled={deleteConfirmText !== 'SUPPRIMER' || deleting}
+                className="bg-red-600 hover:bg-red-500 text-white font-black uppercase text-[10px] px-8 rounded-xl h-11 disabled:opacity-20"
+              >
+                {deleting ? 'Destruction...' : 'Confirmer l\'effacement'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       </div>
     </AdminLayout>
   );
