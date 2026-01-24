@@ -195,3 +195,4 @@ frontend/src/components/Header.jsx   → Menu "Achat / Revente"
 
 **🎉 Intégration terminée avec succès !**
 
+

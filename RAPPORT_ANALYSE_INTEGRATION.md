@@ -355,3 +355,4 @@ yarn start
 2. Le module admin interne doit-il être intégré ou supprimé ?
 3. Y a-t-il d'autres rôles que S_PLAN_15 qui doivent avoir accès ?
 
+

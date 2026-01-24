@@ -1,111 +1,178 @@
-<!doctype html>
-<html lang="en">
-    <head>
-        <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-<link rel="icon" type="image/png" href="%PUBLIC_URL%/favicon.png" />
+import React, { useState } from 'react';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { 
+  CheckCircle, 
+  TrendingUp, 
+  ShieldCheck, 
+  ArrowRight, 
+  Loader2, 
+  Store, 
+  Menu, 
+  User 
+} from 'lucide-react';
+import api from '../utils/api';
+import { toast } from 'sonner';
 
-        <link rel="icon" href="%PUBLIC_URL%/favicon.png" />
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#000000" />
-        <meta name="description" content="DownPricer - Marketplace de produits à prix réduits" />
-        <!--
-      manifest.json provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-    -->
-        <!--
-      Notice the use of %PUBLIC_URL% in the tags above.
-      It will be replaced with the URL of the `public` folder during the build.
-      Only files inside the `public` folder can be referenced from the HTML.
+// --- COMPOSANT HEADER ---
+const Header = () => (
+  <header className="sticky top-0 z-50 w-full border-b border-zinc-800/50 bg-zinc-950/80 backdrop-blur-xl">
+    <div className="container mx-auto flex h-16 items-center justify-between px-4">
+      <div className="flex items-center gap-2 group cursor-pointer">
+        <div className="bg-orange-500 p-1.5 rounded-lg rotate-2 group-hover:rotate-0 transition-transform">
+          <Store className="h-5 w-5 text-white" />
+        </div>
+        <span className="text-xl font-bold tracking-tight text-white font-['Outfit']">
+          Down<span className="text-orange-500">Pricer</span>
+        </span>
+      </div>
 
-      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-      work correctly both with client-side routing and a non-root public URL.
-      Learn how to configure a non-root public URL by running `npm run build`.
-    -->
-        <title>DownPricer - Marketplace</title>
-        <link rel="icon" href="%PUBLIC_URL%/favicon.png" />
+      <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-400">
+        <a href="/" className="hover:text-white transition-colors">Catalogue</a>
+        <a href="/vendre" className="text-orange-500 font-bold">Vendre</a>
+        <a href="/aide" className="hover:text-white transition-colors">Support</a>
+      </nav>
 
-    </head> 
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-white md:hidden">
+          <Menu className="h-6 w-6" />
+        </Button>
+        <Button variant="ghost" className="hidden md:flex text-zinc-400 hover:text-white gap-2">
+          <User className="h-4 w-4" /> Connexion
+        </Button>
+        <Button className="bg-orange-500 hover:bg-orange-600 text-white rounded-full px-5">
+          Démarrer
+        </Button>
+      </div>
+    </div>
+  </header>
+);
 
-    <body>
-        <noscript>You need to enable JavaScript to run this app.</noscript>
-        <div id="root"></div>
-        <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
+// --- COMPOSANT PRINCIPAL ---
+export const DevenirVendeur = () => {
+  const [formData, setFormData] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
-    -->
-        <script>
-            !(function (t, e) {
-                var o, n, p, r;
-                e.__SV ||
-                    ((window.posthog = e),
-                    (e._i = []),
-                    (e.init = function (i, s, a) {
-                        function g(t, e) {
-                            var o = e.split(".");
-                            2 == o.length && ((t = t[o[0]]), (e = o[1])),
-                                (t[e] = function () {
-                                    t.push(
-                                        [e].concat(
-                                            Array.prototype.slice.call(
-                                                arguments,
-                                                0,
-                                            ),
-                                        ),
-                                    );
-                                });
-                        }
-                        ((p = t.createElement("script")).type =
-                            "text/javascript"),
-                            (p.crossOrigin = "anonymous"),
-                            (p.async = !0),
-                            (p.src =
-                                s.api_host.replace(
-                                    ".i.posthog.com",
-                                    "-assets.i.posthog.com",
-                                ) + "/static/array.js"),
-                            (r =
-                                t.getElementsByTagName(
-                                    "script",
-                                )[0]).parentNode.insertBefore(p, r);
-                        var u = e;
-                        for (
-                            void 0 !== a ? (u = e[a] = []) : (a = "posthog"),
-                                u.people = u.people || [],
-                                u.toString = function (t) {
-                                    var e = "posthog";
-                                    return (
-                                        "posthog" !== a && (e += "." + a),
-                                        t || (e += " (stub)"),
-                                        e
-                                    );
-                                },
-                                u.people.toString = function () {
-                                    return u.toString(1) + ".people (stub)";
-                                },
-                                o =
-                                    "init me ws ys ps bs capture je Di ks register register_once register_for_session unregister unregister_for_session Ps getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey canRenderSurvey canRenderSurveyAsync identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty Es $s createPersonProfile Is opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing clear_opt_in_out_capturing Ss debug xs getPageViewId captureTraceFeedback captureTraceMetric".split(
-                                        " ",
-                                    ),
-                                n = 0;
-                            n < o.length;
-                            n++
-                        )
-                            g(u, o[n]);
-                        e._i.push([i, s, a]);
-                    }),
-                    (e.__SV = 1));
-            })(document, window.posthog || []);
-            posthog.init("phc_yJW1VjHGGwmCbbrtczfqqNxgBDbhlhOWcdzcIJEOTFE", {
-                api_host: "https://us.i.posthog.com",
-                person_profiles: "identified_only", // or 'always' to create profiles for anonymous users as well
-            });
-        </script>
-    </body>
-</html>
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const formDataObj = new FormData();
+      Object.keys(formData).forEach(key => formDataObj.append(key, formData[key]));
+      await api.post('/seller/request', formDataObj, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      toast.success('Demande envoyée !');
+      setSubmitted(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Une erreur est survenue');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-zinc-950 text-white font-['Outfit'] selection:bg-orange-500/30">
+      <Header />
+
+      <main className="container mx-auto px-4 py-12 lg:py-24">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          
+          <div className="space-y-10">
+            <div className="space-y-6 text-center lg:text-left">
+              <span className="inline-block px-4 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-bold uppercase tracking-widest">
+                Programme Revendeur
+              </span>
+              <h1 className="text-5xl lg:text-7xl font-extrabold tracking-tighter leading-tight">
+                Vendez plus, <br />
+                <span className="text-orange-500">Gagnez mieux.</span>
+              </h1>
+              <p className="text-zinc-400 text-lg max-w-lg mx-auto lg:mx-0 leading-relaxed">
+                Accédez au catalogue exclusif DownPricer. Sourcez des produits à prix cassés et revendez-les avec une marge maximale.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4">
+              <BenefitItem 
+                icon={<TrendingUp className="text-green-500" />}
+                title="+40% de marge"
+                desc="En moyenne sur chaque vente."
+              />
+              <BenefitItem 
+                icon={<ShieldCheck className="text-orange-500" />}
+                title="Sécurité"
+                desc="Paiements et stocks garantis."
+              />
+            </div>
+          </div>
+
+          <div className="relative">
+            <div className="absolute -inset-4 bg-orange-500/10 blur-3xl rounded-full opacity-50" />
+            
+            {!submitted ? (
+              <Card className="relative bg-zinc-900 border-zinc-800 shadow-2xl">
+                <CardHeader className="space-y-1 text-white">
+                  <CardTitle className="text-2xl">Candidature</CardTitle>
+                  <CardDescription className="text-zinc-500">Réponse sous 48h maximum.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="first_name" className="text-zinc-400">Prénom</Label>
+                        <Input name="first_name" id="first_name" placeholder="Léo" onChange={handleChange} required className="bg-zinc-950 border-zinc-800 text-white focus:ring-orange-500" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="last_name" className="text-zinc-400">Nom</Label>
+                        <Input name="last_name" id="last_name" placeholder="Martin" onChange={handleChange} required className="bg-zinc-950 border-zinc-800 text-white focus:ring-orange-500" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-zinc-400">Email</Label>
+                      <Input name="email" id="email" type="email" placeholder="leo@exemple.com" onChange={handleChange} required className="bg-zinc-950 border-zinc-800 text-white focus:ring-orange-500" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone" className="text-zinc-400">Téléphone</Label>
+                      <Input name="phone" id="phone" type="tel" placeholder="06..." onChange={handleChange} required className="bg-zinc-950 border-zinc-800 text-white focus:ring-orange-500" />
+                    </div>
+                    <Button type="submit" disabled={loading} className="w-full bg-orange-500 hover:bg-orange-600 py-6 text-lg font-bold rounded-xl mt-4 text-white transition-all">
+                      {loading ? <Loader2 className="animate-spin" /> : "Envoyer mon dossier"}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            ) : (
+              <SuccessState name={formData.first_name} />
+            )}
+          </div>
+
+        </div>
+      </main>
+    </div>
+  );
+};
+
+// --- HELPERS ---
+const BenefitItem = ({ icon, title, desc }) => (
+  <div className="p-4 rounded-2xl bg-zinc-900/50 border border-zinc-800 flex gap-4 items-center">
+    <div className="p-2 bg-zinc-950 rounded-lg">{icon}</div>
+    <div>
+      <h4 className="font-bold text-white">{title}</h4>
+      <p className="text-xs text-zinc-500">{desc}</p>
+    </div>
+  </div>
+);
+
+const Success
