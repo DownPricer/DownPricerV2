@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AdminLayout } from '../../components/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Users, Package, FileText, DollarSign } from 'lucide-react';
+import { Users, Package, FileText, DollarSign, Loader2, ArrowUpRight, Activity, Clock } from 'lucide-react';
 import api from '../../utils/api';
 import { toast } from 'sonner';
 
@@ -25,86 +25,72 @@ export const AdminDashboardPage = () => {
 
   return (
     <AdminLayout>
-      <div className="p-8" data-testid="admin-dashboard-content">
-        <h2 className="text-3xl font-bold text-slate-900 mb-6">Dashboard</h2>
+      <div className="min-h-screen bg-black text-white p-6 md:p-12 selection:bg-orange-500/30" data-testid="admin-dashboard-content">
+        
+        {/* Header Section */}
+        <div className="mb-12">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[10px] font-black uppercase tracking-widest mb-4">
+            <Activity className="h-3 w-3" /> System Heartbeat
+          </div>
+          <h2 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            Tableau de <span className="text-orange-500">Bord</span>
+          </h2>
+        </div>
 
         {loading ? (
-          <div className="text-center py-12">
-            <p className="text-slate-500">Chargement...</p>
+          <div className="flex flex-col items-center justify-center py-24">
+            <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
+            <p className="mt-4 text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Collecte des données...</p>
           </div>
         ) : (
           <>
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <Card className="bg-white border-slate-200">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-slate-600">Utilisateurs</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <span className="text-3xl font-bold text-slate-900">{stats?.total_users || 0}</span>
-                    <Users className="h-8 w-8 text-blue-500" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white border-slate-200">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-slate-600">Articles</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <span className="text-3xl font-bold text-slate-900">{stats?.total_articles || 0}</span>
-                    <Package className="h-8 w-8 text-blue-500" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white border-slate-200">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-slate-600">Demandes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <span className="text-3xl font-bold text-slate-900">{stats?.total_demandes || 0}</span>
-                    <FileText className="h-8 w-8 text-blue-500" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white border-slate-200">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-slate-600">Ventes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <span className="text-3xl font-bold text-slate-900">{stats?.total_sales || 0}</span>
-                    <DollarSign className="h-8 w-8 text-blue-500" />
-                  </div>
-                </CardContent>
-              </Card>
+            {/* KPI Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+              <KPICard label="Utilisateurs" value={stats?.total_users || 0} icon={<Users />} color="blue" />
+              <KPICard label="Articles" value={stats?.total_articles || 0} icon={<Package />} color="orange" />
+              <KPICard label="Demandes" value={stats?.total_demandes || 0} icon={<FileText />} color="purple" />
+              <KPICard label="Ventes" value={stats?.total_sales || 0} icon={<DollarSign />} color="green" />
             </div>
 
-            <Card className="bg-white border-slate-200">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold text-slate-900">Dernières demandes</CardTitle>
+            {/* Recent Requests Section */}
+            <Card className="bg-[#080808] border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">
+              <CardHeader className="p-8 pb-4 border-b border-white/[0.03] flex flex-row items-center justify-between">
+                <CardTitle className="text-xs font-black uppercase tracking-[0.3em] text-zinc-500 flex items-center gap-3">
+                  <Clock size={16} className="text-orange-500" /> Dernières Demandes
+                </CardTitle>
+                <button className="text-[10px] font-black text-zinc-500 hover:text-white uppercase tracking-widest transition-colors flex items-center gap-1">
+                  Voir tout <ArrowUpRight size={12} />
+                </button>
               </CardHeader>
-              <CardContent>
+              
+              <CardContent className="p-0">
                 {stats?.recent_demandes && stats.recent_demandes.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="divide-y divide-white/[0.03]">
                     {stats.recent_demandes.map((demande) => (
-                      <div key={demande.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                        <div>
-                          <p className="font-medium text-slate-900">{demande.name}</p>
-                          <p className="text-sm text-slate-500">Prix max: {demande.max_price}€</p>
+                      <div key={demande.id} className="flex items-center justify-between p-6 hover:bg-white/[0.01] transition-all group">
+                        <div className="flex items-center gap-5">
+                          <div className="h-10 w-10 rounded-xl bg-black border border-white/5 flex items-center justify-center text-zinc-700 group-hover:border-orange-500/30 group-hover:text-orange-500 transition-colors">
+                            <FileText size={18} />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-white group-hover:text-orange-500 transition-colors">{demande.name}</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-zinc-600">Max Budget: {demande.max_price}€</p>
+                          </div>
                         </div>
-                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded">
-                          {demande.status}
-                        </span>
+                        
+                        <div className="flex items-center gap-4">
+                          <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-tighter border ${getStatusStyle(demande.status)}`}>
+                            {demande.status.replace(/_/g, ' ')}
+                          </span>
+                          <ArrowUpRight size={14} className="text-zinc-800 group-hover:text-white transition-colors" />
+                        </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-slate-500 text-center py-8">Aucune demande récente</p>
+                  <div className="py-20 text-center">
+                    <p className="text-zinc-600 text-xs font-bold uppercase tracking-[0.2em]">Zéro activité détectée</p>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -113,4 +99,33 @@ export const AdminDashboardPage = () => {
       </div>
     </AdminLayout>
   );
+};
+
+// --- COMPOSANTS INTERNES ---
+
+const KPICard = ({ label, value, icon, color }) => {
+  const colorStyles = {
+    blue: "text-blue-500 bg-blue-500/10 border-blue-500/20",
+    orange: "text-orange-500 bg-orange-500/10 border-orange-500/20",
+    purple: "text-purple-500 bg-purple-500/10 border-purple-500/20",
+    green: "text-green-500 bg-green-500/10 border-green-500/20",
+  };
+
+  return (
+    <div className="bg-[#080808] border border-white/5 p-6 rounded-[1.5rem] hover:border-white/10 transition-all group">
+      <div className={`h-10 w-10 rounded-xl flex items-center justify-center mb-4 border transition-transform group-hover:scale-110 ${colorStyles[color]}`}>
+        {React.cloneElement(icon, { size: 20 })}
+      </div>
+      <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">{label}</p>
+      <p className="text-3xl font-black text-white leading-none tracking-tighter">{value}</p>
+    </div>
+  );
+};
+
+const getStatusStyle = (status) => {
+  const s = status.toUpperCase();
+  if (s.includes('COMPLETED') || s.includes('VALIDATED')) return 'bg-green-500/10 text-green-500 border-green-500/20';
+  if (s.includes('PENDING') || s.includes('AWAITING')) return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
+  if (s.includes('REJECTED') || s.includes('CANCELLED')) return 'bg-red-500/10 text-red-500 border-red-500/20';
+  return 'bg-white/5 text-zinc-500 border-white/10';
 };

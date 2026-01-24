@@ -6,7 +6,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { Settings, DollarSign, FileText, Link as LinkIcon, Save, Mail, Send } from 'lucide-react';
+import { Settings, DollarSign, FileText, Link as LinkIcon, Save, Mail, Send, Loader2, Globe, ShieldCheck, Zap } from 'lucide-react';
 import { Switch } from '../../components/ui/switch';
 import api from '../../utils/api';
 import { toast } from 'sonner';
@@ -34,10 +34,10 @@ export const AdminParametresRichesPage = () => {
     setSaving(true);
     try {
       await api.put(`/admin/settings/${key}`, { value });
-      toast.success(`Paramètre ${key} mis à jour`);
+      toast.success(`Config ${key} mise à jour`);
       fetchSettings();
     } catch (error) {
-      toast.error('Erreur lors de la sauvegarde');
+      toast.error('Erreur de sauvegarde');
     }
     setSaving(false);
   };
@@ -50,9 +50,9 @@ export const AdminParametresRichesPage = () => {
     setSaving(true);
     try {
       const response = await api.post('/admin/email/test');
-      toast.success(response.data.message || 'Email de test envoyé avec succès');
+      toast.success(response.data.message || 'Email de test envoyé');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur lors de l\'envoi de l\'email de test');
+      toast.error('Erreur SMTP');
     }
     setSaving(false);
   };
@@ -60,8 +60,8 @@ export const AdminParametresRichesPage = () => {
   if (loading) {
     return (
       <AdminLayout>
-        <div className="p-8">
-          <p className="text-slate-500">Chargement...</p>
+        <div className="min-h-screen bg-black flex items-center justify-center">
+          <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
         </div>
       </AdminLayout>
     );
@@ -69,430 +69,209 @@ export const AdminParametresRichesPage = () => {
 
   return (
     <AdminLayout>
-      <div className="p-8">
-        <div className="flex items-center gap-2 mb-6">
-          <Settings className="h-8 w-8 text-blue-600" />
-          <h2 className="text-3xl font-bold text-slate-900">Paramètres globaux</h2>
+      <div className="min-h-screen bg-black text-white p-6 md:p-12 selection:bg-orange-500/30">
+        
+        {/* Header Section */}
+        <div className="mb-12">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[10px] font-black uppercase tracking-widest mb-4">
+            <Settings className="h-3 w-3" /> System Preferences
+          </div>
+          <h2 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            Paramètres <span className="text-orange-500">Globaux</span>
+          </h2>
+          <p className="mt-2 text-zinc-500 text-sm font-medium uppercase tracking-wider italic">Configuration maître de l'infrastructure DownPricer</p>
         </div>
 
-        <Tabs defaultValue="general">
-          <TabsList>
-            <TabsTrigger value="general">
-              <Settings className="h-4 w-4 mr-2" />
-              Général
-            </TabsTrigger>
-            <TabsTrigger value="prix">
-              <DollarSign className="h-4 w-4 mr-2" />
-              Prix & Quotas
-            </TabsTrigger>
-            <TabsTrigger value="textes">
-              <FileText className="h-4 w-4 mr-2" />
-              Textes
-            </TabsTrigger>
-            <TabsTrigger value="liens">
-              <LinkIcon className="h-4 w-4 mr-2" />
-              Liens
-            </TabsTrigger>
-            <TabsTrigger value="email">
-              <Mail className="h-4 w-4 mr-2" />
-              Notifications email
-            </TabsTrigger>
+        <Tabs defaultValue="general" className="space-y-8">
+          <TabsList className="bg-[#080808] border border-white/5 p-1 rounded-full inline-flex h-12 mb-4">
+            <TabItem value="general" icon={<Globe size={14}/>} label="Général" />
+            <TabItem value="prix" icon={<DollarSign size={14}/>} label="Prix & Quotas" />
+            <TabItem value="textes" icon={<FileText size={14}/>} label="Textes" />
+            <TabItem value="liens" icon={<LinkIcon size={14}/>} label="Liens" />
+            <TabItem value="email" icon={<Mail size={14}/>} label="Emails" />
           </TabsList>
 
-          <TabsContent value="general" className="mt-6 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Informations du site</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Logo URL</Label>
-                  <Input
-                    value={settings.logo_url || ''}
-                    onChange={(e) => handleChange('logo_url', e.target.value)}
-                    placeholder="https://exemple.com/logo.png"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Email de contact</Label>
-                  <Input
-                    type="email"
-                    value={settings.contact_email || ''}
-                    onChange={(e) => handleChange('contact_email', e.target.value)}
-                    placeholder="contact@downpricer.com"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Téléphone de contact</Label>
-                  <Input
-                    value={settings.contact_phone || ''}
-                    onChange={(e) => handleChange('contact_phone', e.target.value)}
-                    placeholder="+33 1 23 45 67 89"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Lien Discord</Label>
-                  <Input
-                    value={settings.discord_invite_url || ''}
-                    onChange={(e) => handleChange('discord_invite_url', e.target.value)}
-                    placeholder="https://discord.gg/..."
-                  />
-                </div>
-
-                <Button
-                  onClick={() => {
-                    handleSave('logo_url', settings.logo_url);
-                    handleSave('contact_email', settings.contact_email);
-                    handleSave('contact_phone', settings.contact_phone);
-                    handleSave('discord_invite_url', settings.discord_invite_url);
-                  }}
-                  disabled={saving}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Enregistrer
-                </Button>
-              </CardContent>
-            </Card>
+          {/* --- TAB: GENERAL --- */}
+          <TabsContent value="general" className="animate-in fade-in duration-500">
+            <SettingsCard title="Identité du site" icon={<Globe className="text-orange-500"/>}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <Field label="URL du Logo" value={settings.logo_url} onChange={(v) => handleChange('logo_url', v)} placeholder="https://..." />
+                <Field label="Email de Contact" value={settings.contact_email} onChange={(v) => handleChange('contact_email', v)} type="email" />
+                <Field label="Téléphone" value={settings.contact_phone} onChange={(v) => handleChange('contact_phone', v)} />
+                <Field label="Invitation Discord" value={settings.discord_invite_url} onChange={(v) => handleChange('discord_invite_url', v)} />
+              </div>
+              <SaveButton onClick={() => {
+                handleSave('logo_url', settings.logo_url);
+                handleSave('contact_email', settings.contact_email);
+                handleSave('contact_phone', settings.contact_phone);
+                handleSave('discord_invite_url', settings.discord_invite_url);
+              }} saving={saving} />
+            </SettingsCard>
           </TabsContent>
 
-          <TabsContent value="prix" className="mt-6 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Tarification et quotas</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2 mb-6 pb-6 border-b border-slate-200">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base font-semibold">Activer les paiements (Stripe)</Label>
-                      <p className="text-xs text-slate-500">Active ou désactive les boutons de paiement Stripe Checkout sur le site</p>
-                    </div>
-                    <Switch
-                      checked={settings.payments_enabled === true || settings.payments_enabled === "true"}
-                      onCheckedChange={(checked) => {
-                        handleChange('payments_enabled', checked);
-                        handleSave('payments_enabled', checked);
-                      }}
-                    />
-                  </div>
-                  {!settings.payments_enabled && (
-                    <p className="text-xs text-orange-600 mt-2">⚠️ Les paiements sont désactivés. Les boutons "S'abonner / Payer" seront masqués sur le site.</p>
-                  )}
+          {/* --- TAB: PRIX & QUOTAS --- */}
+          <TabsContent value="prix" className="animate-in fade-in duration-500">
+            <SettingsCard title="Tarification & Business Model" icon={<Zap className="text-orange-500"/>}>
+              <div className="bg-black/40 border border-white/5 p-6 rounded-2xl mb-8 flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-white mb-1 uppercase tracking-tight">Passerelle de Paiement (Stripe)</h4>
+                  <p className="text-xs text-zinc-500 uppercase tracking-widest font-medium">Active ou désactive les transactions sur tout le site</p>
                 </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Pourcentage d'acompte (%)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={settings.deposit_percentage || 40}
-                      onChange={(e) => handleChange('deposit_percentage', parseFloat(e.target.value))}
-                    />
-                    <p className="text-xs text-slate-500">Acompte demandé sur les demandes clients</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Frais de service vendeur (%)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={settings.seller_fee_percentage || 10}
-                      onChange={(e) => handleChange('seller_fee_percentage', parseFloat(e.target.value))}
-                    />
-                    <p className="text-xs text-slate-500">Commission prélevée sur les ventes vendeurs</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Prix Mini-site Plan 1 (€)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={settings.minisite_plan_1_price || 1}
-                      onChange={(e) => handleChange('minisite_plan_1_price', parseFloat(e.target.value))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Prix Mini-site Plan 10 (€)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={settings.minisite_plan_10_price || 10}
-                      onChange={(e) => handleChange('minisite_plan_10_price', parseFloat(e.target.value))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Prix Mini-site Plan 15 (€)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={settings.minisite_plan_15_price || 15}
-                      onChange={(e) => handleChange('minisite_plan_15_price', parseFloat(e.target.value))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Prix S-Plan 5 (€)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={settings.splan_5_price || 5}
-                      onChange={(e) => handleChange('splan_5_price', parseFloat(e.target.value))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Prix S-Plan 15 (€)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={settings.splan_15_price || 15}
-                      onChange={(e) => handleChange('splan_15_price', parseFloat(e.target.value))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Quota articles gratuits</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={settings.free_articles_quota || 50}
-                      onChange={(e) => handleChange('free_articles_quota', parseInt(e.target.value))}
-                    />
-                    <p className="text-xs text-slate-500">Nombre d'articles inclus gratuitement</p>
-                  </div>
-                </div>
-
-                <Button
-                  onClick={() => {
-                    Object.keys(settings).filter(k => k.includes('price') || k.includes('percentage') || k.includes('quota')).forEach(key => {
-                      handleSave(key, settings[key]);
-                    });
+                <Switch 
+                  checked={settings.payments_enabled === true || settings.payments_enabled === "true"}
+                  onCheckedChange={(checked) => {
+                    handleChange('payments_enabled', checked);
+                    handleSave('payments_enabled', checked);
                   }}
-                  disabled={saving}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Enregistrer tous les prix
-                </Button>
-              </CardContent>
-            </Card>
+                  className="data-[state=checked]:bg-orange-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <Field label="Acompte Client (%)" value={settings.deposit_percentage} onChange={(v) => handleChange('deposit_percentage', v)} type="number" hint="Sur les demandes sourcing" />
+                <Field label="Frais Vendeur (%)" value={settings.seller_fee_percentage} onChange={(v) => handleChange('seller_fee_percentage', v)} type="number" hint="Commission sur ventes" />
+                <Field label="Quota Gratuit" value={settings.free_articles_quota} onChange={(v) => handleChange('free_articles_quota', v)} type="number" hint="Articles inclus" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8 pt-8 border-t border-white/[0.03]">
+                <Field label="Plan Mini-site 1€" value={settings.minisite_plan_1_price} onChange={(v) => handleChange('minisite_plan_1_price', v)} type="number" />
+                <Field label="Plan Mini-site 10€" value={settings.minisite_plan_10_price} onChange={(v) => handleChange('minisite_plan_10_price', v)} type="number" />
+                <Field label="Plan Mini-site 15€" value={settings.minisite_plan_15_price} onChange={(v) => handleChange('minisite_plan_15_price', v)} type="number" />
+                <Field label="S-Plan 5€" value={settings.splan_5_price} onChange={(v) => handleChange('splan_5_price', v)} type="number" />
+                <Field label="S-Plan 15€" value={settings.splan_15_price} onChange={(v) => handleChange('splan_15_price', v)} type="number" />
+              </div>
+
+              <SaveButton label="Mettre à jour la grille tarifaire" onClick={() => {
+                Object.keys(settings).filter(k => k.includes('price') || k.includes('percentage') || k.includes('quota')).forEach(key => handleSave(key, settings[key]));
+              }} saving={saving} />
+            </SettingsCard>
           </TabsContent>
 
-          <TabsContent value="textes" className="mt-6 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Textes personnalisables</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Message d'accueil homepage</Label>
-                  <Textarea
-                    rows={3}
-                    value={settings.homepage_welcome_text || ''}
-                    onChange={(e) => handleChange('homepage_welcome_text', e.target.value)}
-                    placeholder="Bienvenue sur DownPricer..."
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Description du service</Label>
-                  <Textarea
-                    rows={4}
-                    value={settings.service_description || ''}
-                    onChange={(e) => handleChange('service_description', e.target.value)}
-                    placeholder="DownPricer vous aide à..."
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Message après paiement</Label>
-                  <Textarea
-                    rows={3}
-                    value={settings.payment_success_message || ''}
-                    onChange={(e) => handleChange('payment_success_message', e.target.value)}
-                    placeholder="Merci pour votre paiement..."
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>CGV (Conditions générales)</Label>
-                  <Textarea
-                    rows={6}
-                    value={settings.terms_and_conditions || ''}
-                    onChange={(e) => handleChange('terms_and_conditions', e.target.value)}
-                    placeholder="Conditions générales de vente..."
-                  />
-                </div>
-
-                <Button
-                  onClick={() => {
-                    Object.keys(settings).filter(k => k.includes('text') || k.includes('message') || k.includes('description') || k.includes('conditions')).forEach(key => {
-                      handleSave(key, settings[key]);
-                    });
-                  }}
-                  disabled={saving}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Enregistrer tous les textes
-                </Button>
-              </CardContent>
-            </Card>
+          {/* --- TAB: TEXTES --- */}
+          <TabsContent value="textes" className="animate-in fade-in duration-500">
+            <SettingsCard title="Copywriting & Légal" icon={<FileText className="text-orange-500"/>}>
+              <div className="space-y-8">
+                <AreaField label="Message Accueil" value={settings.homepage_welcome_text} onChange={(v) => handleChange('homepage_welcome_text', v)} />
+                <AreaField label="Description Service" value={settings.service_description} onChange={(v) => handleChange('service_description', v)} rows={4} />
+                <AreaField label="Succès Paiement" value={settings.payment_success_message} onChange={(v) => handleChange('payment_success_message', v)} />
+                <AreaField label="CGV & Mentions" value={settings.terms_and_conditions} onChange={(v) => handleChange('terms_and_conditions', v)} rows={8} />
+              </div>
+              <SaveButton label="Enregistrer les textes" onClick={() => {
+                Object.keys(settings).filter(k => k.includes('text') || k.includes('message') || k.includes('description') || k.includes('conditions')).forEach(key => handleSave(key, settings[key]));
+              }} saving={saving} />
+            </SettingsCard>
           </TabsContent>
 
-          <TabsContent value="liens" className="mt-6 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Liens externes</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Lien Facebook</Label>
-                  <Input
-                    value={settings.facebook_url || ''}
-                    onChange={(e) => handleChange('facebook_url', e.target.value)}
-                    placeholder="https://facebook.com/..."
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Lien Instagram</Label>
-                  <Input
-                    value={settings.instagram_url || ''}
-                    onChange={(e) => handleChange('instagram_url', e.target.value)}
-                    placeholder="https://instagram.com/..."
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Lien Twitter/X</Label>
-                  <Input
-                    value={settings.twitter_url || ''}
-                    onChange={(e) => handleChange('twitter_url', e.target.value)}
-                    placeholder="https://twitter.com/..."
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Lien LinkedIn</Label>
-                  <Input
-                    value={settings.linkedin_url || ''}
-                    onChange={(e) => handleChange('linkedin_url', e.target.value)}
-                    placeholder="https://linkedin.com/..."
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>URL d'assistance</Label>
-                  <Input
-                    value={settings.support_url || ''}
-                    onChange={(e) => handleChange('support_url', e.target.value)}
-                    placeholder="https://support.downpricer.com"
-                  />
-                </div>
-
-                <Button
-                  onClick={() => {
-                    Object.keys(settings).filter(k => k.includes('url')).forEach(key => {
-                      handleSave(key, settings[key]);
-                    });
-                  }}
-                  disabled={saving}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Enregistrer tous les liens
-                </Button>
-              </CardContent>
-            </Card>
+          {/* --- TAB: LIENS --- */}
+          <TabsContent value="liens" className="animate-in fade-in duration-500">
+            <SettingsCard title="Écosystème Social" icon={<LinkIcon className="text-orange-500"/>}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <Field label="Facebook" value={settings.facebook_url} onChange={(v) => handleChange('facebook_url', v)} />
+                <Field label="Instagram" value={settings.instagram_url} onChange={(v) => handleChange('instagram_url', v)} />
+                <Field label="Twitter / X" value={settings.twitter_url} onChange={(v) => handleChange('twitter_url', v)} />
+                <Field label="LinkedIn" value={settings.linkedin_url} onChange={(v) => handleChange('linkedin_url', v)} />
+                <Field label="Support URL" value={settings.support_url} onChange={(v) => handleChange('support_url', v)} />
+              </div>
+              <SaveButton label="Mettre à jour les URLs" onClick={() => {
+                Object.keys(settings).filter(k => k.includes('url')).forEach(key => handleSave(key, settings[key]));
+              }} saving={saving} />
+            </SettingsCard>
           </TabsContent>
 
-          <TabsContent value="email" className="mt-6 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Notifications email</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <Label>Activer les notifications email</Label>
-                      <p className="text-xs text-slate-500">
-                        Active ou désactive toutes les notifications email (demandes, ventes, etc.)
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.email_notif_enabled === true || settings.email_notif_enabled === "true"}
-                      onCheckedChange={(checked) => {
-                        handleChange('email_notif_enabled', checked);
-                        handleSave('email_notif_enabled', checked);
-                      }}
-                    />
-                  </div>
+          {/* --- TAB: EMAIL --- */}
+          <TabsContent value="email" className="animate-in fade-in duration-500">
+            <SettingsCard title="Configuration SMTP & Alertes" icon={<Mail className="text-orange-500"/>}>
+              <div className="bg-black/40 border border-white/5 p-6 rounded-2xl mb-8 flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-white mb-1 uppercase tracking-tight">Flux de Notifications</h4>
+                  <p className="text-xs text-zinc-500 uppercase tracking-widest font-medium">Active l'envoi global des emails transactionnels</p>
                 </div>
+                <Switch 
+                  checked={settings.email_notif_enabled === true || settings.email_notif_enabled === "true"}
+                  onCheckedChange={(checked) => {
+                    handleChange('email_notif_enabled', checked);
+                    handleSave('email_notif_enabled', checked);
+                  }}
+                  className="data-[state=checked]:bg-orange-500"
+                />
+              </div>
 
-                <div className="space-y-2">
-                  <Label>Email admin (notifications)</Label>
-                  <Input
-                    type="email"
-                    value={settings.admin_notif_email || ''}
-                    onChange={(e) => handleChange('admin_notif_email', e.target.value)}
-                    onBlur={(e) => handleSave('admin_notif_email', e.target.value)}
-                    placeholder="contact@downpricer.com"
-                  />
-                  <p className="text-xs text-slate-500">
-                    Email qui recevra les notifications admin (nouvelles ventes, demandes importantes, etc.)
-                  </p>
-                </div>
+              <div className="max-w-md mb-10">
+                <Field label="Email Admin (Réception)" value={settings.admin_notif_email} onChange={(v) => handleChange('admin_notif_email', v)} onBlur={(v) => handleSave('admin_notif_email', v)} />
+              </div>
 
-                <div className="pt-4 border-t border-slate-200">
-                  <div className="space-y-2">
-                    <Label>Test de configuration</Label>
-                    <p className="text-xs text-slate-500 mb-3">
-                      Envoie un email de test pour vérifier que la configuration SMTP est correcte.
-                      L'email sera envoyé à l'adresse admin configurée ci-dessus.
-                    </p>
-                    <Button
-                      onClick={testEmail}
-                      disabled={saving}
-                      variant="outline"
-                      className="border-blue-600 text-blue-600 hover:bg-blue-50"
-                    >
-                      <Send className="h-4 w-4 mr-2" />
-                      Envoyer un email de test
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-slate-200">
-                  <div className="bg-slate-50 p-4 rounded-lg">
-                    <h4 className="text-sm font-semibold text-slate-700 mb-2">Configuration SMTP</h4>
-                    <p className="text-xs text-slate-600 mb-2">
-                      Les paramètres SMTP (hôte, port, utilisateur, mot de passe) doivent être configurés dans les variables d'environnement du serveur.
-                    </p>
-                    <ul className="text-xs text-slate-600 space-y-1 list-disc list-inside">
-                      <li>SMTP_HOST (ex: smtp.mail.ovh.net)</li>
-                      <li>SMTP_PORT (587 pour STARTTLS, 465 pour SSL)</li>
-                      <li>SMTP_USER (noreply@downpricer.com)</li>
-                      <li>SMTP_PASS (mot de passe SMTP)</li>
-                      <li>SMTP_FROM (noreply@downpricer.com)</li>
-                      <li>SMTP_TLS_MODE (starttls ou ssl)</li>
-                    </ul>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+              <div className="p-8 bg-black border border-white/5 rounded-3xl">
+                <h4 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 mb-4 flex items-center gap-2">
+                   <Send size={14}/> Test de connectivité
+                </h4>
+                <p className="text-[11px] font-medium text-zinc-600 uppercase mb-6 leading-relaxed">
+                  Lancez une séquence de test SMTP vers l'adresse admin configurée ci-dessus.
+                </p>
+                <Button onClick={testEmail} disabled={saving} variant="outline" className="rounded-xl border-white/10 bg-white hover:bg-zinc-200 text-black font-black uppercase tracking-widest text-[10px] px-8 h-12 transition-all active:scale-95 shadow-lg shadow-white/5">
+                  Lancer le Test SMTP
+                </Button>
+              </div>
+            </SettingsCard>
           </TabsContent>
         </Tabs>
       </div>
     </AdminLayout>
   );
 };
+
+// --- COMPOSANTS INTERNES ---
+
+const TabItem = ({ value, icon, label }) => (
+  <TabsTrigger value={value} className="rounded-full px-6 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+    <span className="mr-2 opacity-50">{icon}</span> {label}
+  </TabsTrigger>
+);
+
+const SettingsCard = ({ title, icon, children }) => (
+  <Card className="bg-[#080808] border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">
+    <CardHeader className="p-10 pb-4 border-b border-white/[0.03]">
+      <CardTitle className="text-xs font-black uppercase tracking-[0.3em] text-zinc-500 flex items-center gap-3">
+        {icon} {title}
+      </CardTitle>
+    </CardHeader>
+    <CardContent className="p-10">
+      {children}
+    </CardContent>
+  </Card>
+);
+
+const Field = ({ label, hint, value, onChange, onBlur, type = "text", placeholder }) => (
+  <div className="space-y-3">
+    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 ml-1">{label}</Label>
+    <Input
+      type={type} value={value || ''} placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur ? (e) => onBlur(e.target.value) : undefined}
+      className="bg-black border-white/10 h-12 rounded-xl text-sm focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/10 transition-all"
+    />
+    {hint && <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest ml-1">{hint}</p>}
+  </div>
+);
+
+const AreaField = ({ label, value, onChange, rows = 3 }) => (
+  <div className="space-y-3">
+    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 ml-1">{label}</Label>
+    <Textarea
+      value={value || ''} rows={rows}
+      onChange={(e) => onChange(e.target.value)}
+      className="bg-black border-white/10 rounded-2xl text-sm focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/10 transition-all p-4"
+    />
+  </div>
+);
+
+const SaveButton = ({ onClick, saving, label = "Enregistrer les modifications" }) => (
+  <div className="mt-12 pt-8 border-t border-white/[0.03]">
+    <Button 
+      onClick={onClick} disabled={saving}
+      className="bg-orange-600 hover:bg-orange-500 text-white font-black uppercase tracking-widest text-[10px] h-14 px-10 rounded-2xl shadow-lg shadow-orange-900/20 transition-all active:scale-95"
+    >
+      {saving ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4 mr-2" />}
+      {label}
+    </Button>
+  </div>
+);

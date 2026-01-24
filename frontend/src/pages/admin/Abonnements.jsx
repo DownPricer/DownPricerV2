@@ -6,12 +6,20 @@ import { Badge } from '../../components/ui/badge';
 export const AdminAbonnementsPage = () => {
   return (
     <AdminLayout>
-      <div className="p-8">
-        <h2 className="text-3xl font-bold text-slate-900 mb-6">Abonnements</h2>
-        <Card className="bg-white border-slate-200">
-          <CardContent className="p-8 text-center">
-            <p className="text-slate-600 mb-4">Gestion des abonnements Mini-sites (1€/10€/15€) et S-Plan (5€/15€)</p>
-            <Badge className="bg-blue-100 text-blue-800">Fonctionnalité en développement</Badge>
+      <div className="min-h-screen bg-black p-8 md:p-12">
+        <h2 className="text-4xl font-black text-white mb-8 tracking-tighter uppercase italic" style={{ fontFamily: 'Outfit, sans-serif' }}>
+          Abonnements
+        </h2>
+        
+        <Card className="bg-[#080808] border-white/5 rounded-[2rem] overflow-hidden shadow-2xl">
+          <CardContent className="p-12 text-center">
+            <p className="text-zinc-400 font-medium mb-6">
+              Gestion des abonnements Mini-sites <span className="text-white">(1€/10€/15€)</span> et S-Plan <span className="text-white">(5€/15€)</span>
+            </p>
+            
+            <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.15em]">
+              Fonctionnalité en développement
+            </Badge>
           </CardContent>
         </Card>
       </div>

@@ -3,7 +3,7 @@ import { AdminLayout } from '../../components/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { CreditCard, Globe, Star, Users } from 'lucide-react';
+import { CreditCard, Globe, Star, Users, Loader2, TrendingUp, Calendar, Hash } from 'lucide-react';
 import api from '../../utils/api';
 import { toast } from 'sonner';
 
@@ -30,7 +30,6 @@ export const AdminAbonnementsPage = () => {
     setLoading(false);
   };
 
-  const miniSiteSubscriptions = subscriptions.filter(s => s.product === 'minisite');
   const miniSiteUsers = users.filter(u => 
     u.roles.includes('SITE_PLAN_1') || u.roles.includes('SITE_PLAN_2') || u.roles.includes('SITE_PLAN_3')
   );
@@ -38,181 +37,81 @@ export const AdminAbonnementsPage = () => {
     u.roles.includes('S_PLAN_5') || u.roles.includes('S_PLAN_15')
   );
 
+  const monthlyMRR = (
+    miniSiteUsers.filter(u => u.roles.includes('SITE_PLAN_1')).length * 1 +
+    miniSiteUsers.filter(u => u.roles.includes('SITE_PLAN_2')).length * 10 +
+    miniSiteUsers.filter(u => u.roles.includes('SITE_PLAN_3')).length * 15 +
+    sPlanUsers.filter(u => u.roles.includes('S_PLAN_5')).length * 5 +
+    sPlanUsers.filter(u => u.roles.includes('S_PLAN_15')).length * 15
+  );
+
   const getPlanBadge = (roles) => {
-    if (roles.includes('SITE_PLAN_3')) return <Badge className="bg-purple-100 text-purple-800">Mini-site 15€</Badge>;
-    if (roles.includes('SITE_PLAN_2')) return <Badge className="bg-blue-100 text-blue-800">Mini-site 10€</Badge>;
-    if (roles.includes('SITE_PLAN_1')) return <Badge className="bg-green-100 text-green-800">Mini-site 1€</Badge>;
-    if (roles.includes('S_PLAN_15')) return <Badge className="bg-orange-100 text-orange-800">S-Plan 15€</Badge>;
-    if (roles.includes('S_PLAN_5')) return <Badge className="bg-yellow-100 text-yellow-800">S-Plan 5€</Badge>;
-    return null;
+    const config = roles.includes('SITE_PLAN_3') || roles.includes('S_PLAN_15') 
+      ? { label: 'Premium 15€', class: 'bg-orange-500/10 text-orange-500 border-orange-500/20' }
+      : roles.includes('SITE_PLAN_2') 
+      ? { label: 'Standard 10€', class: 'bg-white/10 text-white border-white/10' }
+      : { label: 'Starter', class: 'bg-white/5 text-zinc-500 border-white/5' };
+
+    return <Badge className={`${config.class} border rounded-full text-[9px] font-black uppercase tracking-tighter`}>{config.label}</Badge>;
   };
 
   return (
     <AdminLayout>
-      <div className="p-8">
-        <h2 className="text-3xl font-bold text-slate-900 mb-6">Gestion des abonnements</h2>
+      <div className="min-h-screen bg-black text-white p-6 md:p-12 selection:bg-orange-500/30">
+        
+        {/* Header */}
+        <div className="mb-12">
+          <h2 className="text-4xl font-black tracking-tighter uppercase italic mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            Abonnements <span className="text-orange-500">& Billing</span>
+          </h2>
+          <p className="text-zinc-500 text-sm font-medium uppercase tracking-widest">Contrôle des flux financiers et des accès privilèges</p>
+        </div>
 
-        <div className="grid md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-500">Mini-sites actifs</p>
-                  <p className="text-3xl font-bold">{miniSiteUsers.length}</p>
-                </div>
-                <Globe className="h-8 w-8 text-blue-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-500">S-Plan actifs</p>
-                  <p className="text-3xl font-bold">{sPlanUsers.length}</p>
-                </div>
-                <Star className="h-8 w-8 text-orange-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-500">Total abonnés</p>
-                  <p className="text-3xl font-bold">{miniSiteUsers.length + sPlanUsers.length}</p>
-                </div>
-                <Users className="h-8 w-8 text-green-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-500">Revenus mensuels</p>
-                  <p className="text-3xl font-bold text-green-600">
-                    {miniSiteUsers.filter(u => u.roles.includes('SITE_PLAN_1')).length * 1 +
-                     miniSiteUsers.filter(u => u.roles.includes('SITE_PLAN_2')).length * 10 +
-                     miniSiteUsers.filter(u => u.roles.includes('SITE_PLAN_3')).length * 15 +
-                     sPlanUsers.filter(u => u.roles.includes('S_PLAN_5')).length * 5 +
-                     sPlanUsers.filter(u => u.roles.includes('S_PLAN_15')).length * 15}€
-                  </p>
-                </div>
-                <CreditCard className="h-8 w-8 text-purple-500" />
-              </div>
-            </CardContent>
-          </Card>
+        {/* Top KPIs */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+          <KPICard icon={<Globe size={18}/>} label="Mini-Sites" value={miniSiteUsers.length} color="orange" />
+          <KPICard icon={<Star size={18}/>} label="S-Plan" value={sPlanUsers.length} color="white" />
+          <KPICard icon={<Users size={18}/>} label="Abonnés" value={miniSiteUsers.length + sPlanUsers.length} color="white" />
+          <KPICard icon={<TrendingUp size={18}/>} label="MRR Estimé" value={`${monthlyMRR}€`} color="green" />
         </div>
 
         {loading ? (
-          <p className="text-slate-500">Chargement...</p>
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
+          </div>
         ) : (
-          <Tabs defaultValue="mini-sites">
-            <TabsList>
-              <TabsTrigger value="mini-sites">
-                <Globe className="h-4 w-4 mr-2" />
-                Mini-sites ({miniSiteUsers.length})
+          <Tabs defaultValue="mini-sites" className="space-y-8">
+            <TabsList className="bg-[#080808] border border-white/5 p-1 rounded-full inline-flex h-12">
+              <TabsTrigger value="mini-sites" className="rounded-full px-8 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+                Mini-sites
               </TabsTrigger>
-              <TabsTrigger value="s-plan">
-                <Star className="h-4 w-4 mr-2" />
-                S-Plan ({sPlanUsers.length})
+              <TabsTrigger value="s-plan" className="rounded-full px-8 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+                S-Plan
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="mini-sites" className="mt-6">
-              {miniSiteSubscriptions.length === 0 ? (
-                <Card>
-                  <CardContent className="p-12 text-center">
-                    <p className="text-slate-500">Aucun abonnement Mini-site actif</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="space-y-4">
-                  {miniSiteSubscriptions.map((sub) => {
-                    const getStatusBadge = (status) => {
-                      const statusMap = {
-                        active: { className: "bg-green-100 text-green-800", label: "Actif" },
-                        trialing: { className: "bg-blue-100 text-blue-800", label: "Essai" },
-                        canceled: { className: "bg-gray-100 text-gray-800", label: "Annulé" },
-                        past_due: { className: "bg-yellow-100 text-yellow-800", label: "En retard" },
-                        unpaid: { className: "bg-red-100 text-red-800", label: "Impayé" }
-                      };
-                      const config = statusMap[status] || { className: "bg-gray-100 text-gray-800", label: status };
-                      return <Badge className={config.className}>{config.label}</Badge>;
-                    };
-                    
-                    const getPlanLabel = (plan) => {
-                      const planMap = {
-                        starter: "Starter (1€/mois)",
-                        standard: "Standard (10€/mois)",
-                        premium: "Premium (15€/mois)"
-                      };
-                      return planMap[plan] || plan;
-                    };
-                    
-                    const formatDate = (dateStr) => {
-                      if (!dateStr) return "N/A";
-                      return new Date(dateStr).toLocaleDateString('fr-FR');
-                    };
-                    
-                    return (
-                      <Card key={sub.id}>
-                        <CardContent className="p-6">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-lg">{sub.user_name || sub.user_email}</h3>
-                              <p className="text-sm text-slate-500">{sub.user_email}</p>
-                              <div className="mt-2 flex gap-2 flex-wrap">
-                                <Badge className="bg-blue-100 text-blue-800">{getPlanLabel(sub.plan)}</Badge>
-                                {getStatusBadge(sub.status)}
-                              </div>
-                              {sub.current_period_end && (
-                                <p className="text-xs text-slate-400 mt-2">
-                                  Prochaine échéance : {formatDate(sub.current_period_end)}
-                                </p>
-                              )}
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm text-slate-500">ID Stripe</p>
-                              <p className="text-xs font-mono text-slate-400">{sub.stripe_subscription_id?.substring(0, 20)}...</p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
+            <TabsContent value="mini-sites" className="animate-in fade-in duration-500">
+              <div className="grid gap-3">
+                {subscriptions.length === 0 ? (
+                  <EmptyState text="Aucun abonnement Mini-site actif" />
+                ) : (
+                  subscriptions.filter(s => s.product === 'minisite').map((sub) => (
+                    <SubscriptionRow key={sub.id} sub={sub} />
+                  ))
+                )}
+              </div>
             </TabsContent>
 
-            <TabsContent value="s-plan" className="mt-6">
-              {sPlanUsers.length === 0 ? (
-                <Card>
-                  <CardContent className="p-12 text-center">
-                    <p className="text-slate-500">Aucun abonné S-Plan</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="space-y-4">
-                  {sPlanUsers.map((user) => (
-                    <Card key={user.id}>
-                      <CardContent className="p-6">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <h3 className="font-semibold text-lg">{user.first_name} {user.last_name}</h3>
-                            <p className="text-sm text-slate-500">{user.email}</p>
-                          </div>
-                          {getPlanBadge(user.roles)}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
+            <TabsContent value="s-plan" className="animate-in fade-in duration-500">
+              <div className="grid gap-3">
+                {sPlanUsers.length === 0 ? (
+                  <EmptyState text="Aucun abonné S-Plan" />
+                ) : (
+                  sPlanUsers.map((user) => (
+                    <UserRow key={user.id} user={user} badge={getPlanBadge(user.roles)} />
+                  ))
+                )}
+              </div>
             </TabsContent>
           </Tabs>
         )}
@@ -220,3 +119,76 @@ export const AdminAbonnementsPage = () => {
     </AdminLayout>
   );
 };
+
+// --- COMPOSANTS INTERNES ---
+
+const KPICard = ({ icon, label, value, color }) => (
+  <div className="bg-[#080808] border border-white/5 p-6 rounded-[1.5rem] hover:border-white/10 transition-all group">
+    <div className={`h-10 w-10 rounded-xl flex items-center justify-center mb-4 border transition-colors ${
+      color === 'orange' ? 'bg-orange-500/10 border-orange-500/20 text-orange-500' :
+      color === 'green' ? 'bg-green-500/10 border-green-500/20 text-green-500' :
+      'bg-white/5 border-white/10 text-zinc-400 group-hover:text-white'
+    }`}>
+      {icon}
+    </div>
+    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">{label}</p>
+    <p className="text-2xl font-black text-white">{value}</p>
+  </div>
+);
+
+const SubscriptionRow = ({ sub }) => {
+  const statusConfig = {
+    active: { class: "bg-green-500/10 text-green-500 border-green-500/20", label: "Actif" },
+    past_due: { class: "bg-red-500/10 text-red-500 border-red-500/20", label: "Impayé" },
+    trialing: { class: "bg-blue-500/10 text-blue-500 border-blue-500/20", label: "Essai" },
+    canceled: { class: "bg-white/5 text-zinc-500 border-white/5", label: "Annulé" },
+  }[sub.status] || { class: "bg-white/5 text-zinc-500 border-white/5", label: sub.status };
+
+  return (
+    <div className="bg-[#080808] border border-white/5 p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-white/10 transition-all group">
+      <div className="flex items-center gap-4">
+        <div className="h-10 w-10 rounded-full bg-black border border-white/10 flex items-center justify-center text-zinc-600 group-hover:text-orange-500 transition-colors">
+          <CreditCard size={18} />
+        </div>
+        <div>
+          <h4 className="text-sm font-bold text-white group-hover:text-orange-500 transition-colors">{sub.user_name || sub.user_email}</h4>
+          <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">{sub.user_email}</p>
+        </div>
+      </div>
+      
+      <div className="flex flex-wrap items-center gap-3">
+        <Badge className="bg-white/5 border-white/10 text-[9px] font-black uppercase tracking-tighter">
+          {sub.plan === 'premium' ? 'Premium 15€' : sub.plan === 'standard' ? 'Standard 10€' : 'Starter 1€'}
+        </Badge>
+        <Badge className={`${statusConfig.class} border rounded-full text-[9px] font-black uppercase`}>{statusConfig.label}</Badge>
+        <div className="h-8 w-px bg-white/5 mx-2 hidden md:block" />
+        <div className="text-right">
+          <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">ID STRIPE</p>
+          <p className="text-[10px] font-mono text-zinc-400">{sub.stripe_subscription_id?.substring(0, 12)}...</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const UserRow = ({ user, badge }) => (
+  <div className="bg-[#080808] border border-white/5 p-5 rounded-2xl flex items-center justify-between hover:border-white/10 transition-all group">
+    <div className="flex items-center gap-4">
+      <div className="h-10 w-10 rounded-full bg-black border border-white/10 flex items-center justify-center text-zinc-600 group-hover:text-orange-500 transition-colors">
+        <Users size={18} />
+      </div>
+      <div>
+        <h4 className="text-sm font-bold text-white">{user.first_name} {user.last_name}</h4>
+        <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">{user.email}</p>
+      </div>
+    </div>
+    {badge}
+  </div>
+);
+
+const EmptyState = ({ text }) => (
+  <div className="bg-[#080808] border border-white/5 p-12 rounded-[2rem] text-center">
+    <Hash className="h-10 w-10 text-zinc-800 mx-auto mb-4" />
+    <p className="text-zinc-500 text-xs font-bold uppercase tracking-[0.2em]">{text}</p>
+  </div>
+);
