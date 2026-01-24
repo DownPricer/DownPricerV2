@@ -12,10 +12,13 @@ export const AppLayout = ({ children }) => {
   // Ne pas afficher le Header pour les routes admin (elles utilisent AdminLayout)
   const isAdminRoute = location.pathname.startsWith('/admin');
   
+  // Ne pas afficher le Header pour les routes Pro (elles utilisent ProLayout)
+  const isProRoute = location.pathname.startsWith('/pro');
+  
   // Ne pas afficher le Header pour les routes de login/signup (elles ont leur propre style)
   const isAuthRoute = location.pathname === '/login' || location.pathname === '/signup';
   
-  const showHeader = !isAdminRoute && !isAuthRoute;
+  const showHeader = !isAdminRoute && !isProRoute && !isAuthRoute;
   
   return (
     <div className="min-h-screen bg-gray-50">

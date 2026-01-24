@@ -42,8 +42,8 @@ else:
 client = AsyncIOMotorClient(mongo_url)
 db = client[db_name]
 
-# Router avec préfixe /api/pro
-pro_router = APIRouter(prefix="/api/pro", tags=["Pro"])
+# Router avec préfixe /api/pro (sera inclus dans api_router qui a déjà /api)
+pro_router = APIRouter(prefix="/pro", tags=["Pro"])
 
 # ============================================================================
 # MODÈLES PYDANTIC POUR LE MODULE PRO

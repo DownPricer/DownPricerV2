@@ -2433,10 +2433,11 @@ async def stripe_webhook(request: Request):
         raise HTTPException(status_code=500, detail=f"Erreur lors du traitement du webhook: {str(e)}")
 
 
-app.include_router(api_router)
-
 # Router Pro pour module achat/revente (S-tier uniquement)
-app.include_router(pro_router)
+# Inclus dans api_router pour avoir le préfixe /api/pro
+api_router.include_router(pro_router)
+
+app.include_router(api_router)
 
 @app.get("/health")
 @app.get("/api/health")

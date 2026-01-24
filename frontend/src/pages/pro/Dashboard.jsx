@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Package, TrendingUp, CheckCircle, DollarSign, AlertCircle, Plus } from 'lucide-react';
+import { Package, TrendingUp, CheckCircle, DollarSign, AlertCircle, Plus, Loader } from 'lucide-react';
 import api from '../../utils/api';
-import { getUser } from '../../utils/auth';
 
 export const ProDashboard = () => {
   const [data, setData] = useState({
@@ -11,7 +10,6 @@ export const ProDashboard = () => {
     alerts: []
   });
   const [loading, setLoading] = useState(true);
-  const user = getUser();
 
   useEffect(() => {
     fetchData();
@@ -19,17 +17,31 @@ export const ProDashboard = () => {
 
   const fetchData = async () => {
     try {
-      // Récupérer les articles sans photos (optimisé)
-      const articlesResponse = await api.get('/pro/articles-light');
-      const articles = articlesResponse.data;
+      // OPTIMISÉ : Une seule requête pour tout SANS photos
+      const response = await api.get('/pro/articles-light');
+      const articles = response.data;
 
-      // Récupérer les stats
-      const statsResponse = await api.get('/pro/dashboard/stats');
-      const stats = statsResponse.data;
+      // Calculer les stats localement
+      const stats = {
+        total_articles: articles.length,
+        articles_for_sale: articles.filter(a => a.status === 'À vendre').length,
+        articles_sold: articles.filter(a => a.status === 'Vendu').length,
+        current_margin: articles.reduce((sum, a) => {
+          if (a.status === 'Vendu' && a.actual_sale_price) {
+            return sum + (a.actual_sale_price - a.purchase_price);
+          }
+          return sum;
+        }, 0)
+      };
 
-      // Récupérer les alertes
-      const alertsResponse = await api.get('/pro/dashboard/alerts');
-      const alerts = alertsResponse.data;
+      // Calculer les alertes localement
+      const threeDaysFromNow = new Date();
+      threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+      const alerts = articles.filter(a => 
+        a.return_deadline && 
+        new Date(a.return_deadline) <= threeDaysFromNow &&
+        a.status !== 'Vendu'
+      );
 
       setData({
         articles: articles.slice(0, 5), // Seulement les 5 premiers
@@ -39,7 +51,6 @@ export const ProDashboard = () => {
     } catch (error) {
       console.error('Erreur:', error);
       if (error.response?.status === 403) {
-        // Rediriger si pas S-tier
         window.location.href = '/';
       }
     } finally {
@@ -50,17 +61,13 @@ export const ProDashboard = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+        <Loader className="h-8 w-8 animate-spin text-indigo-600" />
       </div>
     );
   }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard Achat / Revente</h1>
-        <p className="mt-2 text-gray-600">Gérez vos achats et ventes</p>
-      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -133,7 +140,7 @@ export const ProDashboard = () => {
           <h3 className="text-lg font-medium text-gray-900">Articles récents</h3>
           <Link
             to="/pro/articles/new"
-            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-orange-500 hover:bg-orange-600"
+            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
           >
             <Plus className="h-4 w-4 mr-2" />
             Ajouter
@@ -171,7 +178,7 @@ export const ProDashboard = () => {
               <p className="text-gray-500 mb-4">Aucun article</p>
               <Link
                 to="/pro/articles/new"
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-orange-500 hover:bg-orange-600"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Ajouter votre premier article

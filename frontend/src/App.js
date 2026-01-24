@@ -387,6 +387,10 @@ import { MinisiteUpgrade } from './pages/MinisiteUpgrade'; // Importé ici
 import { ProDashboard } from './pages/pro/Dashboard';
 import { ProArticles } from './pages/pro/Articles';
 import { ProAddArticle } from './pages/pro/AddArticle';
+import { ProPortfolio } from './pages/pro/Portfolio';
+import { ProStatistics } from './pages/pro/Statistics';
+import { ProAnalytics } from './pages/pro/Analytics';
+import { ProLayout } from './components/ProLayout';
 
 const ProtectedRoute = ({ children, requiredRole }) => {
   const user = getUser();
@@ -696,12 +700,14 @@ function App() {
             }
           />
           
-          {/* Pro Module Routes (S-tier uniquement) */}
+          {/* Pro Module Routes (S-tier uniquement) - Utilise ProLayout */}
           <Route
             path="/pro/dashboard"
             element={
               <ProtectedSTierRoute>
-                <ProDashboard />
+                <ProLayout>
+                  <ProDashboard />
+                </ProLayout>
               </ProtectedSTierRoute>
             }
           />
@@ -709,7 +715,9 @@ function App() {
             path="/pro/articles"
             element={
               <ProtectedSTierRoute>
-                <ProArticles />
+                <ProLayout>
+                  <ProArticles />
+                </ProLayout>
               </ProtectedSTierRoute>
             }
           />
@@ -717,7 +725,39 @@ function App() {
             path="/pro/articles/new"
             element={
               <ProtectedSTierRoute>
-                <ProAddArticle />
+                <ProLayout>
+                  <ProAddArticle />
+                </ProLayout>
+              </ProtectedSTierRoute>
+            }
+          />
+          <Route
+            path="/pro/portfolio"
+            element={
+              <ProtectedSTierRoute>
+                <ProLayout>
+                  <ProPortfolio />
+                </ProLayout>
+              </ProtectedSTierRoute>
+            }
+          />
+          <Route
+            path="/pro/statistics"
+            element={
+              <ProtectedSTierRoute>
+                <ProLayout>
+                  <ProStatistics />
+                </ProLayout>
+              </ProtectedSTierRoute>
+            }
+          />
+          <Route
+            path="/pro/analytics"
+            element={
+              <ProtectedSTierRoute>
+                <ProLayout>
+                  <ProAnalytics />
+                </ProLayout>
               </ProtectedSTierRoute>
             }
           />
