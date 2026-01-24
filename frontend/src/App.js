@@ -390,6 +390,7 @@ import { ProAddArticle } from './pages/pro/AddArticle';
 import { ProPortfolio } from './pages/pro/Portfolio';
 import { ProStatistics } from './pages/pro/Statistics';
 import { ProAnalytics } from './pages/pro/Analytics';
+import { ProAdmin } from './pages/pro/Admin';
 import { ProLayout } from './components/ProLayout';
 
 const ProtectedRoute = ({ children, requiredRole }) => {
@@ -759,6 +760,16 @@ function App() {
                   <ProAnalytics />
                 </ProLayout>
               </ProtectedSTierRoute>
+            }
+          />
+          <Route
+            path="/pro/admin"
+            element={
+              <ProtectedRoute requiredRole="ADMIN">
+                <ProLayout>
+                  <ProAdmin />
+                </ProLayout>
+              </ProtectedRoute>
             }
           />
           </Routes>

@@ -74,3 +74,26 @@ def require_s_tier():
         return current_user
     
     return s_tier_checker
+
+def require_admin():
+    """
+    Middleware pour vérifier l'accès admin (ADMIN role).
+    Utilisé pour les endpoints admin du module Pro.
+    """
+    async def admin_checker(current_user: TokenData = Depends(get_current_user)):
+        user_roles = []
+        for role_str in current_user.roles:
+            try:
+                user_roles.append(UserRole(role_str))
+            except ValueError:
+                continue
+        
+        if UserRole.ADMIN not in user_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Accès interdit : rôle administrateur requis"
+            )
+        
+        return current_user
+    
+    return admin_checker

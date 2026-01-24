@@ -11,8 +11,8 @@ import base64
 from PIL import Image
 import io
 
-from dependencies import get_current_user, require_s_tier, TokenData
-from models import User
+from dependencies import get_current_user, require_s_tier, require_admin, TokenData
+from models import User, UserRole
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 from dotenv import load_dotenv
@@ -389,4 +389,107 @@ async def get_pro_dashboard_stats(
         "potential_revenue": potential_revenue,
         "current_margin": total_earned - total_invested
     }
+
+# ============================================================================
+# ENDPOINTS ADMIN (STATS GLOBALES - TOUS LES USERS)
+# ============================================================================
+
+@pro_router.get("/admin/stats")
+async def get_pro_admin_stats(
+    current_user: TokenData = Depends(require_admin())
+):
+    """
+    Statistiques globales pour tous les utilisateurs du module Pro.
+    Accessible uniquement aux administrateurs.
+    """
+    db_conn = get_db()
+    
+    # Récupérer tous les articles (tous users)
+    all_articles = await db_conn.pro_articles.find({}).to_list(length=None)
+    
+    # Récupérer toutes les transactions (tous users)
+    all_transactions = await db_conn.pro_transactions.find({}).to_list(length=None)
+    
+    # Calculer les stats globales
+    total_articles = len(all_articles)
+    articles_for_sale = len([a for a in all_articles if a.get("status") == "À vendre"])
+    articles_sold = len([a for a in all_articles if a.get("status") == "Vendu"])
+    articles_lost = len([a for a in all_articles if a.get("status") == "Perte"])
+    
+    # Calculer les montants globaux
+    total_invested = sum(a.get("purchase_price", 0) for a in all_articles)
+    total_earned = sum(a.get("actual_sale_price", 0) for a in all_articles if a.get("status") == "Vendu")
+    potential_revenue = sum(a.get("estimated_sale_price", 0) for a in all_articles if a.get("status") == "À vendre")
+    
+    # Calculer les transactions
+    total_transactions = len(all_transactions)
+    total_purchases = sum(abs(t.get("amount", 0)) for t in all_transactions if t.get("type") == "achat")
+    total_sales = sum(t.get("amount", 0) for t in all_transactions if t.get("type") == "vente")
+    
+    # Alertes retour globales (dans les 3 prochains jours)
+    three_days_from_now = datetime.utcnow() + timedelta(days=3)
+    alerts_count = len([
+        a for a in all_articles 
+        if a.get("return_deadline") 
+        and datetime.fromisoformat(a["return_deadline"].replace("Z", "+00:00")) <= three_days_from_now
+        and a.get("status") != "Vendu"
+    ])
+    
+    # Compter les users uniques
+    unique_user_ids = set()
+    unique_user_ids.update(a.get("user_id") for a in all_articles)
+    unique_user_ids.update(t.get("user_id") for t in all_transactions)
+    total_users = len(unique_user_ids)
+    
+    return {
+        "total_users": total_users,
+        "total_articles": total_articles,
+        "articles_for_sale": articles_for_sale,
+        "articles_sold": articles_sold,
+        "articles_lost": articles_lost,
+        "total_transactions": total_transactions,
+        "total_invested": total_invested,
+        "total_earned": total_earned,
+        "total_revenue": total_earned,  # Alias pour compatibilité
+        "potential_revenue": potential_revenue,
+        "current_margin": total_earned - total_invested,
+        "total_purchases": total_purchases,
+        "total_sales": total_sales,
+        "alerts_count": alerts_count
+    }
+
+@pro_router.get("/admin/users")
+async def get_pro_admin_users(
+    current_user: TokenData = Depends(require_admin())
+):
+    """
+    Liste des utilisateurs ayant utilisé le module Pro.
+    Accessible uniquement aux administrateurs.
+    """
+    db_conn = get_db()
+    
+    # Récupérer tous les user_ids uniques depuis les articles et transactions
+    user_ids_from_articles = await db_conn.pro_articles.distinct("user_id")
+    user_ids_from_transactions = await db_conn.pro_transactions.distinct("user_id")
+    all_user_ids = set(user_ids_from_articles) | set(user_ids_from_transactions)
+    
+    # Récupérer les infos des users depuis la collection users
+    users_list = []
+    for user_id in all_user_ids:
+        user_doc = await db_conn.users.find_one({"id": user_id})
+        if user_doc:
+            # Compter les articles et transactions de cet user
+            user_articles_count = await db_conn.pro_articles.count_documents({"user_id": user_id})
+            user_transactions_count = await db_conn.pro_transactions.count_documents({"user_id": user_id})
+            
+            users_list.append({
+                "id": user_doc.get("id"),
+                "email": user_doc.get("email"),
+                "is_admin": UserRole.ADMIN.value in user_doc.get("roles", []),
+                "created_at": user_doc.get("created_at"),
+                "articles_count": user_articles_count,
+                "transactions_count": user_transactions_count
+            })
+    
+    return users_list
 
