@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, Menu, X, User, ChevronRight } from 'lucide-react';
+import { Search, Menu, X, User, ChevronRight, LogOut, LayoutDashboard, ShieldCheck } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
@@ -34,10 +34,12 @@ export const Header = () => {
 
   const handleLogout = () => {
     logout();
+    setUser(null);
+    setMobileMenuOpen(false);
+    navigate('/');
   };
 
   return (
-    /* CHANGEMENT : bg-black solide (100%) et suppression du blur pour éviter le gris */
     <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-black" data-testid="main-header">
       <div className="container mx-auto px-6">
         <div className="flex h-16 items-center justify-between gap-8">
@@ -48,21 +50,21 @@ export const Header = () => {
             </div>
           </Link>
 
-          {/* Barre de recherche - On utilise un fond très légèrement surélevé (#0A0A0A) */}
+          {/* DESKTOP SEARCH */}
           <div className="hidden md:flex flex-1 max-w-md">
             <form onSubmit={handleSearch} className="w-full relative group">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/20 group-focus-within:text-orange-500 transition-colors" />
-              <Input
+              <input
                 type="text"
                 placeholder="Rechercher un article..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 w-full bg-[#0A0A0A] border-white/5 text-white placeholder:text-white/20 focus:ring-orange-500/20 focus:border-orange-500/50 rounded-full transition-all h-10 border"
-                data-testid="header-search-input"
+                className="pl-10 w-full bg-[#0A0A0A] border-white/5 text-white placeholder:text-white/20 focus:ring-orange-500/20 focus:border-orange-500/50 rounded-full transition-all h-10 border text-sm outline-none"
               />
             </form>
           </div>
 
+          {/* DESKTOP NAV */}
           <nav className="hidden md:flex items-center gap-1">
             {!user ? (
               <>
@@ -73,7 +75,6 @@ export const Header = () => {
                 <Button
                   onClick={() => navigate('/login')}
                   className="bg-white hover:bg-white/90 text-black font-extrabold rounded-full px-5 h-8 text-[11px] uppercase tracking-wider transition-all active:scale-95"
-                  data-testid="header-login-btn"
                 >
                   Connexion
                 </Button>
@@ -83,7 +84,7 @@ export const Header = () => {
                 {hasRole('CLIENT') && <NavLink onClick={() => navigate('/mes-demandes')}>Mes demandes</NavLink>}
                 <NavLink onClick={() => navigate('/minisite')}>Mon Site</NavLink>
                 {hasRole('SELLER') ? (
-                  <NavLink onClick={() => navigate('/seller/dashboard')} active>Vendeur</NavLink>
+                  <NavLink onClick={() => navigate('/seller/dashboard')}>Vendeur</NavLink>
                 ) : (
                   <NavLink onClick={() => navigate('/devenir-vendeur')}>Vendre</NavLink>
                 )}
@@ -99,21 +100,16 @@ export const Header = () => {
                 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="ml-2 text-white/40 hover:text-white hover:bg-white/5 rounded-full transition-colors h-9 w-9"
-                      data-testid="header-account-menu-btn"
-                    >
+                    <Button variant="ghost" size="icon" className="ml-2 text-white/40 hover:text-white hover:bg-white/5 rounded-full transition-colors h-9 w-9">
                       <User className="h-5 w-5" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-[#0A0A0A] border-white/10 text-white min-w-[180px] p-2 shadow-2xl">
-                    <DropdownMenuItem onClick={() => navigate('/mon-compte')} className="rounded-md focus:bg-white/10 cursor-pointer">
+                    <DropdownMenuItem onClick={() => navigate('/mon-compte')} className="rounded-md focus:bg-white/10 cursor-pointer text-xs uppercase font-bold tracking-widest">
                       Mon compte
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="bg-white/10" />
-                    <DropdownMenuItem onClick={handleLogout} className="rounded-md text-red-400 focus:bg-red-500/10 cursor-pointer">
+                    <DropdownMenuItem onClick={handleLogout} className="rounded-md text-red-400 focus:bg-red-500/10 cursor-pointer text-xs uppercase font-bold tracking-widest">
                       Déconnexion
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -122,37 +118,68 @@ export const Header = () => {
             )}
           </nav>
 
+          {/* MOBILE TOGGLE */}
           <button
-            className="md:hidden text-white/60 hover:text-white"
+            className="md:hidden p-2 text-white/60 hover:text-white bg-white/5 rounded-xl border border-white/5"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            data-testid="header-mobile-menu-toggle"
           >
             {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
         </div>
 
-        {/* Menu Mobile - Noir Solide également */}
+        {/* MOBILE MENU - CORRIGÉ AVEC LOGIQUE USER */}
         {mobileMenuOpen && (
-          <div className="md:hidden py-6 space-y-4 border-t border-white/5 bg-black animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="md:hidden py-6 space-y-6 border-t border-white/5 bg-black animate-in fade-in slide-in-from-top-4 duration-300">
             <form onSubmit={handleSearch} className="px-2">
-              <Input
+              <input
                 type="text"
                 placeholder="Rechercher..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-[#0A0A0A] border-white/10 text-white rounded-xl placeholder:text-white/20 h-11"
+                className="w-full bg-[#0A0A0A] border border-white/10 text-white rounded-xl placeholder:text-white/20 h-12 px-4 outline-none focus:border-orange-500/50 transition-all"
               />
             </form>
+
             <div className="grid gap-1 px-2">
               <MobileNavLink onClick={() => { navigate('/faire-demande'); setMobileMenuOpen(false); }}>Faire une demande</MobileNavLink>
               <MobileNavLink onClick={() => { navigate('/minisite'); setMobileMenuOpen(false); }}>Mon Site</MobileNavLink>
-              <MobileNavLink onClick={() => { navigate('/devenir-vendeur'); setMobileMenuOpen(false); }}>Devenir vendeur</MobileNavLink>
-              <Button
-                className="w-full mt-4 bg-orange-600 hover:bg-orange-500 text-white rounded-xl h-12 font-bold shadow-lg shadow-orange-900/20"
-                onClick={() => { navigate('/login'); setMobileMenuOpen(false); }}
-              >
-                Connexion
-              </Button>
+              
+              {user ? (
+                <>
+                  {/* Liens spécifiques si connecté */}
+                  <div className="h-[1px] bg-white/5 my-2 mx-4" />
+                  {hasRole('CLIENT') && <MobileNavLink onClick={() => { navigate('/mes-demandes'); setMobileMenuOpen(false); }}>Mes demandes</MobileNavLink>}
+                  {hasRole('SELLER') ? (
+                    <MobileNavLink onClick={() => { navigate('/seller/dashboard'); setMobileMenuOpen(false); }}>Espace Vendeur</MobileNavLink>
+                  ) : (
+                    <MobileNavLink onClick={() => { navigate('/devenir-vendeur'); setMobileMenuOpen(false); }}>Devenir Vendeur</MobileNavLink>
+                  )}
+                  {hasRole('ADMIN') && (
+                    <MobileNavLink onClick={() => { navigate('/admin/dashboard'); setMobileMenuOpen(false); }} className="text-orange-500">
+                      Panel Administration
+                    </MobileNavLink>
+                  )}
+                  <MobileNavLink onClick={() => { navigate('/mon-compte'); setMobileMenuOpen(false); }}>Mon compte</MobileNavLink>
+                  
+                  <Button
+                    className="w-full mt-4 bg-white/5 hover:bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl h-12 font-black uppercase text-[10px] tracking-widest"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="h-4 w-4 mr-2" /> Déconnexion
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {/* Liens si déconnecté */}
+                  <MobileNavLink onClick={() => { navigate('/devenir-vendeur'); setMobileMenuOpen(false); }}>Devenir vendeur</MobileNavLink>
+                  <Button
+                    className="w-full mt-4 bg-orange-600 hover:bg-orange-500 text-white rounded-xl h-12 font-black uppercase text-[10px] tracking-widest shadow-lg shadow-orange-900/20"
+                    onClick={() => { navigate('/login'); setMobileMenuOpen(false); }}
+                  >
+                    Connexion / Inscription
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -172,10 +199,10 @@ const NavLink = ({ children, onClick, active, className }) => (
   </button>
 );
 
-const MobileNavLink = ({ children, onClick }) => (
+const MobileNavLink = ({ children, onClick, className }) => (
   <button
     onClick={onClick}
-    className="flex items-center justify-between w-full p-4 text-sm font-semibold text-white/70 hover:bg-white/5 rounded-xl transition-all"
+    className={`flex items-center justify-between w-full p-4 text-[11px] font-black uppercase tracking-[0.15em] text-white/70 hover:bg-white/5 rounded-xl transition-all ${className}`}
   >
     {children}
     <ChevronRight className="h-4 w-4 text-white/20" />
