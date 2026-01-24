@@ -325,7 +325,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, Menu, X, User } from 'lucide-react';
+import { Search, Menu, X, User, ChevronRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
@@ -337,6 +337,9 @@ export const Header = () => {
   const [user, setUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // On force le thème sombre/noir partout pour l'unité visuelle
+  const isDark = true; 
 
   useEffect(() => {
     const loadUser = async () => {
@@ -357,72 +360,148 @@ export const Header = () => {
     setMobileMenuOpen(false);
   };
 
+  const handleLogout = () => {
+    logout();
+  };
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-black/60 backdrop-blur-xl transition-colors duration-300" data-testid="main-header">
+    <header className="sticky top-0 z-50 w-full border-b border-zinc-800/50 bg-[#050505]/80 backdrop-blur-md" data-testid="main-header">
       <div className="container mx-auto px-6">
         <div className="flex h-16 items-center justify-between gap-8">
           
-          <Link to="/" className="flex items-center space-x-2 shrink-0">
+          {/* Logo avec style épuré */}
+          <Link to="/" className="flex items-center space-x-2 shrink-0" data-testid="header-logo">
             <div className="text-xl font-black tracking-tighter text-white uppercase italic">
               Down<span className="text-orange-500">Pricer</span>
             </div>
           </Link>
 
+          {/* Barre de recherche style "Command Palette" */}
           <div className="hidden md:flex flex-1 max-w-md">
             <form onSubmit={handleSearch} className="w-full relative group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-600 group-focus-within:text-orange-500 transition-colors" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-zinc-500 group-focus-within:text-orange-500 transition-colors" />
               <Input
                 type="text"
-                placeholder="Rechercher..."
+                placeholder="Rechercher un article..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 w-full bg-white/5 border-white/10 text-white placeholder:text-zinc-600 focus:ring-orange-500/20 focus:border-orange-500/40 rounded-full h-9 transition-all"
+                className="pl-10 w-full bg-zinc-900/50 border-zinc-800 text-zinc-200 placeholder:text-zinc-600 focus:ring-orange-500/20 focus:border-orange-500/50 rounded-full transition-all h-10"
+                data-testid="header-search-input"
               />
             </form>
           </div>
 
+          {/* Navigation principale */}
           <nav className="hidden md:flex items-center gap-1">
             {!user ? (
               <>
-                <NavLink onClick={() => navigate('/devenir-vendeur')}>Devenir Vendeur</NavLink>
-                <div className="h-4 w-px bg-white/10 mx-2" />
+                <NavLink onClick={() => navigate('/faire-demande')}>Demande</NavLink>
+                <NavLink onClick={() => navigate('/minisite')}>Mon Site</NavLink>
+                <NavLink onClick={() => navigate('/devenir-vendeur')}>Vendre</NavLink>
+                <div className="h-4 w-[1px] bg-zinc-800 mx-2" />
                 <Button
                   onClick={() => navigate('/login')}
-                  className="bg-white hover:bg-zinc-200 text-black font-bold rounded-full px-5 h-8 text-[11px] uppercase tracking-wider transition-all active:scale-95"
+                  className="bg-white hover:bg-zinc-200 text-black font-bold rounded-full px-6 h-9 text-xs transition-transform active:scale-95"
+                  data-testid="header-login-btn"
                 >
                   Connexion
                 </Button>
               </>
             ) : (
-              <div className="flex items-center gap-2">
+              <>
+                {hasRole('CLIENT') && <NavLink onClick={() => navigate('/mes-demandes')}>Mes demandes</NavLink>}
+                <NavLink onClick={() => navigate('/minisite')}>Mon Site</NavLink>
+                {hasRole('SELLER') ? (
+                  <NavLink onClick={() => navigate('/seller/dashboard')} active>Espace Vendeur</NavLink>
+                ) : (
+                  <NavLink onClick={() => navigate('/devenir-vendeur')}>Devenir vendeur</NavLink>
+                )}
+                {hasSTier() && <NavLink onClick={() => navigate('/pro/dashboard')}>Pro</NavLink>}
                 {hasRole('ADMIN') && <NavLink onClick={() => navigate('/admin/dashboard')} className="text-orange-500">Admin</NavLink>}
+                
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-white hover:bg-white/5 rounded-full">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="ml-2 text-zinc-400 hover:text-white hover:bg-zinc-900 rounded-full"
+                      data-testid="header-account-menu-btn"
+                    >
                       <User className="h-5 w-5" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-black border-white/10 text-white p-2">
-                    <DropdownMenuItem onClick={() => navigate('/mon-compte')} className="cursor-pointer focus:bg-white/10">Mon compte</DropdownMenuItem>
-                    <DropdownMenuSeparator className="bg-white/10" />
-                    <DropdownMenuItem onClick={logout} className="text-red-400 focus:bg-red-500/10 cursor-pointer">Déconnexion</DropdownMenuItem>
+                  <DropdownMenuContent align="end" className="bg-zinc-900 border-zinc-800 text-white min-w-[180px] p-2">
+                    <DropdownMenuItem onClick={() => navigate('/mon-compte')} className="rounded-md focus:bg-zinc-800 focus:text-white cursor-pointer">
+                      Mon compte
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-zinc-800" />
+                    <DropdownMenuItem onClick={handleLogout} className="rounded-md focus:bg-red-500/10 text-red-400 focus:text-red-400 cursor-pointer">
+                      Déconnexion
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              </div>
+              </>
             )}
           </nav>
 
-          <button className="md:hidden text-white" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-            {mobileMenuOpen ? <X /> : <Menu />}
+          {/* Mobile Toggle */}
+          <button
+            className="md:hidden text-zinc-400 hover:text-white"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            data-testid="header-mobile-menu-toggle"
+          >
+            {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
         </div>
+
+        {/* Menu Mobile */}
+        {mobileMenuOpen && (
+          <div className="md:hidden py-6 space-y-4 border-t border-zinc-900 animate-in slide-in-from-top-4 duration-200">
+            <form onSubmit={handleSearch} className="px-2">
+              <Input
+                type="text"
+                placeholder="Rechercher..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-zinc-900 border-zinc-800 text-white rounded-xl"
+              />
+            </form>
+            <div className="grid gap-1 px-2">
+              <MobileNavLink onClick={() => { navigate('/faire-demande'); setMobileMenuOpen(false); }}>Faire une demande</MobileNavLink>
+              <MobileNavLink onClick={() => { navigate('/minisite'); setMobileMenuOpen(false); }}>Mon Site</MobileNavLink>
+              <MobileNavLink onClick={() => { navigate('/devenir-vendeur'); setMobileMenuOpen(false); }}>Devenir vendeur</MobileNavLink>
+              <Button
+                className="w-full mt-4 bg-orange-600 hover:bg-orange-500 text-white rounded-xl h-12 font-bold"
+                onClick={() => { navigate('/login'); setMobileMenuOpen(false); }}
+              >
+                Connexion
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </header>
   );
 };
 
-const NavLink = ({ children, onClick, className }) => (
-  <button onClick={onClick} className={`px-4 py-2 text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-400 hover:text-white transition-colors ${className}`}>
+// Sous-composants pour garder un code propre
+const NavLink = ({ children, onClick, active, className }) => (
+  <button
+    onClick={onClick}
+    className={`px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-full hover:text-white ${
+      active ? 'text-orange-500' : 'text-zinc-400 hover:bg-zinc-900'
+    } ${className}`}
+  >
     {children}
+  </button>
+);
+
+const MobileNavLink = ({ children, onClick }) => (
+  <button
+    onClick={onClick}
+    className="flex items-center justify-between w-full p-4 text-sm font-semibold text-zinc-300 hover:bg-zinc-900 rounded-xl transition-colors"
+  >
+    {children}
+    <ChevronRight className="h-4 w-4 text-zinc-600" />
   </button>
 );
