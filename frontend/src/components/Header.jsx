@@ -13,8 +13,6 @@ export const Header = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const isDark = true; 
-
   useEffect(() => {
     const loadUser = async () => {
       const currentUser = getUser();
@@ -39,7 +37,7 @@ export const Header = () => {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-black/80 backdrop-blur-md" data-testid="main-header">
+    <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-black/80 backdrop-blur-xl" data-testid="main-header">
       <div className="container mx-auto px-6">
         <div className="flex h-16 items-center justify-between gap-8">
           
@@ -51,13 +49,15 @@ export const Header = () => {
 
           <div className="hidden md:flex flex-1 max-w-md">
             <form onSubmit={handleSearch} className="w-full relative group">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-zinc-500 group-focus-within:text-orange-500 transition-colors" />
+              {/* Icône passée en white/20 */}
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/20 group-focus-within:text-orange-500 transition-colors" />
               <Input
                 type="text"
                 placeholder="Rechercher un article..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 w-full bg-white/5 border-white/10 text-zinc-200 placeholder:text-zinc-600 focus:ring-orange-500/20 focus:border-orange-500/50 rounded-full transition-all h-10"
+                /* Suppression du zinc-900 pour du white/5, bordure white/10 */
+                className="pl-10 w-full bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-orange-500/20 focus:border-orange-500/50 rounded-full transition-all h-10 border"
                 data-testid="header-search-input"
               />
             </form>
@@ -72,7 +72,7 @@ export const Header = () => {
                 <div className="h-4 w-[1px] bg-white/10 mx-2" />
                 <Button
                   onClick={() => navigate('/login')}
-                  className="bg-white hover:bg-zinc-200 text-black font-bold rounded-full px-6 h-9 text-xs transition-transform active:scale-95"
+                  className="bg-white hover:bg-white/90 text-black font-bold rounded-full px-6 h-9 text-xs transition-all active:scale-95"
                   data-testid="header-login-btn"
                 >
                   Connexion
@@ -92,16 +92,17 @@ export const Header = () => {
                 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
+                    {/* Icône user en white/40 */}
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="ml-2 text-zinc-400 hover:text-white hover:bg-white/5 rounded-full"
+                      className="ml-2 text-white/40 hover:text-white hover:bg-white/5 rounded-full"
                       data-testid="header-account-menu-btn"
                     >
                       <User className="h-5 w-5" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-black border-white/10 text-white min-w-[180px] p-2">
+                  <DropdownMenuContent align="end" className="bg-black border-white/10 text-white min-w-[180px] p-2 shadow-2xl">
                     <DropdownMenuItem onClick={() => navigate('/mon-compte')} className="rounded-md focus:bg-white/10 focus:text-white cursor-pointer">
                       Mon compte
                     </DropdownMenuItem>
@@ -116,7 +117,7 @@ export const Header = () => {
           </nav>
 
           <button
-            className="md:hidden text-zinc-400 hover:text-white"
+            className="md:hidden text-white/40 hover:text-white"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             data-testid="header-mobile-menu-toggle"
           >
@@ -132,7 +133,7 @@ export const Header = () => {
                 placeholder="Rechercher..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-white/5 border-white/10 text-white rounded-xl"
+                className="bg-white/5 border-white/10 text-white rounded-xl placeholder:text-white/20"
               />
             </form>
             <div className="grid gap-1 px-2">
@@ -140,7 +141,7 @@ export const Header = () => {
               <MobileNavLink onClick={() => { navigate('/minisite'); setMobileMenuOpen(false); }}>Mon Site</MobileNavLink>
               <MobileNavLink onClick={() => { navigate('/devenir-vendeur'); setMobileMenuOpen(false); }}>Devenir vendeur</MobileNavLink>
               <Button
-                className="w-full mt-4 bg-orange-600 hover:bg-orange-500 text-white rounded-xl h-12 font-bold"
+                className="w-full mt-4 bg-orange-600 hover:bg-orange-500 text-white rounded-xl h-12 font-bold shadow-lg shadow-orange-900/20"
                 onClick={() => { navigate('/login'); setMobileMenuOpen(false); }}
               >
                 Connexion
@@ -157,7 +158,7 @@ const NavLink = ({ children, onClick, active, className }) => (
   <button
     onClick={onClick}
     className={`px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors rounded-full hover:text-white ${
-      active ? 'text-orange-500' : 'text-zinc-400 hover:bg-white/5'
+      active ? 'text-orange-500' : 'text-white/50 hover:bg-white/5'
     } ${className}`}
   >
     {children}
@@ -167,9 +168,9 @@ const NavLink = ({ children, onClick, active, className }) => (
 const MobileNavLink = ({ children, onClick }) => (
   <button
     onClick={onClick}
-    className="flex items-center justify-between w-full p-4 text-sm font-semibold text-zinc-300 hover:bg-white/5 rounded-xl transition-colors"
+    className="flex items-center justify-between w-full p-4 text-sm font-semibold text-white/70 hover:bg-white/5 rounded-xl transition-colors"
   >
     {children}
-    <ChevronRight className="h-4 w-4 text-zinc-600" />
+    <ChevronRight className="h-4 w-4 text-white/20" />
   </button>
 );
