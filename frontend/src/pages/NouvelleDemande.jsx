@@ -66,7 +66,6 @@ export const NouvelleDemande = () => {
   if (demandeCreated) {
     return (
       <div className="min-h-screen bg-zinc-950 text-white" data-testid="nouvelle-demande-recap">
-        <Header />
         <main className="container mx-auto px-4 py-8 max-w-2xl">
           <Card className="bg-zinc-900 border-zinc-800">
             <CardContent className="p-8">
@@ -107,8 +106,6 @@ export const NouvelleDemande = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white" data-testid="nouvelle-demande-page">
-      <Header />
-      
       <main className="container mx-auto px-4 py-8 max-w-3xl">
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-orange-500 mb-2" style={{fontFamily: 'Outfit, sans-serif'}}>
           Nouvelle demande

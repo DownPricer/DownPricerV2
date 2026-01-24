@@ -36,8 +36,7 @@
 
 //   return (
 //     <div className="min-h-screen bg-zinc-950 text-white" data-testid="faire-demande-page">
-//       <Header />
-      
+//       
 //       <main className="container mx-auto px-4 py-8 max-w-4xl">
 //         <div className="mb-8">
 //           <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-orange-500 mb-4" style={{fontFamily: 'Outfit, sans-serif'}}>
@@ -152,7 +151,6 @@ export const FaireDemande = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-orange-500/30" data-testid="faire-demande-page">
-      <Header />
       
       {/* --- HERO SECTION --- */}
       <div className="relative border-b border-zinc-800/50 bg-zinc-900/30">

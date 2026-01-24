@@ -44,7 +44,6 @@ export const SellerVentes = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <Header />
       
       <main className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold text-orange-500 mb-6" style={{fontFamily: 'Outfit, sans-serif'}}>

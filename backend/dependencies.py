@@ -48,9 +48,6 @@ def require_s_tier():
     Autorise aussi ADMIN pour l'accès complet.
     """
     async def s_tier_checker(current_user: TokenData = Depends(get_current_user)):
-        # Normaliser current_user.roles en liste si ce n'est pas déjà le cas
-        roles_list = current_user.roles if isinstance(current_user.roles, list) else [current_user.roles]
-        
         # Rôles S-tier autorisés (en string pour comparaison robuste)
         s_tier_role_strings = [
             "S_PLAN_5",
@@ -60,25 +57,47 @@ def require_s_tier():
             "ADMIN"  # Admin a accès complet
         ]
         
-        # Vérifier si l'utilisateur a au moins un rôle autorisé
-        # Comparaison en string pour robustesse (peut être Enum ou str)
+        # Extraire les rôles de différentes façons possibles
+        # current_user.roles peut être une liste, un string, ou un champ "role" peut exister
+        roles_to_check = []
+        
+        # Méthode 1: current_user.roles (liste ou string)
+        if hasattr(current_user, 'roles'):
+            roles_attr = current_user.roles
+            if isinstance(roles_attr, list):
+                roles_to_check.extend(roles_attr)
+            elif roles_attr:
+                roles_to_check.append(roles_attr)
+        
+        # Méthode 2: current_user.role (singulier, si existe)
+        if hasattr(current_user, 'role') and current_user.role:
+            roles_to_check.append(current_user.role)
+        
+        # Convertir tous les rôles en string pour comparaison
         user_role_strings = []
-        for role in roles_list:
+        for role in roles_to_check:
             if isinstance(role, UserRole):
                 user_role_strings.append(role.value)
             elif isinstance(role, str):
-                user_role_strings.append(role)
+                user_role_strings.append(role.upper())  # Normaliser en majuscules
             else:
                 # Essayer de convertir en string
-                user_role_strings.append(str(role))
+                role_str = str(role).upper()
+                user_role_strings.append(role_str)
+        
+        # Normaliser aussi les rôles autorisés en majuscules pour comparaison
+        s_tier_normalized = [r.upper() for r in s_tier_role_strings]
+        user_role_strings_normalized = [r.upper() for r in user_role_strings]
         
         # Vérifier si l'utilisateur a au moins un rôle autorisé
-        has_access = any(role_str in s_tier_role_strings for role_str in user_role_strings)
+        has_access = any(role_str in s_tier_normalized for role_str in user_role_strings_normalized)
         
         if not has_access:
+            # Message de debug avec les rôles lus
+            roles_debug = ", ".join(user_role_strings) if user_role_strings else "aucun rôle trouvé"
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Accès interdit : module Pro réservé aux utilisateurs S-tier (S_PLAN_5, S_PLAN_10, S_PLAN_15) ou ADMIN"
+                detail=f"Accès interdit : module Pro réservé aux utilisateurs S-tier (S_PLAN_5, S_PLAN_10, S_PLAN_15) ou ADMIN. Rôles détectés: {roles_debug}"
             )
         
         return current_user

@@ -44,7 +44,7 @@ export const Header = () => {
   return (
     <header className={`sticky top-0 z-50 w-full border-b ${
       isMarketplace 
-        ? 'bg-zinc-900/95 backdrop-blur-xl border-zinc-800 text-white' 
+        ? 'bg-slate-900/95 backdrop-blur-xl border-slate-800 text-white' 
         : 'bg-white/95 backdrop-blur-xl border-slate-200 text-slate-900'
     }`} data-testid="main-header">
       <div className="container mx-auto px-4">
@@ -67,7 +67,7 @@ export const Header = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`pl-10 w-full ${
                   isMarketplace 
-                    ? 'bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-400 focus:border-orange-500' 
+                    ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-400 focus:border-orange-500' 
                     : 'bg-white border-slate-300 focus:border-blue-500'
                 }`}
                 data-testid="header-search-input"
@@ -183,12 +183,12 @@ export const Header = () => {
                       <User className="h-5 w-5" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className={isMarketplace ? 'bg-zinc-900 border-zinc-800 text-white' : ''}>
-                    <DropdownMenuItem onClick={() => navigate('/mon-compte')} className={isMarketplace ? 'text-white focus:bg-zinc-800' : ''}>
+                  <DropdownMenuContent align="end" className={isMarketplace ? 'bg-slate-900 border-slate-800 text-white' : ''}>
+                    <DropdownMenuItem onClick={() => navigate('/mon-compte')} className={isMarketplace ? 'text-white focus:bg-slate-800' : ''}>
                       Mon compte
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator className={isMarketplace ? 'bg-zinc-800' : ''} />
-                    <DropdownMenuItem onClick={handleLogout} className={isMarketplace ? 'text-red-400 focus:bg-zinc-800' : 'text-red-600'}>
+                    <DropdownMenuSeparator className={isMarketplace ? 'bg-slate-800' : ''} />
+                    <DropdownMenuItem onClick={handleLogout} className={isMarketplace ? 'text-red-400 focus:bg-slate-800' : 'text-red-600'}>
                       Déconnexion
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -207,14 +207,14 @@ export const Header = () => {
         </div>
 
         {mobileMenuOpen && (
-          <div className="md:hidden py-4 space-y-2 border-t border-zinc-800">
+          <div className="md:hidden py-4 space-y-2 border-t border-slate-800">
             <form onSubmit={handleSearch} className="mb-4">
               <Input
                 type="text"
                 placeholder="Rechercher…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={isMarketplace ? 'bg-zinc-800 border-zinc-700 text-white' : ''}
+                className={isMarketplace ? 'bg-slate-800 border-slate-700 text-white' : ''}
               />
             </form>
             {!user ? (

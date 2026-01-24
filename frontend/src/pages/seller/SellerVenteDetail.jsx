@@ -62,7 +62,6 @@ export const SellerVenteDetail = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-950 text-white">
-        <Header />
         <main className="container mx-auto px-4 py-8">
           <p className="text-center text-zinc-400">Chargement...</p>
         </main>
@@ -73,7 +72,6 @@ export const SellerVenteDetail = () => {
   if (!sale || !article) {
     return (
       <div className="min-h-screen bg-zinc-950 text-white">
-        <Header />
         <main className="container mx-auto px-4 py-8">
           <p className="text-center text-red-500">Vente non trouvée</p>
         </main>
@@ -83,7 +81,6 @@ export const SellerVenteDetail = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <Header />
       
       <main className="container mx-auto px-4 py-8">
         <Button

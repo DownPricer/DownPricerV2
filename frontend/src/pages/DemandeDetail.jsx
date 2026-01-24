@@ -86,8 +86,6 @@ export const DemandeDetail = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-orange-500/30" data-testid="demande-detail-page">
-      <Header />
-      
       <main className="container mx-auto px-4 py-8 md:py-12">
         
         {/* --- Navigation & Titre --- */}
@@ -303,7 +301,6 @@ export const DemandeDetail = () => {
 // --- Skeleton pour le chargement ---
 const DetailSkeleton = () => (
   <div className="min-h-screen bg-zinc-950 text-white">
-    <Header />
     <div className="container mx-auto px-4 py-12">
       <div className="h-8 w-32 bg-zinc-900 rounded mb-8 animate-pulse" />
       <div className="flex justify-between mb-8">

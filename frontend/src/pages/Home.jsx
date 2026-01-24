@@ -268,8 +268,6 @@ export const Home = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-orange-500/30">
-      <Header />
-      
       {/* --- HERO SECTION --- */}
       <div className={`overflow-hidden transition-all duration-500 ease-in-out ${
         heroCollapsed ? 'max-h-0 opacity-0' : 'max-h-96 opacity-100'

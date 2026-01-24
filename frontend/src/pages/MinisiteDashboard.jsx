@@ -991,7 +991,6 @@ export const MinisiteDashboard = () => {
   if (!minisite) {
     return (
       <div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-orange-500/30">
-        <Header />
         <main className="container mx-auto px-4 py-16">
           <Card className="bg-gradient-to-r from-orange-900/20 to-red-900/20 border-orange-500/50 max-w-2xl mx-auto">
             <CardContent className="p-8 text-center space-y-6">
@@ -1025,8 +1024,6 @@ export const MinisiteDashboard = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-orange-500/30">
-      <Header />
-      
       <main className="container mx-auto px-4 py-8">
         
         {/* --- DASHBOARD HEADER --- */}

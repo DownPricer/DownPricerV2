@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 export const CGU = () => {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <Header />
       
       <main className="container mx-auto px-4 py-12 max-w-4xl">
         <Card className="bg-zinc-900 border-zinc-800">

@@ -183,7 +183,6 @@ export const MinisiteLanding = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <Header />
       
       <main className="container mx-auto px-4 py-12">
         {/* Hero */}

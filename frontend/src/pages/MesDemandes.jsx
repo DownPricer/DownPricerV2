@@ -101,8 +101,6 @@ export const MesDemandes = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-orange-500/30" data-testid="mes-demandes-page">
-      <Header />
-      
       <main className="container mx-auto px-4 py-8 md:py-12">
         
         {/* --- Header de Section --- */}

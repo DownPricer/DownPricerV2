@@ -50,7 +50,6 @@ export const ArticleDetail = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-950 text-white">
-        <Header />
         <div className="container mx-auto px-4 py-12 text-center">
           <p>Chargement...</p>
         </div>
@@ -66,8 +65,6 @@ export const ArticleDetail = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white" data-testid="article-detail-page">
-      <Header />
-      
       <main className="container mx-auto px-4 py-8">
         <div className="grid md:grid-cols-2 gap-8">
           <div>

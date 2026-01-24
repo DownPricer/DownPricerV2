@@ -90,7 +90,6 @@ export const SellerArticleDetail = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-950 text-white">
-        <Header />
         <div className="container mx-auto px-4 py-12 text-center">
           <p className="text-zinc-400">Chargement...</p>
         </div>
@@ -104,7 +103,6 @@ export const SellerArticleDetail = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white" data-testid="seller-article-detail">
-      <Header />
       
       <main className="container mx-auto px-4 py-8">
         <Button

@@ -31,7 +31,6 @@ export const MonCompte = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white" data-testid="mon-compte-page">
-      <Header />
       
       <main className="container mx-auto px-4 py-8 max-w-2xl">
         <h1 className="text-3xl font-bold text-orange-500 mb-6" style={{fontFamily: 'Outfit, sans-serif'}}>
