@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 
-// Fonction de compression d'image (Logique conservée)
+// Fonction de compression d'image (Logique conservée à l'identique)
 const compressImage = (file, maxWidth = 800, quality = 0.8) => {
   return new Promise((resolve) => {
     const canvas = document.createElement('canvas');
@@ -89,36 +89,37 @@ export const ProAddArticle = () => {
 
   return (
     <div className="min-h-screen bg-black text-white selection:bg-orange-500/30">
-      <div className="max-w-4xl mx-auto px-6 py-10">
+      {/* Container : Padding horizontal réduit sur mobile (px-4) */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         
-        {/* Header avec bouton retour */}
-        <div className="flex items-center justify-between mb-10">
+        {/* Header : Flex-col sur mobile pour éviter les chevauchements si le titre est long */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8 sm:mb-10">
           <button 
             onClick={() => navigate('/pro/dashboard')}
-            className="group flex items-center gap-2 text-zinc-500 hover:text-white transition-colors"
+            className="group flex items-center gap-2 text-zinc-500 hover:text-white transition-colors w-fit"
           >
             <div className="p-2 rounded-full group-hover:bg-white/5 transition-colors">
               <ArrowLeft className="h-5 w-5" />
             </div>
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Retour Dashboard</span>
+            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em]">Retour Dashboard</span>
           </button>
           
-          <h1 className="text-2xl font-black tracking-tighter uppercase italic" style={{ fontFamily: 'Outfit, sans-serif' }}>
+          <h1 className="text-xl sm:text-2xl font-black tracking-tighter uppercase italic" style={{ fontFamily: 'Outfit, sans-serif' }}>
             Nouvel <span className="text-orange-500">Article</span>
           </h1>
         </div>
 
         {success && (
           <div className="mb-8 bg-green-500/10 border border-green-500/20 rounded-2xl p-4 flex items-center animate-in zoom-in-95">
-            <CheckCircle className="h-5 w-5 text-green-500 mr-3" />
-            <p className="text-green-500 text-sm font-bold uppercase tracking-widest">Article ajouté avec succès !</p>
+            <CheckCircle className="h-5 w-5 text-green-500 mr-3 shrink-0" />
+            <p className="text-green-500 text-xs sm:text-sm font-bold uppercase tracking-widest">Article ajouté avec succès !</p>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-8">
+        <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8">
           
-          {/* Section Image OLED Style */}
-          <div className="bg-[#080808] border border-white/5 rounded-[2rem] p-8">
+          {/* Section Image OLED : Arrondis et paddings adaptatifs */}
+          <div className="bg-[#080808] border border-white/5 rounded-2xl sm:rounded-[2rem] p-5 sm:p-8">
             <Label className="text-[10px] uppercase tracking-widest text-zinc-500 font-black mb-4 block">Visuel du produit</Label>
             
             <div className="relative group">
@@ -130,7 +131,7 @@ export const ProAddArticle = () => {
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
               />
               <div className={`
-                h-48 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-3
+                h-40 sm:h-48 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center gap-3
                 ${formData.photo ? 'border-orange-500/50 bg-orange-500/5' : 'border-white/5 bg-black hover:border-white/20'}
               `}>
                 {imageCompressing ? (
@@ -138,26 +139,26 @@ export const ProAddArticle = () => {
                 ) : formData.photo ? (
                   <div className="relative h-full w-full p-2">
                     <img src={formData.photo} alt="Preview" className="h-full w-full object-contain rounded-xl" />
-                    <div className="absolute bottom-4 right-4 bg-green-500 text-black p-1.5 rounded-full">
-                      <CheckCircle className="h-4 w-4" />
+                    <div className="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 bg-green-500 text-black p-1.5 rounded-full">
+                      <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                     </div>
                   </div>
                 ) : (
                   <>
-                    <div className="p-4 rounded-full bg-white/5 text-zinc-500 group-hover:text-white transition-colors">
-                      <Camera className="h-6 w-6" />
+                    <div className="p-3 sm:p-4 rounded-full bg-white/5 text-zinc-500 group-hover:text-white transition-colors">
+                      <Camera className="h-5 w-5 sm:h-6 sm:w-6" />
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Cliquez ou glissez une photo</span>
+                    <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-zinc-500 px-4 text-center">Cliquez ou glissez une photo</span>
                   </>
                 )}
               </div>
             </div>
-            {imageCompressing && <p className="text-center mt-3 text-[10px] text-orange-500 uppercase font-black animate-pulse">Optimisation en cours...</p>}
+            {imageCompressing && <p className="text-center mt-3 text-[9px] sm:text-[10px] text-orange-500 uppercase font-black animate-pulse">Optimisation en cours...</p>}
           </div>
 
-          {/* Formulaire Grid */}
-          <div className="bg-[#080808] border border-white/5 rounded-[2rem] p-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+          {/* Formulaire Grid : Padding réduit sur mobile */}
+          <div className="bg-[#080808] border border-white/5 rounded-2xl sm:rounded-[2rem] p-5 sm:p-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 sm:gap-y-6">
               
               <div className="md:col-span-2 space-y-2">
                 <FormLabel>Nom de l'article</FormLabel>
@@ -182,19 +183,25 @@ export const ProAddArticle = () => {
 
               <div className="space-y-2">
                 <FormLabel>Plateforme d'achat</FormLabel>
-                <select
-                  value={formData.purchase_platform}
-                  onChange={(e) => setFormData(prev => ({ ...prev, purchase_platform: e.target.value }))}
-                  className="w-full bg-black border border-white/10 rounded-xl h-12 px-4 text-sm text-white focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 transition-all outline-none appearance-none"
-                  required
-                >
-                  <option value="">Sélectionner...</option>
-                  <option value="Vinted">Vinted</option>
-                  <option value="eBay">eBay</option>
-                  <option value="Amazon">Amazon</option>
-                  <option value="LeBonCoin">LeBonCoin</option>
-                  <option value="Autre">Autre</option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={formData.purchase_platform}
+                    onChange={(e) => setFormData(prev => ({ ...prev, purchase_platform: e.target.value }))}
+                    className="w-full bg-black border border-white/10 rounded-xl h-12 px-4 text-sm text-white focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 transition-all outline-none appearance-none cursor-pointer"
+                    required
+                  >
+                    <option value="">Sélectionner...</option>
+                    <option value="Vinted">Vinted</option>
+                    <option value="eBay">eBay</option>
+                    <option value="Amazon">Amazon</option>
+                    <option value="LeBonCoin">LeBonCoin</option>
+                    <option value="Autre">Autre</option>
+                  </select>
+                  {/* Petit indicateur visuel pour le select car appearance-none retire la flèche par défaut */}
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500">
+                    <ImageIcon className="h-3 w-3 opacity-0" /> {/* Juste pour l'espace si besoin, ou ajouter un chevron */}
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -251,16 +258,16 @@ export const ProAddArticle = () => {
               </div>
             </div>
 
-            <div className="mt-10">
+            <div className="mt-8 sm:mt-10">
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-orange-600 hover:bg-orange-500 text-white font-black h-14 rounded-2xl shadow-lg shadow-orange-900/20 transition-all active:scale-[0.98] uppercase tracking-widest text-xs"
+                className="w-full bg-orange-600 hover:bg-orange-500 text-white font-black h-12 sm:h-14 rounded-xl sm:rounded-2xl shadow-lg shadow-orange-900/20 transition-all active:scale-[0.98] uppercase tracking-widest text-[10px] sm:text-xs"
               >
                 {loading ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
                 ) : (
-                  <span className="flex items-center gap-2">
+                  <span className="flex items-center justify-center gap-2">
                     Confirmer l'ajout <Plus className="h-4 w-4 stroke-[3px]" />
                   </span>
                 )}
@@ -273,9 +280,9 @@ export const ProAddArticle = () => {
   );
 };
 
-// Composants Helper Internes
+// Composants Helper Internes (Adaptés)
 const FormLabel = ({ children }) => (
-  <Label className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold ml-1">
+  <Label className="text-[9px] sm:text-[10px] uppercase tracking-widest text-zinc-500 font-bold ml-1">
     {children}
   </Label>
 );
@@ -283,6 +290,6 @@ const FormLabel = ({ children }) => (
 const CustomInput = (props) => (
   <Input 
     {...props}
-    className="bg-black border-white/10 text-white placeholder:text-zinc-700 h-12 rounded-xl focus:border-orange-500/50 focus:ring-orange-500/10 transition-all"
+    className="bg-black border-white/10 text-white placeholder:text-zinc-700 h-11 sm:h-12 rounded-xl focus:border-orange-500/50 focus:ring-orange-500/10 transition-all text-sm"
   />
 );

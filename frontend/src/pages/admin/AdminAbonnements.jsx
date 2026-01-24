@@ -57,17 +57,18 @@ export const AdminAbonnementsPage = () => {
 
   return (
     <AdminLayout>
-      <div className="min-h-screen bg-black text-white p-6 md:p-12 selection:bg-orange-500/30">
+      {/* Ajustement padding global : p-4 sur mobile */}
+      <div className="min-h-screen bg-black text-white p-4 sm:p-8 md:p-12 selection:bg-orange-500/30">
         
-        {/* Header */}
-        <div className="mb-12">
-          <h2 className="text-4xl font-black tracking-tighter uppercase italic mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
+        {/* Header : Reduction taille texte sur mobile */}
+        <div className="mb-8 md:mb-12">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tighter uppercase italic mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
             Abonnements <span className="text-orange-500">& Billing</span>
           </h2>
-          <p className="text-zinc-500 text-sm font-medium uppercase tracking-widest">Contrôle des flux financiers et des accès privilèges</p>
+          <p className="text-zinc-500 text-[10px] sm:text-sm font-medium uppercase tracking-widest">Contrôle des flux financiers et des accès privilèges</p>
         </div>
 
-        {/* Top KPIs */}
+        {/* Top KPIs : Grille adaptative */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
           <KPICard icon={<Globe size={18}/>} label="Mini-Sites" value={miniSiteUsers.length} color="orange" />
           <KPICard icon={<Star size={18}/>} label="S-Plan" value={sPlanUsers.length} color="white" />
@@ -80,17 +81,18 @@ export const AdminAbonnementsPage = () => {
             <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
           </div>
         ) : (
-          <Tabs defaultValue="mini-sites" className="space-y-8">
-            <TabsList className="bg-[#080808] border border-white/5 p-1 rounded-full inline-flex h-12">
-              <TabsTrigger value="mini-sites" className="rounded-full px-8 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+          <Tabs defaultValue="mini-sites" className="space-y-6 md:space-y-8">
+            {/* Tabs : Full width sur mobile avec padding réduit */}
+            <TabsList className="bg-[#080808] border border-white/5 p-1 rounded-full flex w-full sm:inline-flex h-12">
+              <TabsTrigger value="mini-sites" className="flex-1 sm:flex-none rounded-full px-4 sm:px-8 text-[9px] sm:text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-orange-500 data-[state=active]:text-white">
                 Mini-sites
               </TabsTrigger>
-              <TabsTrigger value="s-plan" className="rounded-full px-8 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+              <TabsTrigger value="s-plan" className="flex-1 sm:flex-none rounded-full px-4 sm:px-8 text-[9px] sm:text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-orange-500 data-[state=active]:text-white">
                 S-Plan
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="mini-sites" className="animate-in fade-in duration-500">
+            <TabsContent value="mini-sites" className="animate-in fade-in duration-500 outline-none">
               <div className="grid gap-3">
                 {subscriptions.length === 0 ? (
                   <EmptyState text="Aucun abonnement Mini-site actif" />
@@ -102,7 +104,7 @@ export const AdminAbonnementsPage = () => {
               </div>
             </TabsContent>
 
-            <TabsContent value="s-plan" className="animate-in fade-in duration-500">
+            <TabsContent value="s-plan" className="animate-in fade-in duration-500 outline-none">
               <div className="grid gap-3">
                 {sPlanUsers.length === 0 ? (
                   <EmptyState text="Aucun abonné S-Plan" />
@@ -123,7 +125,7 @@ export const AdminAbonnementsPage = () => {
 // --- COMPOSANTS INTERNES ---
 
 const KPICard = ({ icon, label, value, color }) => (
-  <div className="bg-[#080808] border border-white/5 p-6 rounded-[1.5rem] hover:border-white/10 transition-all group">
+  <div className="bg-[#080808] border border-white/5 p-5 md:p-6 rounded-[1.5rem] hover:border-white/10 transition-all group">
     <div className={`h-10 w-10 rounded-xl flex items-center justify-center mb-4 border transition-colors ${
       color === 'orange' ? 'bg-orange-500/10 border-orange-500/20 text-orange-500' :
       color === 'green' ? 'bg-green-500/10 border-green-500/20 text-green-500' :
@@ -131,8 +133,8 @@ const KPICard = ({ icon, label, value, color }) => (
     }`}>
       {icon}
     </div>
-    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">{label}</p>
-    <p className="text-2xl font-black text-white">{value}</p>
+    <p className="text-[9px] md:text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">{label}</p>
+    <p className="text-xl md:text-2xl font-black text-white">{value}</p>
   </div>
 );
 
@@ -145,26 +147,26 @@ const SubscriptionRow = ({ sub }) => {
   }[sub.status] || { class: "bg-white/5 text-zinc-500 border-white/5", label: sub.status };
 
   return (
-    <div className="bg-[#080808] border border-white/5 p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-white/10 transition-all group">
+    <div className="bg-[#080808] border border-white/5 p-4 md:p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-white/10 transition-all group">
       <div className="flex items-center gap-4">
-        <div className="h-10 w-10 rounded-full bg-black border border-white/10 flex items-center justify-center text-zinc-600 group-hover:text-orange-500 transition-colors">
+        <div className="h-10 w-10 shrink-0 rounded-full bg-black border border-white/10 flex items-center justify-center text-zinc-600 group-hover:text-orange-500 transition-colors">
           <CreditCard size={18} />
         </div>
-        <div>
-          <h4 className="text-sm font-bold text-white group-hover:text-orange-500 transition-colors">{sub.user_name || sub.user_email}</h4>
-          <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">{sub.user_email}</p>
+        <div className="min-w-0"> {/* min-w-0 permet le truncate du texte long */}
+          <h4 className="text-sm font-bold text-white group-hover:text-orange-500 transition-colors truncate">{sub.user_name || sub.user_email}</h4>
+          <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider truncate">{sub.user_email}</p>
         </div>
       </div>
       
-      <div className="flex flex-wrap items-center gap-3">
-        <Badge className="bg-white/5 border-white/10 text-[9px] font-black uppercase tracking-tighter">
+      <div className="flex flex-wrap items-center gap-3 md:justify-end">
+        <Badge className="bg-white/5 border-white/10 text-[9px] font-black uppercase tracking-tighter shrink-0">
           {sub.plan === 'premium' ? 'Premium 15€' : sub.plan === 'standard' ? 'Standard 10€' : 'Starter 1€'}
         </Badge>
-        <Badge className={`${statusConfig.class} border rounded-full text-[9px] font-black uppercase`}>{statusConfig.label}</Badge>
+        <Badge className={`${statusConfig.class} border rounded-full text-[9px] font-black uppercase shrink-0`}>{statusConfig.label}</Badge>
         <div className="h-8 w-px bg-white/5 mx-2 hidden md:block" />
-        <div className="text-right">
+        <div className="text-left md:text-right w-full md:w-auto mt-2 md:mt-0">
           <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">ID STRIPE</p>
-          <p className="text-[10px] font-mono text-zinc-400">{sub.stripe_subscription_id?.substring(0, 12)}...</p>
+          <p className="text-[10px] font-mono text-zinc-400 break-all">{sub.stripe_subscription_id?.substring(0, 16)}...</p>
         </div>
       </div>
     </div>
@@ -172,23 +174,25 @@ const SubscriptionRow = ({ sub }) => {
 };
 
 const UserRow = ({ user, badge }) => (
-  <div className="bg-[#080808] border border-white/5 p-5 rounded-2xl flex items-center justify-between hover:border-white/10 transition-all group">
+  <div className="bg-[#080808] border border-white/5 p-4 md:p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-white/10 transition-all group">
     <div className="flex items-center gap-4">
-      <div className="h-10 w-10 rounded-full bg-black border border-white/10 flex items-center justify-center text-zinc-600 group-hover:text-orange-500 transition-colors">
+      <div className="h-10 w-10 shrink-0 rounded-full bg-black border border-white/10 flex items-center justify-center text-zinc-600 group-hover:text-orange-500 transition-colors">
         <Users size={18} />
       </div>
-      <div>
-        <h4 className="text-sm font-bold text-white">{user.first_name} {user.last_name}</h4>
-        <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">{user.email}</p>
+      <div className="min-w-0">
+        <h4 className="text-sm font-bold text-white truncate">{user.first_name} {user.last_name}</h4>
+        <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider truncate">{user.email}</p>
       </div>
     </div>
-    {badge}
+    <div className="flex sm:justify-end">
+      {badge}
+    </div>
   </div>
 );
 
 const EmptyState = ({ text }) => (
-  <div className="bg-[#080808] border border-white/5 p-12 rounded-[2rem] text-center">
-    <Hash className="h-10 w-10 text-zinc-800 mx-auto mb-4" />
-    <p className="text-zinc-500 text-xs font-bold uppercase tracking-[0.2em]">{text}</p>
+  <div className="bg-[#080808] border border-white/5 p-8 md:p-12 rounded-[1.5rem] md:rounded-[2rem] text-center">
+    <Hash className="h-8 w-8 md:h-10 md:w-10 text-zinc-800 mx-auto mb-4" />
+    <p className="text-zinc-500 text-[10px] md:text-xs font-bold uppercase tracking-[0.2em]">{text}</p>
   </div>
 );

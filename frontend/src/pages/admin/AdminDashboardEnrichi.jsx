@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../../components/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Badge } from '../../components/ui/badge'; // Corrigé : Import ajouté
+import { Badge } from '../../components/ui/badge';
 import { 
   Package, 
   ShoppingCart, 
@@ -100,7 +100,7 @@ export const AdminDashboardEnrichiPage = () => {
   if (loading) {
     return (
       <AdminLayout>
-        <div className="min-h-screen bg-black flex flex-col items-center justify-center">
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 text-center">
           <Loader2 className="h-10 w-10 animate-spin text-orange-500 mb-4" />
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500 italic">Initialisation du Centre de Commandement...</p>
         </div>
@@ -110,21 +110,23 @@ export const AdminDashboardEnrichiPage = () => {
 
   return (
     <AdminLayout>
+      {/* Ajustement du padding global : p-4 sur mobile */}
       <div className="min-h-screen bg-black text-white p-4 sm:p-6 md:p-12 selection:bg-orange-500/30">
         
-        {/* Header Section */}
-        <div className="mb-10 md:mb-16 max-w-7xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[9px] md:text-[10px] font-black uppercase tracking-widest mb-4">
+        {/* Header Section : Tailles adaptatives */}
+        <div className="mb-8 md:mb-16 max-w-7xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[8px] md:text-[10px] font-black uppercase tracking-widest mb-4">
             <Zap className="h-3 w-3 fill-orange-500" /> Administrative Command Center
           </div>
-          <h2 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic leading-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>
+          <h2 className="text-2xl sm:text-3xl md:text-5xl font-black tracking-tighter uppercase italic leading-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>
             Dashboard <span className="text-orange-500">Enrichi</span>
           </h2>
-          <p className="mt-2 text-zinc-500 text-xs md:text-sm font-medium uppercase tracking-widest italic opacity-70">Aperçu global de l'infrastructure DownPricer</p>
+          <p className="mt-2 text-zinc-500 text-[10px] md:text-sm font-medium uppercase tracking-widest italic opacity-70">Aperçu global de l'infrastructure DownPricer</p>
         </div>
 
         {/* --- ROW 1: CORE KPIs --- */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 max-w-7xl mx-auto">
+        {/* grid-cols-1 par défaut sur mobile */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 md:mb-8 max-w-7xl mx-auto">
           <MainStatCard 
             label="Articles" value={stats.articlesCount} icon={<Package />} 
             color="blue" onClick={() => navigate('/admin/articles')} 
@@ -144,7 +146,7 @@ export const AdminDashboardEnrichiPage = () => {
         </div>
 
         {/* --- ROW 2: CRITICAL ALERTS --- */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12 max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 md:mb-12 max-w-7xl mx-auto">
           <AlertCard 
             label="Dossiers en attente" value={stats.demandesPending} 
             icon={<Clock />} color="orange" onClick={() => navigate('/admin/demandes')}
@@ -160,24 +162,24 @@ export const AdminDashboardEnrichiPage = () => {
         </div>
 
         {/* --- ROW 3: DETAILED ANALYTICS & ACTIVITY --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 max-w-7xl mx-auto">
           
           {/* Analytics Summary */}
           <Card className="bg-[#080808] border-white/5 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl">
-            <CardHeader className="p-6 md:p-10 pb-4">
+            <CardHeader className="p-6 md:p-10 pb-2">
               <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 flex items-center gap-3">
                 <TrendingUp className="h-4 w-4 text-blue-500" /> Analyse de Performance
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6 md:p-10 pt-4">
-              <div className="space-y-6">
+              <div className="space-y-5 md:space-y-6">
                 <AnalyticsRow label="Volume de ventes total" value={stats.ventesCount} />
                 <AnalyticsRow label="Revenus nets cumulés" value={`${stats.revenueTotal.toFixed(2)}€`} color="text-green-500" />
                 <AnalyticsRow 
                   label="Valeur moyenne panier" 
                   value={`${stats.ventesCount > 0 ? (stats.revenueTotal / stats.ventesCount).toFixed(0) : 0}€`} 
                 />
-                <div className="pt-6 border-t border-white/[0.03]">
+                <div className="pt-4 md:pt-6 border-t border-white/[0.03]">
                   <p className="text-[9px] font-black text-zinc-600 uppercase mb-3">Progression du mois</p>
                   <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
                     <div className="h-full bg-orange-500 rounded-full" style={{ width: '74%' }} />
@@ -189,26 +191,25 @@ export const AdminDashboardEnrichiPage = () => {
 
           {/* Activity Feed */}
           <Card className="bg-[#080808] border-white/5 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden">
-            <CardHeader className="p-6 md:p-10 pb-4">
+            <CardHeader className="p-6 md:p-10 pb-2">
               <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 flex items-center gap-3">
                 <Activity className="h-4 w-4 text-orange-500" /> Flux d'activité live
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6 md:p-10 pt-4">
-              <div className="space-y-3 max-h-[350px] overflow-y-auto no-scrollbar">
+              <div className="space-y-3 max-h-[400px] overflow-y-auto no-scrollbar pr-1">
                 {recentActivity.length === 0 ? (
                   <div className="py-10 text-center text-zinc-800 text-[10px] font-bold uppercase tracking-widest">Zéro mouvement système</div>
                 ) : (
                   recentActivity.map((activity, index) => (
                     <div key={index} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-black border border-white/[0.03] rounded-2xl group hover:border-white/10 transition-all gap-3">
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-bold text-zinc-200 group-hover:text-orange-500 transition-colors truncate">{activity.label}</p>
                         <p className="text-[10px] font-medium text-zinc-600 uppercase tracking-tighter mt-0.5">
                           {activity.time.toLocaleDateString('fr-FR')} • {activity.time.toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}
                         </p>
                       </div>
-                      {/* Badge corrigé avec import */}
-                      <Badge className={`text-[8px] font-black px-2.5 py-1 rounded-full uppercase tracking-tighter w-fit border-0 ${getStatusStyle(activity.status)}`}>
+                      <Badge className={`text-[8px] font-black px-2.5 py-1 rounded-full uppercase tracking-tighter w-fit border-0 shrink-0 ${getStatusStyle(activity.status)}`}>
                         {activity.status.replace(/_/g, ' ')}
                       </Badge>
                     </div>
@@ -239,14 +240,14 @@ const MainStatCard = ({ label, value, icon, color, onClick }) => {
       className={`bg-[#080808] border-white/5 rounded-[1.5rem] md:rounded-[2rem] transition-all duration-300 hover:border-white/10 group cursor-pointer active:scale-95`}
       onClick={onClick}
     >
-      <CardContent className="p-6 md:p-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[9px] md:text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">{label}</p>
-            <p className="text-2xl md:text-3xl font-black text-white tracking-tighter">{value}</p>
+      <CardContent className="p-5 md:p-8">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[9px] md:text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1 md:mb-2">{label}</p>
+            <p className="text-xl md:text-3xl font-black text-white tracking-tighter truncate">{value}</p>
           </div>
-          <div className={`h-10 w-10 md:h-12 md:w-12 rounded-xl md:rounded-2xl flex items-center justify-center border transition-transform group-hover:scale-110 ${colors[color]}`}>
-            {React.cloneElement(icon, { size: 22 })}
+          <div className={`h-10 w-10 md:h-12 md:w-12 shrink-0 rounded-xl md:rounded-2xl flex items-center justify-center border transition-transform group-hover:scale-110 ${colors[color]}`}>
+            {React.cloneElement(icon, { size: 20 })}
           </div>
         </div>
       </CardContent>
@@ -264,23 +265,23 @@ const AlertCard = ({ label, value, icon, color, onClick }) => {
   return (
     <div 
       onClick={onClick}
-      className={`p-6 rounded-[1.5rem] border flex items-center justify-between cursor-pointer transition-all active:scale-[0.98] ${colors[color]}`}
+      className={`p-5 md:p-6 rounded-[1.5rem] border flex items-center justify-between cursor-pointer transition-all active:scale-[0.98] ${colors[color]}`}
     >
-      <div>
+      <div className="min-w-0">
         <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-1">{label}</p>
-        <p className="text-2xl font-black">{value}</p>
+        <p className="text-xl md:text-2xl font-black">{value}</p>
       </div>
-      <div className="opacity-30 group-hover:opacity-100 transition-opacity">
-        {React.cloneElement(icon, { size: 24 })}
+      <div className="opacity-30 group-hover:opacity-100 transition-opacity shrink-0">
+        {React.cloneElement(icon, { size: 22 })}
       </div>
     </div>
   );
 };
 
 const AnalyticsRow = ({ label, value, color = "text-zinc-300" }) => (
-  <div className="flex justify-between items-center py-1.5 border-b border-white/[0.02]">
-    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight">{label}</span>
-    <span className={`text-sm font-black ${color}`}>{value}</span>
+  <div className="flex justify-between items-center py-2 border-b border-white/[0.02] gap-2">
+    <span className="text-[9px] md:text-[10px] font-bold text-zinc-500 uppercase tracking-tight">{label}</span>
+    <span className={`text-xs md:text-sm font-black shrink-0 ${color}`}>{value}</span>
   </div>
 );
 

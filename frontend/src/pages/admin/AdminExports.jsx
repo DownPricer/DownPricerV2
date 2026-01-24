@@ -71,29 +71,30 @@ export const AdminExportsPage = () => {
 
   return (
     <AdminLayout>
-      <div className="min-h-screen bg-black text-white p-6 md:p-12 selection:bg-orange-500/30">
+      {/* Container : Padding p-4 sur mobile */}
+      <div className="min-h-screen bg-black text-white p-4 sm:p-6 md:p-12 selection:bg-orange-500/30">
         
-        {/* Header Section */}
-        <div className="mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[10px] font-black uppercase tracking-widest mb-4">
+        {/* Header Section : Texte adaptatif */}
+        <div className="mb-8 md:mb-12">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[9px] md:text-[10px] font-black uppercase tracking-widest mb-4">
             <Database className="h-3 w-3" /> Data Management
           </div>
-          <h2 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic" style={{ fontFamily: 'Outfit, sans-serif' }}>
+          <h2 className="text-2xl sm:text-3xl md:text-5xl font-black tracking-tighter uppercase italic leading-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>
             Exports & <span className="text-orange-500">Backups</span>
           </h2>
-          <p className="mt-2 text-zinc-500 text-sm font-medium uppercase tracking-wider italic">Extraction brute et sauvegarde de la base de données</p>
+          <p className="mt-2 text-zinc-500 text-[10px] sm:text-sm font-medium uppercase tracking-wider italic">Extraction brute et sauvegarde de la base de données</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
           
-          {/* CSV Section */}
-          <Card className="bg-[#080808] border-white/5 rounded-[2rem] overflow-hidden shadow-2xl">
-            <CardHeader className="px-8 pt-8 pb-4">
-              <CardTitle className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 flex items-center gap-2">
+          {/* CSV Section : Padding réduit (p-5) sur mobile */}
+          <Card className="bg-[#080808] border-white/5 rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden shadow-2xl">
+            <CardHeader className="p-6 sm:px-8 sm:pt-8 sm:pb-4">
+              <CardTitle className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-zinc-500 flex items-center gap-2">
                 <Table className="h-4 w-4 text-orange-500" /> Formats Tableurs (CSV)
               </CardTitle>
             </CardHeader>
-            <CardContent className="px-8 pb-8 space-y-3">
+            <CardContent className="p-6 sm:px-8 sm:pb-8 space-y-3">
               <ExportButton 
                 label="Articles" icon={<Package size={16}/>} 
                 loading={exporting === 'articles'} 
@@ -118,20 +119,20 @@ export const AdminExportsPage = () => {
           </Card>
 
           {/* Full Backup Section */}
-          <Card className="bg-[#080808] border-white/5 rounded-[2rem] overflow-hidden shadow-2xl flex flex-col">
-            <CardHeader className="px-8 pt-8 pb-4">
-              <CardTitle className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 flex items-center gap-2">
+          <Card className="bg-[#080808] border-white/5 rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden shadow-2xl flex flex-col">
+            <CardHeader className="p-6 sm:px-8 sm:pt-8 sm:pb-4">
+              <CardTitle className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-zinc-500 flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-green-500" /> Sauvegarde Critique
               </CardTitle>
             </CardHeader>
-            <CardContent className="px-8 pb-8 flex-1 flex flex-col">
-              <p className="text-zinc-500 text-xs font-medium leading-relaxed mb-8 uppercase tracking-wider">
+            <CardContent className="p-6 sm:px-8 sm:pb-8 flex-1 flex flex-col">
+              <p className="text-zinc-500 text-[10px] sm:text-xs font-medium leading-relaxed mb-6 sm:mb-8 uppercase tracking-wider">
                 Générez un snapshot complet de l'infrastructure au format JSON pour une restauration d'urgence.
               </p>
               
-              <div className="mt-auto space-y-6">
+              <div className="mt-auto space-y-4 sm:space-y-6">
                 <Button
-                  className="w-full bg-white hover:bg-zinc-200 text-black font-black uppercase tracking-widest text-[11px] h-14 rounded-2xl shadow-lg transition-all active:scale-[0.98]"
+                  className="w-full bg-white hover:bg-zinc-200 text-black font-black uppercase tracking-widest text-[10px] sm:text-[11px] h-12 sm:h-14 rounded-xl sm:rounded-2xl shadow-lg transition-all active:scale-[0.98]"
                   disabled={exporting === 'full'}
                 >
                   {exporting === 'full' ? (
@@ -142,10 +143,10 @@ export const AdminExportsPage = () => {
                   Full System Dump (JSON)
                 </Button>
 
-                <div className="bg-black/40 border border-white/5 rounded-2xl p-4 flex items-center justify-between">
+                <div className="bg-black/40 border border-white/5 rounded-xl sm:rounded-2xl p-4 flex items-center justify-between">
                   <div>
-                    <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Dernier Snapshot</p>
-                    <p className="text-xs font-bold text-zinc-400 uppercase tracking-tighter">Aucune archive détectée</p>
+                    <p className="text-[8px] sm:text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Dernier Snapshot</p>
+                    <p className="text-[10px] sm:text-xs font-bold text-zinc-400 uppercase tracking-tighter">Aucune archive détectée</p>
                   </div>
                   <div className="h-2 w-2 rounded-full bg-zinc-800 animate-pulse" />
                 </div>
@@ -154,13 +155,14 @@ export const AdminExportsPage = () => {
           </Card>
         </div>
 
-        {/* Instructions Card OLED */}
-        <Card className="mt-8 bg-[#080808] border-white/5 rounded-[2rem] overflow-hidden">
-          <CardHeader className="px-8 pt-8">
-            <CardTitle className="text-xs font-black uppercase tracking-[0.2em] text-orange-500">Security Protocols</CardTitle>
+        {/* Instructions Card : Adaptation grille mobile */}
+        <Card className="mt-6 md:mt-8 bg-[#080808] border-white/5 rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden">
+          <CardHeader className="p-6 sm:px-8 sm:pt-8">
+            <CardTitle className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-orange-500">Security Protocols</CardTitle>
           </CardHeader>
-          <CardContent className="px-8 pb-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+          <CardContent className="px-6 pb-6 sm:px-8 sm:pb-8">
+            {/* Grille : 1 colonne mobile, 2 colonnes desktop */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2 md:gap-y-4">
               <InstructionItem text="Les exports CSV sont formatés pour Excel et Google Sheets." />
               <InstructionItem text="Le dump JSON inclut l'intégralité des relations SQL." />
               <InstructionItem text="Privilégiez les sauvegardes hors pic d'activité." />
@@ -180,23 +182,23 @@ const ExportButton = ({ label, icon, loading, onClick }) => (
   <button
     onClick={onClick}
     disabled={loading}
-    className="w-full flex items-center justify-between p-4 bg-white/[0.02] border border-white/[0.03] hover:border-orange-500/30 hover:bg-white/[0.04] rounded-2xl transition-all group active:scale-[0.99] disabled:opacity-50"
+    className="w-full flex items-center justify-between p-3 sm:p-4 bg-white/[0.02] border border-white/[0.03] hover:border-orange-500/30 hover:bg-white/[0.04] rounded-xl sm:rounded-2xl transition-all group active:scale-[0.99] disabled:opacity-50"
   >
-    <div className="flex items-center gap-4">
-      <div className="h-10 w-10 rounded-xl bg-black border border-white/5 flex items-center justify-center text-zinc-500 group-hover:text-orange-500 transition-colors">
-        {loading ? <Loader2 className="animate-spin h-5 w-5" /> : icon}
+    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+      <div className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 rounded-lg sm:rounded-xl bg-black border border-white/5 flex items-center justify-center text-zinc-500 group-hover:text-orange-500 transition-colors">
+        {loading ? <Loader2 className="animate-spin h-4 w-4 sm:h-5 sm:w-5" /> : icon}
       </div>
-      <span className="text-xs font-bold text-zinc-300 group-hover:text-white uppercase tracking-widest">
+      <span className="text-[9px] sm:text-xs font-bold text-zinc-300 group-hover:text-white uppercase tracking-widest truncate">
         {loading ? 'Processing...' : `Exporter les ${label}`}
       </span>
     </div>
-    <ChevronRight className="h-4 w-4 text-zinc-800 group-hover:text-orange-500 transition-colors" />
+    <ChevronRight className="h-4 w-4 shrink-0 text-zinc-800 group-hover:text-orange-500 transition-colors" />
   </button>
 );
 
 const InstructionItem = ({ text }) => (
   <div className="flex items-start gap-3 py-2 border-b border-white/[0.02]">
-    <div className="h-1.5 w-1.5 rounded-full bg-orange-500/50 mt-1.5 shrink-0" />
-    <p className="text-[11px] font-medium text-zinc-500 uppercase leading-relaxed">{text}</p>
+    <div className="h-1 w-1 sm:h-1.5 sm:w-1.5 rounded-full bg-orange-500/50 mt-1.5 shrink-0" />
+    <p className="text-[9px] sm:text-[11px] font-medium text-zinc-500 uppercase leading-relaxed">{text}</p>
   </div>
 );
