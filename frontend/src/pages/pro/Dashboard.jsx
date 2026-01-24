@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Package, TrendingUp, CheckCircle, DollarSign, AlertCircle, Plus, Loader } from 'lucide-react';
+import { Package, TrendingUp, CheckCircle, DollarSign, AlertCircle, Plus, Loader, ArrowUpRight } from 'lucide-react';
 import api from '../../utils/api';
 
 export const ProDashboard = () => {
@@ -17,11 +17,9 @@ export const ProDashboard = () => {
 
   const fetchData = async () => {
     try {
-      // OPTIMISÉ : Une seule requête pour tout SANS photos
       const response = await api.get('/pro/articles-light');
       const articles = response.data;
 
-      // Calculer les stats localement
       const stats = {
         total_articles: articles.length,
         articles_for_sale: articles.filter(a => a.status === 'À vendre').length,
@@ -34,7 +32,6 @@ export const ProDashboard = () => {
         }, 0)
       };
 
-      // Calculer les alertes localement
       const threeDaysFromNow = new Date();
       threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
       const alerts = articles.filter(a => 
@@ -44,15 +41,13 @@ export const ProDashboard = () => {
       );
 
       setData({
-        articles: articles.slice(0, 5), // Seulement les 5 premiers
+        articles: articles.slice(0, 5),
         stats,
         alerts
       });
     } catch (error) {
       console.error('Erreur:', error);
-      if (error.response?.status === 403) {
-        window.location.href = '/';
-      }
+      if (error.response?.status === 403) window.location.href = '/';
     } finally {
       setLoading(false);
     }
@@ -60,134 +55,136 @@ export const ProDashboard = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader className="h-8 w-8 animate-spin text-indigo-600" />
+      <div className="flex flex-col items-center justify-center h-screen bg-black">
+        <Loader className="h-10 w-10 animate-spin text-orange-500" />
+        <p className="mt-4 text-zinc-500 text-xs font-bold uppercase tracking-widest">Chargement du dashboard...</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <Package className="h-6 w-6 text-indigo-600" />
-            <div className="ml-3">
-              <p className="text-sm text-gray-600">Articles</p>
-              <p className="text-xl font-bold text-indigo-600">{data.stats.total_articles || 0}</p>
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen bg-black text-white selection:bg-orange-500/30 pb-12">
+      <div className="max-w-7xl mx-auto px-6 py-10">
         
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <TrendingUp className="h-6 w-6 text-blue-600" />
-            <div className="ml-3">
-              <p className="text-sm text-gray-600">À vendre</p>
-              <p className="text-xl font-bold text-blue-600">{data.stats.articles_for_sale || 0}</p>
-            </div>
+        {/* Header Dashboard */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+          <div>
+            <h1 className="text-4xl font-black tracking-tighter" style={{ fontFamily: 'Outfit, sans-serif' }}>
+              PRO <span className="text-orange-500">DASHBOARD</span>
+            </h1>
+            <p className="text-zinc-500 text-sm mt-2">Suivez vos performances d'achat-revente en temps réel.</p>
           </div>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <CheckCircle className="h-6 w-6 text-green-600" />
-            <div className="ml-3">
-              <p className="text-sm text-gray-600">Vendus</p>
-              <p className="text-xl font-bold text-green-600">{data.stats.articles_sold || 0}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <DollarSign className="h-6 w-6 text-purple-600" />
-            <div className="ml-3">
-              <p className="text-sm text-gray-600">Marge</p>
-              <p className={`text-xl font-bold ${(data.stats.current_margin || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {(data.stats.current_margin || 0).toFixed(2)}€
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Alertes */}
-      {data.alerts && data.alerts.length > 0 && (
-        <div className="mb-8 bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center mb-3">
-            <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
-            <h3 className="text-lg font-medium text-red-800">Alertes retour</h3>
-          </div>
-          <div className="space-y-2">
-            {data.alerts.map(article => (
-              <div key={article.id} className="flex justify-between items-center text-red-700 bg-red-100 p-3 rounded">
-                <span className="font-medium">{article.name}</span>
-                <span className="text-sm">
-                  {new Date(article.return_deadline).toLocaleDateString()}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Articles récents */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="text-lg font-medium text-gray-900">Articles récents</h3>
           <Link
             to="/pro/articles/new"
-            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+            className="inline-flex items-center px-6 py-3 bg-white hover:bg-zinc-200 text-black text-xs font-black uppercase tracking-widest rounded-full transition-all active:scale-95 shadow-lg shadow-white/5"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Ajouter
+            <Plus className="h-4 w-4 mr-2 stroke-[3px]" />
+            Ajouter un article
           </Link>
         </div>
-        <div className="p-6">
-          {data.articles && data.articles.length > 0 ? (
-            <div className="space-y-3">
-              {data.articles.map(article => (
-                <div key={article.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center">
-                    <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center mr-3">
-                      <Package className="h-5 w-5 text-indigo-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{article.name}</p>
-                      <p className="text-sm text-gray-500">{article.purchase_platform} • {article.purchase_price}€</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      article.status === 'Vendu' ? 'bg-green-100 text-green-800' :
-                      article.status === 'À vendre' ? 'bg-blue-100 text-blue-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {article.status}
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+          <StatCard icon={<Package size={20}/>} label="Total Stock" value={data.stats.total_articles} color="orange" />
+          <StatCard icon={<TrendingUp size={20}/>} label="En Vente" value={data.stats.articles_for_sale} color="white" />
+          <StatCard icon={<CheckCircle size={20}/>} label="Vendus" value={data.stats.articles_sold} color="white" />
+          <StatCard 
+            icon={<DollarSign size={20}/>} 
+            label="Marge Nette" 
+            value={`${(data.stats.current_margin || 0).toFixed(0)}€`} 
+            color={(data.stats.current_margin || 0) >= 0 ? 'green' : 'red'} 
+          />
+        </div>
+
+        {/* Alerts Section */}
+        {data.alerts && data.alerts.length > 0 && (
+          <div className="mb-10 animate-in fade-in slide-in-from-top-2">
+            <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <AlertCircle className="h-5 w-5 text-red-500" />
+                <h3 className="text-sm font-black uppercase tracking-widest text-red-500 text-white">Alertes de retour imminentes</h3>
+              </div>
+              <div className="grid gap-2">
+                {data.alerts.map(article => (
+                  <div key={article.id} className="flex justify-between items-center bg-black/40 border border-red-500/10 p-4 rounded-xl">
+                    <span className="text-sm font-bold text-zinc-200">{article.name}</span>
+                    <span className="text-[10px] font-black bg-red-500/20 text-red-500 px-3 py-1 rounded-full uppercase">
+                      Expire le {new Date(article.return_deadline).toLocaleDateString()}
                     </span>
                   </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Recent Articles Table */}
+        <div className="bg-[#080808] border border-white/5 rounded-[2rem] overflow-hidden">
+          <div className="px-8 py-6 border-b border-white/5 flex items-center justify-between">
+            <h3 className="text-sm font-black uppercase tracking-widest text-zinc-400">Dernières Activités</h3>
+            <Link to="/pro/articles" className="text-[10px] font-bold text-orange-500 hover:underline uppercase tracking-widest flex items-center gap-1">
+              Voir tout <ArrowUpRight size={12} />
+            </Link>
+          </div>
+          <div className="p-4">
+            {data.articles && data.articles.length > 0 ? (
+              <div className="space-y-2">
+                {data.articles.map(article => (
+                  <div key={article.id} className="flex items-center justify-between p-4 bg-white/[0.02] hover:bg-white/[0.04] border border-transparent hover:border-white/5 rounded-2xl transition-all group">
+                    <div className="flex items-center">
+                      <div className="h-10 w-10 rounded-xl bg-black border border-white/10 flex items-center justify-center mr-4 group-hover:border-orange-500/50 transition-colors">
+                        <Package className="h-5 w-5 text-zinc-500 group-hover:text-orange-500" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-white text-sm">{article.name}</p>
+                        <p className="text-[10px] text-zinc-500 uppercase font-medium tracking-wider">
+                          {article.purchase_platform} • <span className="text-zinc-300">{article.purchase_price}€</span>
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      <span className={`text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-tighter ${
+                        article.status === 'Vendu' ? 'bg-green-500/10 text-green-500' :
+                        article.status === 'À vendre' ? 'bg-orange-500/10 text-orange-500' :
+                        'bg-zinc-800 text-zinc-400'
+                      }`}>
+                        {article.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16">
+                <div className="h-16 w-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/5">
+                  <Package className="h-8 w-8 text-zinc-700" />
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500 mb-4">Aucun article</p>
-              <Link
-                to="/pro/articles/new"
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Ajouter votre premier article
-              </Link>
-            </div>
-          )}
+                <p className="text-zinc-500 text-sm font-medium">Aucun article en inventaire</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
+// Composant Statistique pour le look "Grid"
+const StatCard = ({ icon, label, value, color }) => {
+  const colors = {
+    orange: "text-orange-500 bg-orange-500/10 border-orange-500/20",
+    white: "text-white bg-white/5 border-white/10",
+    green: "text-green-500 bg-green-500/10 border-green-500/20",
+    red: "text-red-500 bg-red-500/10 border-red-500/20",
+  };
+
+  return (
+    <div className="bg-[#080808] border border-white/5 p-6 rounded-[1.5rem] hover:border-white/10 transition-all">
+      <div className={`h-10 w-10 rounded-xl flex items-center justify-center mb-4 border ${colors[color]}`}>
+        {icon}
+      </div>
+      <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.15em] mb-1">{label}</p>
+      <p className="text-2xl font-black text-white">{value}</p>
+    </div>
+  );
+};
