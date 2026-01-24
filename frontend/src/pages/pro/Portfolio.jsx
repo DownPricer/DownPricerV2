@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wallet, TrendingUp, DollarSign, Loader } from 'lucide-react';
+import { Wallet, TrendingUp, DollarSign, Loader2, ArrowUpRight, ArrowDownRight, History, Info } from 'lucide-react';
 import api from '../../utils/api';
 
 export const ProPortfolio = () => {
@@ -19,16 +19,13 @@ export const ProPortfolio = () => {
         api.get('/pro/transactions'),
         api.get('/pro/articles-light')
       ]);
-
       setData({
         transactions: transactionsRes.data,
         articles: articlesRes.data
       });
     } catch (error) {
       console.error('Erreur:', error);
-      if (error.response?.status === 403) {
-        window.location.href = '/';
-      }
+      if (error.response?.status === 403) window.location.href = '/';
     } finally {
       setLoading(false);
     }
@@ -36,8 +33,9 @@ export const ProPortfolio = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader className="h-8 w-8 animate-spin text-indigo-600" />
+      <div className="flex flex-col items-center justify-center h-screen bg-black">
+        <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
+        <p className="mt-4 text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Synchronisation du portefeuille...</p>
       </div>
     );
   }
@@ -58,114 +56,135 @@ export const ProPortfolio = () => {
     .reduce((sum, a) => sum + a.estimated_sale_price, 0);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Mon portefeuille</h1>
-        <p className="mt-2 text-gray-600">Suivi de vos achats et revenus</p>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-red-100">
-              <TrendingUp className="h-6 w-6 text-red-600 transform rotate-180" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Achats</p>
-              <p className="text-xl font-bold text-red-600">-{totalPurchases.toFixed(2)}€</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-green-100">
-              <TrendingUp className="h-6 w-6 text-green-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Revenus</p>
-              <p className="text-xl font-bold text-green-600">+{totalSales.toFixed(2)}€</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <div className={`p-3 rounded-full ${balance >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
-              <Wallet className={`h-6 w-6 ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`} />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Solde Net</p>
-              <p className={`text-xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {balance >= 0 ? '+' : ''}{balance.toFixed(2)}€
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-blue-100">
-              <DollarSign className="h-6 w-6 text-blue-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Potentiel</p>
-              <p className="text-xl font-bold text-blue-600">+{potentialRevenue.toFixed(2)}€</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Transactions */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Transactions récentes</h3>
-        </div>
+    <div className="min-h-screen bg-black text-white selection:bg-orange-500/30 pb-20">
+      <div className="max-w-7xl mx-auto px-6 py-10">
         
-        {data.transactions.length > 0 ? (
-          <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
-            {data.transactions.slice(0, 50).map((transaction) => (
-              <div key={transaction.id} className="px-6 py-4 flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-gray-900">{transaction.description}</p>
-                  <p className="text-sm text-gray-500">{new Date(transaction.date).toLocaleDateString()}</p>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    transaction.type === 'achat' ? 'bg-red-100 text-red-800' :
-                    transaction.type === 'vente' ? 'bg-green-100 text-green-800' :
-                    'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {transaction.type}
-                  </span>
-                  <span className={`font-medium ${transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {transaction.amount >= 0 ? '+' : ''}{transaction.amount.toFixed(2)}€
-                  </span>
-                </div>
-              </div>
-            ))}
+        {/* Header Section */}
+        <div className="mb-12">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[10px] font-black uppercase tracking-widest mb-4">
+            <Wallet className="h-3 w-3" /> Financial Assets
           </div>
-        ) : (
-          <div className="text-center py-12">
-            <Wallet className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500">Aucune transaction</p>
-          </div>
-        )}
-      </div>
+          <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            Mon <span className="text-orange-500">Portefeuille</span>
+          </h1>
+          <p className="mt-2 text-zinc-500 text-sm font-medium uppercase tracking-wider">Suivi en temps réel de vos flux de trésorerie</p>
+        </div>
 
-      {/* Info sur la logique */}
-      <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="font-medium text-blue-900 mb-2">💡 Logique du portefeuille</h4>
-        <ul className="text-sm text-blue-800 space-y-1">
-          <li>• <strong>Achats</strong> : Montants négatifs (investissements)</li>
-          <li>• <strong>Revenus</strong> : Montants positifs (ventes réalisées)</li>
-          <li>• <strong>Solde</strong> : Revenus - Achats = Bénéfice net</li>
-          <li>• <strong>Potentiel</strong> : Revenus estimés des articles à vendre</li>
-        </ul>
+        {/* Portfolio Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+          <SummaryCard 
+            icon={<ArrowDownRight size={20}/>} 
+            label="Total Achats" 
+            value={`-${totalPurchases.toFixed(0)}€`} 
+            color="red" 
+          />
+          <SummaryCard 
+            icon={<ArrowUpRight size={20}/>} 
+            label="Total Revenus" 
+            value={`+${totalSales.toFixed(0)}€`} 
+            color="green" 
+          />
+          <SummaryCard 
+            icon={<Wallet size={20}/>} 
+            label="Solde Net" 
+            value={`${balance >= 0 ? '+' : ''}${balance.toFixed(0)}€`} 
+            color={balance >= 0 ? "orange" : "red"}
+            highlight={true}
+          />
+          <SummaryCard 
+            icon={<TrendingUp size={20}/>} 
+            label="Plus-value potentielle" 
+            value={`+${potentialRevenue.toFixed(0)}€`} 
+            color="white" 
+          />
+        </div>
+
+        {/* Transactions Table */}
+        <div className="bg-[#080808] border border-white/5 rounded-[2rem] overflow-hidden">
+          <div className="px-8 py-6 border-b border-white/5 flex items-center justify-between bg-white/[0.01]">
+            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-400 flex items-center gap-2">
+              <History className="h-4 w-4" /> Transactions Récentes
+            </h3>
+            <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Dernières 50 opérations</span>
+          </div>
+          
+          <div className="max-h-[500px] overflow-y-auto no-scrollbar divide-y divide-white/[0.03]">
+            {data.transactions.length > 0 ? (
+              data.transactions.slice(0, 50).map((transaction) => (
+                <div key={transaction.id} className="px-8 py-5 flex items-center justify-between hover:bg-white/[0.02] transition-colors group">
+                  <div className="flex items-center gap-4">
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center border transition-all ${
+                      transaction.type === 'achat' ? 'bg-red-500/5 border-red-500/10 text-red-500' : 'bg-green-500/5 border-green-500/10 text-green-500'
+                    }`}>
+                      {transaction.type === 'achat' ? <ArrowDownRight size={18} /> : <ArrowUpRight size={18} />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-white group-hover:text-orange-500 transition-colors">{transaction.description}</p>
+                      <p className="text-[10px] font-medium text-zinc-600 uppercase tracking-wider">{new Date(transaction.date).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-6">
+                    <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-tighter ${
+                      transaction.type === 'achat' ? 'bg-white/5 text-zinc-500' : 'bg-green-500/10 text-green-500'
+                    }`}>
+                      {transaction.type}
+                    </span>
+                    <span className={`text-sm font-black min-w-[80px] text-right ${transaction.amount >= 0 ? 'text-green-500' : 'text-white'}`}>
+                      {transaction.amount >= 0 ? '+' : ''}{transaction.amount.toFixed(2)}€
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="py-20 text-center">
+                <History className="h-12 w-12 text-zinc-800 mx-auto mb-4" />
+                <p className="text-zinc-600 text-sm font-bold uppercase tracking-widest">Aucun mouvement enregistré</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* OLED Info Box */}
+        <div className="mt-8 bg-orange-500/5 border border-orange-500/10 rounded-2xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Info className="h-5 w-5 text-orange-500" />
+            <h4 className="text-xs font-black uppercase tracking-widest text-orange-500">Business Logic</h4>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-[10px] font-bold text-zinc-500 uppercase tracking-tight">
+            <div className="flex gap-2"><span className="text-orange-500">•</span> Achats : Investissement initial</div>
+            <div className="flex gap-2"><span className="text-orange-500">•</span> Revenus : CA net encaissé</div>
+            <div className="flex gap-2"><span className="text-orange-500">•</span> Solde : Marge nette réalisée</div>
+            <div className="flex gap-2"><span className="text-orange-500">•</span> Potentiel : Valeur estimée du stock</div>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
+// --- COMPOSANT CARD ---
+const SummaryCard = ({ icon, label, value, color, highlight }) => {
+  const colorStyles = {
+    red: "text-red-500 bg-red-500/10 border-red-500/20",
+    green: "text-green-500 bg-green-500/10 border-green-500/20",
+    orange: "text-orange-500 bg-orange-500/10 border-orange-500/20",
+    white: "text-white bg-white/5 border-white/10",
+  };
 
+  return (
+    <div className={`
+      relative overflow-hidden p-6 rounded-[1.5rem] border transition-all duration-500 group
+      ${highlight ? 'bg-orange-500/5 border-orange-500/20' : 'bg-[#080808] border-white/5 hover:border-white/10'}
+    `}>
+      {/* Subtle Glow for Highlighted Card */}
+      {highlight && <div className="absolute -top-10 -right-10 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full" />}
+      
+      <div className={`h-10 w-10 rounded-xl flex items-center justify-center mb-4 border transition-transform group-hover:scale-110 duration-300 ${colorStyles[color]}`}>
+        {icon}
+      </div>
+      <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1 relative z-10">{label}</p>
+      <p className="text-2xl font-black text-white leading-none relative z-10">{value}</p>
+    </div>
+  );
+};

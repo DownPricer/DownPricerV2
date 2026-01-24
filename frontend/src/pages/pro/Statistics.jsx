@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, CheckCircle, TrendingUp, DollarSign, Loader } from 'lucide-react';
+import { BarChart3, CheckCircle, TrendingUp, DollarSign, Loader2, AlertCircle, PieChart, Calendar, ArrowUpRight } from 'lucide-react';
 import api from '../../utils/api';
 
 export const ProStatistics = () => {
@@ -26,9 +26,7 @@ export const ProStatistics = () => {
       });
     } catch (error) {
       console.error('Erreur:', error);
-      if (error.response?.status === 403) {
-        window.location.href = '/';
-      }
+      if (error.response?.status === 403) window.location.href = '/';
     } finally {
       setLoading(false);
     }
@@ -36,228 +34,198 @@ export const ProStatistics = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader className="h-8 w-8 animate-spin text-indigo-600" />
+      <div className="flex flex-col items-center justify-center h-screen bg-black">
+        <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
+        <p className="mt-4 text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Compilation des data...</p>
       </div>
     );
   }
 
-  // Calculs des statistiques
+  // --- LOGIQUE DE CALCUL (Conservée) ---
   const soldArticles = data.articles.filter(a => a.status === 'Vendu');
   const lostArticles = data.articles.filter(a => a.status === 'Perte');
-  
   const conversionRate = data.articles.length > 0 ? 
     Math.round((soldArticles.length / data.articles.length) * 100) : 0;
-
   const totalRevenue = soldArticles.reduce((sum, a) => sum + (a.actual_sale_price || 0), 0);
   const totalInvestment = data.articles.reduce((sum, a) => sum + a.purchase_price, 0);
   const totalMargin = totalRevenue - soldArticles.reduce((sum, a) => sum + a.purchase_price, 0);
+  const averageMargin = soldArticles.length > 0 ? totalMargin / soldArticles.length : 0;
 
-  // Répartition par plateforme
   const platformStats = data.articles.reduce((acc, article) => {
     acc[article.purchase_platform] = (acc[article.purchase_platform] || 0) + 1;
     return acc;
   }, {});
 
-  // Ventes par mois
   const monthlyStats = soldArticles.reduce((acc, article) => {
     const month = new Date(article.updated_at).toLocaleDateString('fr-FR', { 
       year: 'numeric', 
       month: 'long' 
     });
-    if (!acc[month]) {
-      acc[month] = { sales: 0, revenue: 0, margin: 0 };
-    }
+    if (!acc[month]) acc[month] = { sales: 0, revenue: 0, margin: 0 };
     acc[month].sales += 1;
     acc[month].revenue += article.actual_sale_price || 0;
     acc[month].margin += (article.actual_sale_price || 0) - article.purchase_price;
     return acc;
   }, {});
 
-  const averageMargin = soldArticles.length > 0 ? 
-    soldArticles.reduce((sum, a) => sum + ((a.actual_sale_price || 0) - a.purchase_price), 0) / soldArticles.length : 0;
-
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Statistiques</h1>
-        <p className="mt-2 text-gray-600">Analyse de votre activité d'achat-revente</p>
-      </div>
-
-      {/* KPIs principaux */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <BarChart3 className="h-6 w-6 text-blue-600" />
-            <div className="ml-3">
-              <p className="text-sm text-gray-600">Total Articles</p>
-              <p className="text-xl font-bold text-blue-600">{data.articles.length}</p>
-            </div>
-          </div>
+    <div className="min-h-screen bg-black text-white selection:bg-orange-500/30 pb-20">
+      <div className="max-w-7xl mx-auto px-6 py-10">
+        
+        {/* Header */}
+        <div className="mb-12">
+          <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            Reporting <span className="text-orange-500">Performance</span>
+          </h1>
+          <p className="mt-2 text-zinc-500 text-sm font-medium uppercase tracking-wider italic">Analyse approfondie de votre cycle d'achat-revente</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <CheckCircle className="h-6 w-6 text-green-600" />
-            <div className="ml-3">
-              <p className="text-sm text-gray-600">Vendus</p>
-              <p className="text-xl font-bold text-green-600">{soldArticles.length}</p>
-            </div>
-          </div>
+        {/* Top KPIs */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+          <KPICard icon={<BarChart3 size={18}/>} label="Total Articles" value={data.articles.length} color="white" />
+          <KPICard icon={<CheckCircle size={18}/>} label="Vendus" value={soldArticles.length} color="green" />
+          <KPICard icon={<TrendingUp size={18}/>} label="Taux de Vente" value={`${conversionRate}%`} color="orange" />
+          <KPICard icon={<DollarSign size={18}/>} label="Revenue Total" value={`${totalRevenue.toFixed(0)}€`} color="white" />
         </div>
 
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <TrendingUp className="h-6 w-6 text-purple-600" />
-            <div className="ml-3">
-              <p className="text-sm text-gray-600">Taux de Vente</p>
-              <p className="text-xl font-bold text-purple-600">{conversionRate}%</p>
+        {/* Second Row: Detailed Metrics */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
+          
+          {/* Performance Box */}
+          <div className="bg-[#080808] border border-white/5 rounded-[2rem] p-8">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-8 flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" /> Métriques de Profit
+            </h3>
+            <div className="space-y-6">
+              <StatRow label="Marge Totale" value={`${totalMargin.toFixed(2)}€`} color={totalMargin >= 0 ? 'text-green-500' : 'text-red-500'} />
+              <StatRow label="Marge Moyenne" value={`${averageMargin.toFixed(2)}€`} color={averageMargin >= 0 ? 'text-green-500' : 'text-red-500'} />
+              <StatRow label="Investissement" value={`${totalInvestment.toFixed(2)}€`} color="text-white" />
+              <StatRow label="Pertes (Litiges)" value={lostArticles.length} color="text-red-500" />
             </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <DollarSign className="h-6 w-6 text-yellow-600" />
-            <div className="ml-3">
-              <p className="text-sm text-gray-600">Revenus</p>
-              <p className="text-xl font-bold text-yellow-600">{totalRevenue.toFixed(2)}€</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Métriques avancées */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Performance</h3>
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Marge totale</span>
-              <span className={`font-medium ${totalMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {totalMargin.toFixed(2)}€
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Marge moyenne</span>
-              <span className={`font-medium ${averageMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {averageMargin.toFixed(2)}€
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Investissement</span>
-              <span className="font-medium text-blue-600">{totalInvestment.toFixed(2)}€</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Articles perdus</span>
-              <span className="font-medium text-red-600">{lostArticles.length}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Répartition par plateforme</h3>
-          <div className="space-y-3">
-            {Object.entries(platformStats).map(([platform, count]) => (
-              <div key={platform} className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">{platform}</span>
-                <div className="flex items-center space-x-3">
-                  <div className="w-20 bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-indigo-600 h-2 rounded-full" 
-                      style={{ width: `${(count / data.articles.length) * 100}%` }}
-                    />
+          {/* Platform Distribution */}
+          <div className="bg-[#080808] border border-white/5 rounded-[2rem] p-8">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-8 flex items-center gap-2">
+              <PieChart className="h-4 w-4" /> Sourcing Platforms
+            </h3>
+            <div className="space-y-5">
+              {Object.entries(platformStats).map(([platform, count]) => (
+                <div key={platform} className="group">
+                  <div className="flex justify-between text-[11px] font-bold mb-2">
+                    <span className="text-zinc-400 group-hover:text-white transition-colors">{platform}</span>
+                    <span className="text-white">{count} items</span>
                   </div>
-                  <span className="text-sm text-gray-600 w-8">{count}</span>
+                  <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-full bg-orange-500" style={{ width: `${(count / data.articles.length) * 100}%` }} />
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Ventes par mois</h3>
-          <div className="space-y-3">
-            {Object.entries(monthlyStats).slice(0, 6).map(([month, stats]) => (
-              <div key={month} className="border-l-4 border-indigo-500 pl-4">
-                <div className="flex justify-between items-start">
+          {/* Monthly Breakdown */}
+          <div className="bg-[#080808] border border-white/5 rounded-[2rem] p-8">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-8 flex items-center gap-2">
+              <Calendar className="h-4 w-4" /> Historique Mensuel
+            </h3>
+            <div className="space-y-4 max-h-[220px] overflow-y-auto no-scrollbar">
+              {Object.entries(monthlyStats).slice(0, 5).map(([month, stats]) => (
+                <div key={month} className="flex justify-between items-center p-3 rounded-xl bg-white/[0.02] border border-white/5">
                   <div>
-                    <p className="font-medium text-gray-900">{month}</p>
-                    <p className="text-sm text-gray-600">{stats.sales} ventes</p>
+                    <p className="text-[11px] font-black uppercase tracking-tighter text-white">{month}</p>
+                    <p className="text-[9px] text-zinc-500 font-bold uppercase">{stats.sales} ventes</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium text-green-600">{stats.revenue.toFixed(2)}€</p>
-                    <p className={`text-sm ${stats.margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {stats.margin >= 0 ? '+' : ''}{stats.margin.toFixed(2)}€
+                    <p className="text-xs font-black text-green-500">{stats.revenue.toFixed(0)}€</p>
+                    <p className={`text-[9px] font-bold ${stats.margin >= 0 ? 'text-green-500/50' : 'text-red-500/50'}`}>
+                      {stats.margin >= 0 ? '+' : ''}{stats.margin.toFixed(0)}€
                     </p>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Top articles */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Articles les plus rentables</h3>
-        </div>
-        <div className="p-6">
-          <div className="space-y-4">
+        {/* Top Profitable Articles */}
+        <div className="bg-[#080808] border border-white/5 rounded-[2rem] overflow-hidden mb-12">
+          <div className="px-8 py-6 border-b border-white/5">
+            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-400 italic">Top 5 - Rentabilité Maximale</h3>
+          </div>
+          <div className="divide-y divide-white/[0.03]">
             {soldArticles
               .sort((a, b) => ((b.actual_sale_price || 0) - b.purchase_price) - ((a.actual_sale_price || 0) - a.purchase_price))
               .slice(0, 5)
               .map((article, index) => (
-                <div key={article.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center mr-3">
-                      <span className="text-sm font-medium text-indigo-600">#{index + 1}</span>
-                    </div>
+                <div key={article.id} className="flex items-center justify-between p-6 hover:bg-white/[0.01] transition-colors group">
+                  <div className="flex items-center gap-5">
+                    <span className="text-lg font-black text-white/10 group-hover:text-orange-500 transition-colors italic">0{index + 1}</span>
                     <div>
-                      <p className="font-medium text-gray-900">{article.name}</p>
-                      <p className="text-sm text-gray-500">{article.purchase_platform}</p>
+                      <h4 className="text-sm font-bold text-white tracking-tight">{article.name}</h4>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-zinc-600">{article.purchase_platform}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium text-gray-900">{article.purchase_price}€ → {article.actual_sale_price}€</p>
-                    <p className="text-sm font-medium text-green-600">
-                      +{((article.actual_sale_price || 0) - article.purchase_price).toFixed(2)}€
+                    <div className="flex items-center justify-end gap-2 text-xs font-bold text-zinc-400">
+                      <span>{article.purchase_price}€</span>
+                      <ArrowUpRight size={12} className="text-zinc-700" />
+                      <span className="text-white">{article.actual_sale_price}€</span>
+                    </div>
+                    <p className="text-sm font-black text-green-500 mt-1">
+                      + {((article.actual_sale_price || 0) - article.purchase_price).toFixed(2)}€
                     </p>
                   </div>
                 </div>
               ))}
           </div>
-          
-          {soldArticles.length === 0 && (
-            <div className="text-center py-8">
-              <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">Aucune vente pour le moment</p>
-            </div>
-          )}
         </div>
-      </div>
 
-      {/* Conseils basés sur les données */}
-      <div className="mt-8 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <h4 className="font-medium text-yellow-900 mb-2">📊 Insights automatiques</h4>
-        <ul className="text-sm text-yellow-800 space-y-1">
-          {conversionRate < 50 && (
-            <li>• Votre taux de conversion est de {conversionRate}%. Essayez d'optimiser vos prix de vente.</li>
-          )}
-          {averageMargin < 0 && (
-            <li>• Marge moyenne négative. Revoyez votre stratégie d'achat ou vos prix de vente.</li>
-          )}
-          {lostArticles.length > 0 && (
-            <li>• {lostArticles.length} articles marqués comme perte. Analysez les causes.</li>
-          )}
-          {Object.keys(platformStats).length > 0 && (
-            <li>• Votre plateforme la plus utilisée : {Object.keys(platformStats).reduce((a, b) => platformStats[a] > platformStats[b] ? a : b)}</li>
-          )}
-        </ul>
+        {/* Automatic Insights OLED */}
+        <div className="bg-orange-500/5 border border-orange-500/10 rounded-[2rem] p-8">
+          <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-orange-500 mb-6 flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" /> Diagnostic Système
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <InsightItem condition={conversionRate < 50} text={`Taux de conversion faible (${conversionRate}%). Optimisez vos descriptions.`} />
+            <InsightItem condition={averageMargin < 10} text={`Alerte Marge : Rentabilité moyenne sous le seuil critique.`} />
+            <InsightItem condition={lostArticles.length > 0} text={`${lostArticles.length} litiges détectés. Vérifiez vos transporteurs.`} />
+            <InsightItem condition={true} text={`Sourcing dominant identifié sur ${Object.keys(platformStats).reduce((a, b) => platformStats[a] > platformStats[b] ? a : b) || 'N/A'}.`} />
+          </div>
+        </div>
+
       </div>
     </div>
   );
 };
 
+// --- COMPOSANTS INTERNES ---
 
+const KPICard = ({ icon, label, value, color }) => (
+  <div className="bg-[#080808] border border-white/5 p-6 rounded-[1.5rem] hover:border-white/10 transition-all">
+    <div className={`h-10 w-10 rounded-xl flex items-center justify-center mb-4 border ${
+      color === 'green' ? 'bg-green-500/10 border-green-500/20 text-green-500' :
+      color === 'orange' ? 'bg-orange-500/10 border-orange-500/20 text-orange-500' :
+      color === 'purple' ? 'bg-purple-500/10 border-purple-500/20 text-purple-500' :
+      'bg-white/5 border-white/10 text-white'
+    }`}>
+      {icon}
+    </div>
+    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">{label}</p>
+    <p className="text-2xl font-black text-white leading-none tracking-tighter">{value}</p>
+  </div>
+);
+
+const StatRow = ({ label, value, color }) => (
+  <div className="flex justify-between items-center py-1 border-b border-white/[0.02]">
+    <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-tight">{label}</span>
+    <span className={`text-sm font-black ${color}`}>{value}</span>
+  </div>
+);
+
+const InsightItem = ({ condition, text }) => condition ? (
+  <div className="flex items-start gap-3 p-4 rounded-xl bg-black/40 border border-white/5">
+    <div className="h-2 w-2 rounded-full bg-orange-500 mt-1.5 shadow-[0_0_10px_rgba(249,115,22,0.5)]" />
+    <p className="text-[11px] font-bold text-zinc-300 uppercase leading-relaxed">{text}</p>
+  </div>
+) : null;

@@ -1,34 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, DollarSign, BarChart3, CheckCircle, AlertCircle, Package, Loader } from 'lucide-react';
+import { TrendingUp, DollarSign, BarChart3, CheckCircle, AlertCircle, Package, Loader2, Calendar, Target, Zap } from 'lucide-react';
 import api from '../../utils/api';
-
-// Note: Chart.js n'est pas installé dans Downpricer
-// Pour activer les graphiques, installer: npm install chart.js react-chartjs-2
-// Puis décommenter les imports et composants ci-dessous
-
-// import {
-//   Chart as ChartJS,
-//   CategoryScale,
-//   LinearScale,
-//   PointElement,
-//   LineElement,
-//   Title,
-//   Tooltip,
-//   Legend,
-//   BarElement,
-// } from 'chart.js';
-// import { Line, Bar } from 'react-chartjs-2';
-
-// ChartJS.register(
-//   CategoryScale,
-//   LinearScale,
-//   PointElement,
-//   LineElement,
-//   Title,
-//   Tooltip,
-//   Legend,
-//   BarElement
-// );
 
 export const ProAnalytics = () => {
   const [data, setData] = useState({
@@ -36,7 +8,7 @@ export const ProAnalytics = () => {
     transactions: []
   });
   const [loading, setLoading] = useState(true);
-  const [interval, setInterval] = useState(7); // Intervalle en jours (1, 7, 14, 21)
+  const [interval, setInterval] = useState(7);
 
   useEffect(() => {
     fetchData();
@@ -48,16 +20,13 @@ export const ProAnalytics = () => {
         api.get('/pro/articles-light'),
         api.get('/pro/transactions')
       ]);
-
       setData({
         articles: articlesRes.data,
         transactions: transactionsRes.data
       });
     } catch (error) {
       console.error('Erreur:', error);
-      if (error.response?.status === 403) {
-        window.location.href = '/';
-      }
+      if (error.response?.status === 403) window.location.href = '/';
     } finally {
       setLoading(false);
     }
@@ -65,62 +34,15 @@ export const ProAnalytics = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader className="h-8 w-8 animate-spin text-indigo-600" />
+      <div className="flex flex-col items-center justify-center h-screen bg-black">
+        <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
+        <p className="mt-4 text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Calcul des données...</p>
       </div>
     );
   }
 
-  // Calculer les données de ventes par date
+  // --- LOGIQUE DE CALCUL (Conservée) ---
   const soldArticles = data.articles.filter(a => a.status === 'Vendu');
-  
-  // Grouper les ventes par date selon l'intervalle
-  const getSalesData = () => {
-    const salesByDate = {};
-    const now = new Date();
-    const daysToShow = interval * 10; // Afficher 10 périodes
-    
-    // Initialiser toutes les dates avec 0
-    for (let i = daysToShow; i >= 0; i -= interval) {
-      const date = new Date(now);
-      date.setDate(date.getDate() - i);
-      const dateKey = interval === 1 
-        ? date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
-        : `S${Math.floor(i/interval) + 1}`;
-      salesByDate[dateKey] = 0;
-    }
-
-    // Compter les ventes réelles
-    soldArticles.forEach(article => {
-      const saleDate = new Date(article.updated_at);
-      const daysDiff = Math.floor((now - saleDate) / (1000 * 60 * 60 * 24));
-      
-      if (daysDiff <= daysToShow) {
-        const periodIndex = Math.floor(daysDiff / interval);
-        const periodKey = interval === 1 
-          ? saleDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
-          : `S${Math.floor((daysToShow - daysDiff)/interval) + 1}`;
-        
-        if (salesByDate.hasOwnProperty(periodKey)) {
-          salesByDate[periodKey]++;
-        }
-      }
-    });
-
-    return salesByDate;
-  };
-
-  const salesData = getSalesData();
-  const labels = Object.keys(salesData).reverse();
-  const values = Object.values(salesData).reverse();
-
-  // Données pour le graphique des marges
-  const marginData = soldArticles.map(article => ({
-    name: article.name.length > 15 ? article.name.substring(0, 15) + '...' : article.name,
-    margin: (article.actual_sale_price || 0) - article.purchase_price
-  })).sort((a, b) => b.margin - a.margin).slice(0, 10);
-
-  // Calculs des stats avancées
   const totalRevenue = soldArticles.reduce((sum, a) => sum + (a.actual_sale_price || 0), 0);
   const totalInvestment = soldArticles.reduce((sum, a) => sum + a.purchase_price, 0);
   const totalMargin = totalRevenue - totalInvestment;
@@ -128,12 +50,16 @@ export const ProAnalytics = () => {
   const avgMargin = soldArticles.length > 0 ? totalMargin / soldArticles.length : 0;
   const avgDaysToSell = soldArticles.length > 0 ? 
     soldArticles.reduce((sum, a) => {
-      const purchaseDate = new Date(a.purchase_date);
-      const saleDate = new Date(a.updated_at);
-      return sum + Math.floor((saleDate - purchaseDate) / (1000 * 60 * 60 * 24));
+      const pDate = new Date(a.purchase_date);
+      const sDate = new Date(a.updated_at);
+      return sum + Math.floor((sDate - pDate) / (1000 * 60 * 60 * 24));
     }, 0) / soldArticles.length : 0;
 
-  // Répartition par plateforme de vente
+  const marginData = soldArticles.map(article => ({
+    name: article.name,
+    margin: (article.actual_sale_price || 0) - article.purchase_price
+  })).sort((a, b) => b.margin - a.margin).slice(0, 8);
+
   const salePlatformStats = soldArticles.reduce((acc, article) => {
     const platform = article.sale_platform || 'Non spécifié';
     acc[platform] = (acc[platform] || 0) + 1;
@@ -141,180 +67,162 @@ export const ProAnalytics = () => {
   }, {});
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Analytics Avancées</h1>
-        <p className="mt-2 text-gray-600">Graphiques et analyses détaillées de votre activité</p>
-      </div>
+    <div className="min-h-screen bg-black text-white selection:bg-orange-500/30 pb-20">
+      <div className="max-w-7xl mx-auto px-6 py-10">
+        
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+          <div>
+            <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic" style={{ fontFamily: 'Outfit, sans-serif' }}>
+              Advanced <span className="text-orange-500">Analytics</span>
+            </h1>
+            <p className="mt-2 text-zinc-500 text-sm font-medium uppercase tracking-wider">Analyse de performance et rentabilité</p>
+          </div>
 
-      {/* Contrôles d'intervalle */}
-      <div className="mb-8 bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Paramètres d'analyse</h3>
-        <div className="flex items-center space-x-4">
-          <span className="text-sm font-medium text-gray-700">Intervalle:</span>
-          {[1, 7, 14, 21].map(days => (
-            <button
-              key={days}
-              onClick={() => setInterval(days)}
-              className={`px-4 py-2 rounded-md text-sm font-medium ${
-                interval === days
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {days === 1 ? '1 jour' : `${days} jours`}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Stats rapides */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <TrendingUp className="h-6 w-6 text-green-600" />
-            <div className="ml-3">
-              <p className="text-sm text-gray-600">Taux de conversion</p>
-              <p className="text-xl font-bold text-green-600">{conversionRate.toFixed(1)}%</p>
-            </div>
+          {/* Interval Selector */}
+          <div className="bg-[#080808] border border-white/5 p-1 rounded-full flex gap-1">
+            {[1, 7, 14, 21].map(days => (
+              <button
+                key={days}
+                onClick={() => setInterval(days)}
+                className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                  interval === days ? 'bg-orange-500 text-white' : 'text-zinc-500 hover:text-white'
+                }`}
+              >
+                {days === 1 ? 'Daily' : `${days}D`}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <DollarSign className="h-6 w-6 text-purple-600" />
-            <div className="ml-3">
-              <p className="text-sm text-gray-600">Marge moyenne</p>
-              <p className={`text-xl font-bold ${avgMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {avgMargin.toFixed(2)}€
+        {/* Rapid Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+          <StatCard icon={<TrendingUp size={18}/>} label="Conversion" value={`${conversionRate.toFixed(1)}%`} color="green" />
+          <StatCard icon={<DollarSign size={18}/>} label="Marge Moyenne" value={`${avgMargin.toFixed(0)}€`} color="orange" />
+          <StatCard icon={<Calendar size={18}/>} label="Vitesse Vente" value={`${avgDaysToSell.toFixed(0)} j`} color="white" />
+          <StatCard icon={<CheckCircle size={18}/>} label="Volumes" value={soldArticles.length} color="white" />
+        </div>
+
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
+          
+          {/* Sales Evolution Placeholder */}
+          <div className="bg-[#080808] border border-white/5 rounded-[2rem] p-8 min-h-[350px] flex flex-col">
+            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 mb-8">Évolution des ventes</h3>
+            <div className="flex-1 flex flex-col items-center justify-center border border-white/[0.02] rounded-2xl bg-black/40">
+              <BarChart3 className="h-10 w-10 text-zinc-800 mb-4 animate-pulse" />
+              <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest text-center px-10 leading-relaxed">
+                Visualisation temporelle bientôt disponible<br/>
+                <span className="text-orange-500/40 italic">Integration Chart.js v4</span>
               </p>
             </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <BarChart3 className="h-6 w-6 text-blue-600" />
-            <div className="ml-3">
-              <p className="text-sm text-gray-600">Jours moy. vente</p>
-              <p className="text-xl font-bold text-blue-600">{avgDaysToSell.toFixed(0)} j</p>
+          {/* Top Margins List */}
+          <div className="bg-[#080808] border border-white/5 rounded-[2rem] p-8">
+            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 mb-8">Top Marges par Article</h3>
+            <div className="space-y-4">
+              {marginData.length > 0 ? marginData.map((item, index) => (
+                <div key={index} className="flex items-center justify-between group">
+                  <span className="text-xs font-bold text-zinc-400 group-hover:text-white transition-colors truncate max-w-[200px]">{item.name}</span>
+                  <div className="flex items-center gap-4 flex-1 ml-6">
+                     <div className="h-1 bg-white/5 flex-1 rounded-full overflow-hidden">
+                        <div className="h-full bg-orange-500" style={{ width: `${(item.margin / marginData[0].margin) * 100}%` }} />
+                     </div>
+                     <span className={`text-xs font-black min-w-[50px] text-right ${item.margin >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      +{item.margin.toFixed(0)}€
+                    </span>
+                  </div>
+                </div>
+              )) : (
+                <p className="text-center text-zinc-600 text-xs py-20 italic">Aucune donnée disponible</p>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <CheckCircle className="h-6 w-6 text-indigo-600" />
-            <div className="ml-3">
-              <p className="text-sm text-gray-600">Articles vendus</p>
-              <p className="text-xl font-bold text-indigo-600">{soldArticles.length}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Graphiques - Placeholder si Chart.js n'est pas installé */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Évolution des ventes</h3>
-          <div className="h-64 flex items-center justify-center text-gray-500">
-            <div className="text-center">
-              <BarChart3 className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-              <p>Graphiques disponibles après installation de Chart.js</p>
-              <p className="text-sm mt-2">npm install chart.js react-chartjs-2</p>
-            </div>
-          </div>
-          {/* Décommenter quand Chart.js est installé:
-          <Line data={salesChartData} options={salesChartOptions} />
-          */}
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Top 10 - Marges par article</h3>
-          <div className="space-y-2">
-            {marginData.slice(0, 10).map((item, index) => (
-              <div key={index} className="flex items-center justify-between">
-                <span className="text-sm text-gray-700">{item.name}</span>
-                <span className={`text-sm font-medium ${item.margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {item.margin >= 0 ? '+' : ''}{item.margin.toFixed(2)}€
-                </span>
-              </div>
-            ))}
-          </div>
-          {/* Décommenter quand Chart.js est installé:
-          <Bar data={marginChartData} options={marginChartOptions} />
-          */}
-        </div>
-      </div>
-
-      {/* Analyses textuelles */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Répartition par plateforme de vente */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Plateformes de vente préférées</h3>
-          <div className="space-y-3">
-            {Object.entries(salePlatformStats).map(([platform, count]) => (
-              <div key={platform} className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">{platform}</span>
-                <div className="flex items-center space-x-3">
-                  <div className="w-24 bg-gray-200 rounded-full h-2">
+        {/* Lower Grid: Platforms & Insights */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          
+          {/* Platforms */}
+          <div className="bg-[#080808] border border-white/5 rounded-[2rem] p-8">
+            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 mb-8">Répartition Plateformes</h3>
+            <div className="space-y-6">
+              {Object.entries(salePlatformStats).map(([platform, count]) => (
+                <div key={platform} className="space-y-2">
+                  <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+                    <span>{platform}</span>
+                    <span className="text-zinc-500">{count} ventes</span>
+                  </div>
+                  <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                     <div 
-                      className="bg-indigo-600 h-2 rounded-full" 
-                      style={{ width: `${(count / soldArticles.length) * 100}%` }}
+                      className="bg-orange-500 h-full rounded-full" 
+                      style={{ width: `${(count / soldArticles.length) * 100}%` }} 
                     />
                   </div>
-                  <span className="text-sm text-gray-600 w-8">{count}</span>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Insights automatiques */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">🎯 Insights automatiques</h3>
-          <div className="space-y-3 text-sm">
-            {conversionRate > 70 && (
-              <div className="flex items-start">
-                <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 mr-2" />
-                <span className="text-green-800">Excellent taux de conversion ({conversionRate.toFixed(1)}%) !</span>
-              </div>
-            )}
-            
-            {avgMargin > 10 && (
-              <div className="flex items-start">
-                <TrendingUp className="h-4 w-4 text-green-600 mt-0.5 mr-2" />
-                <span className="text-green-800">Marge moyenne très profitable ({avgMargin.toFixed(2)}€)</span>
-              </div>
-            )}
-            
-            {avgDaysToSell < 14 && soldArticles.length > 0 && (
-              <div className="flex items-start">
-                <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5 mr-2" />
-                <span className="text-blue-800">Ventes rapides : {avgDaysToSell.toFixed(0)} jours en moyenne</span>
-              </div>
-            )}
-
-            {Object.keys(salePlatformStats).length > 0 && (
-              <div className="flex items-start">
-                <BarChart3 className="h-4 w-4 text-purple-600 mt-0.5 mr-2" />
-                <span className="text-purple-800">
-                  Plateforme star : {Object.keys(salePlatformStats).reduce((a, b) => salePlatformStats[a] > salePlatformStats[b] ? a : b)}
-                </span>
-              </div>
-            )}
-
-            {soldArticles.length === 0 && (
-              <div className="flex items-start">
-                <Package className="h-4 w-4 text-gray-500 mt-0.5 mr-2" />
-                <span className="text-gray-600">Commencez par vendre quelques articles pour voir vos analytics !</span>
-              </div>
-            )}
+          {/* Smart Insights */}
+          <div className="bg-[#080808] border border-white/5 rounded-[2rem] p-8">
+            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 mb-8">🎯 AI Insights</h3>
+            <div className="space-y-4">
+              {conversionRate > 70 && (
+                <InsightRow icon={<Zap size={14}/>} color="green" text={`Conversion d'élite : ${conversionRate.toFixed(0)}%`} />
+              )}
+              {avgMargin > 10 && (
+                <InsightRow icon={<Target size={14}/>} color="orange" text={`Marge saine (> ${avgMargin.toFixed(0)}€/unité)`} />
+              )}
+              {avgDaysToSell < 14 && soldArticles.length > 0 && (
+                <InsightRow icon={<TrendingUp size={14}/>} color="blue" text={`Rotation rapide des stocks (${avgDaysToSell.toFixed(0)}j)`} />
+              )}
+              {Object.keys(salePlatformStats).length > 0 && (
+                <InsightRow icon={<Package size={14}/>} color="white" text={`Lead Platform : ${Object.keys(salePlatformStats).reduce((a, b) => salePlatformStats[a] > salePlatformStats[b] ? a : b)}`} />
+              )}
+            </div>
           </div>
+
         </div>
       </div>
     </div>
   );
 };
 
+// --- COMPOSANTS INTERNES ---
 
+const StatCard = ({ icon, label, value, color }) => {
+  const colors = {
+    green: "text-green-500 bg-green-500/10 border-green-500/20",
+    orange: "text-orange-500 bg-orange-500/10 border-orange-500/20",
+    white: "text-white bg-white/5 border-white/10",
+    blue: "text-blue-500 bg-blue-500/10 border-blue-500/20",
+  };
+
+  return (
+    <div className="bg-[#080808] border border-white/5 p-6 rounded-[1.5rem] hover:border-white/10 transition-all">
+      <div className={`h-10 w-10 rounded-xl flex items-center justify-center mb-4 border ${colors[color]}`}>
+        {icon}
+      </div>
+      <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.15em] mb-1">{label}</p>
+      <p className="text-2xl font-black text-white leading-none">{value}</p>
+    </div>
+  );
+};
+
+const InsightRow = ({ icon, color, text }) => {
+  const colors = {
+    green: "bg-green-500/10 text-green-500 border-green-500/10",
+    orange: "bg-orange-500/10 text-orange-500 border-orange-500/10",
+    blue: "bg-blue-500/10 text-blue-500 border-blue-500/10",
+    white: "bg-white/5 text-white/70 border-white/10",
+  };
+
+  return (
+    <div className={`flex items-center gap-3 p-3 rounded-xl border ${colors[color]} animate-in slide-in-from-right-2 duration-500`}>
+      <div className="shrink-0">{icon}</div>
+      <span className="text-[11px] font-bold uppercase tracking-tight">{text}</span>
+    </div>
+  );
+};

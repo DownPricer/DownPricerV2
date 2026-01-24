@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Package, Search, Plus, Trash2 } from 'lucide-react';
+import { Package, Search, Plus, Trash2, Loader2, ArrowUpRight, Filter } from 'lucide-react';
 import api from '../../utils/api';
 
 export const ProArticles = () => {
@@ -19,22 +19,19 @@ export const ProArticles = () => {
       setArticles(response.data);
     } catch (error) {
       console.error('Erreur:', error);
-      if (error.response?.status === 403) {
-        navigate('/');
-      }
+      if (error.response?.status === 403) navigate('/');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (articleId) => {
-    if (window.confirm('Supprimer cet article ?')) {
+    if (window.confirm('Supprimer cet article définitivement ?')) {
       try {
         await api.delete(`/pro/articles/${articleId}`);
         setArticles(prev => prev.filter(article => article.id !== articleId));
       } catch (error) {
         console.error('Erreur:', error);
-        alert('Erreur lors de la suppression');
       }
     }
   };
@@ -45,98 +42,123 @@ export const ProArticles = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+      <div className="flex flex-col items-center justify-center h-screen bg-black">
+        <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
+        <p className="mt-4 text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">Chargement de l'inventaire...</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Mes articles</h1>
-          <p className="mt-2 text-gray-600">Gérez votre inventaire</p>
-        </div>
-        <Link
-          to="/pro/articles/new"
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-orange-500 hover:bg-orange-600"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Ajouter un article
-        </Link>
-      </div>
-
-      {/* Recherche */}
-      <div className="mb-6">
-        <div className="relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Rechercher..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-          />
-        </div>
-      </div>
-
-      {/* Liste des articles */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredArticles.map(article => (
-          <div key={article.id} className="bg-white rounded-lg shadow p-4">
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center">
-                <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center mr-3">
-                  <Package className="h-5 w-5 text-indigo-600" />
-                </div>
-                <div>
-                  <h3 className="font-medium text-gray-900">{article.name}</h3>
-                  <p className="text-sm text-gray-500">{article.purchase_platform}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => handleDelete(article.id)}
-                className="text-red-600 hover:text-red-800"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-            
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Prix d'achat</span>
-                <span className="font-medium">{article.purchase_price}€</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Prix estimé</span>
-                <span className="font-medium">{article.estimated_sale_price}€</span>
-              </div>
-              <div className="flex justify-between items-center pt-2 border-t">
-                <span className="text-gray-600">Statut</span>
-                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                  article.status === 'Vendu' ? 'bg-green-100 text-green-800' :
-                  article.status === 'À vendre' ? 'bg-blue-100 text-blue-800' :
-                  article.status === 'Perte' ? 'bg-red-100 text-red-800' :
-                  'bg-yellow-100 text-yellow-800'
-                }`}>
-                  {article.status}
-                </span>
-              </div>
-            </div>
-          </div>
-        ))}
+    <div className="min-h-screen bg-black text-white selection:bg-orange-500/30 pb-20">
+      <div className="max-w-7xl mx-auto px-6 py-10">
         
-        {filteredArticles.length === 0 && (
-          <div className="col-span-full text-center py-12">
-            <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500 mb-4">Aucun article trouvé</p>
+        {/* Header avec Titre et Action */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+          <div>
+            <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic" style={{ fontFamily: 'Outfit, sans-serif' }}>
+              Mon <span className="text-orange-500">Inventaire</span>
+            </h1>
+            <p className="mt-2 text-zinc-500 text-sm font-medium uppercase tracking-wider">Gérez vos stocks et suivez vos marges</p>
+          </div>
+          
+          <Link
+            to="/pro/articles/new"
+            className="inline-flex items-center px-6 py-3 bg-white hover:bg-zinc-200 text-black text-xs font-black uppercase tracking-widest rounded-full transition-all active:scale-95"
+          >
+            <Plus className="h-4 w-4 mr-2 stroke-[3px]" />
+            Nouveau Produit
+          </Link>
+        </div>
+
+        {/* Barre de Recherche OLED */}
+        <div className="mb-10 flex gap-4">
+          <div className="relative flex-1 group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-600 group-focus-within:text-orange-500 transition-colors" />
+            <input
+              type="text"
+              placeholder="Rechercher une référence, une plateforme..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-4 py-4 bg-[#080808] border border-white/5 rounded-2xl text-sm focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/10 transition-all"
+            />
+          </div>
+          <button className="hidden sm:flex items-center justify-center px-6 bg-[#080808] border border-white/5 rounded-2xl text-zinc-500 hover:text-white transition-colors">
+            <Filter size={18} />
+          </button>
+        </div>
+
+        {/* Grille d'Articles */}
+        {filteredArticles.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredArticles.map(article => (
+              <div 
+                key={article.id} 
+                className="bg-[#080808] border border-white/5 rounded-[1.5rem] p-6 hover:border-white/10 transition-all group relative overflow-hidden"
+              >
+                {/* Background Decor */}
+                <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 blur-2xl rounded-full -mr-10 -mt-10" />
+
+                <div className="flex items-start justify-between mb-6 relative z-10">
+                  <div className="flex items-center">
+                    <div className="h-12 w-12 rounded-xl bg-black border border-white/10 flex items-center justify-center mr-4 group-hover:border-orange-500/50 transition-colors">
+                      <Package className="h-6 w-6 text-zinc-600 group-hover:text-orange-500 transition-colors" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-white tracking-tight line-clamp-1">{article.name}</h3>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{article.purchase_platform}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleDelete(article.id)}
+                    className="p-2 text-zinc-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+                
+                <div className="space-y-3 mb-6 relative z-10">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Investissement</span>
+                    <span className="text-sm font-medium">{article.purchase_price}€</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Prix Estimé</span>
+                    <span className="text-sm font-black text-orange-500">{article.estimated_sale_price}€</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-4 border-t border-white/[0.03] relative z-10">
+                  <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-tighter ${
+                    article.status === 'Vendu' ? 'bg-green-500/10 text-green-500' :
+                    article.status === 'À vendre' ? 'bg-orange-500/10 text-orange-500' :
+                    'bg-white/5 text-zinc-500'
+                  }`}>
+                    {article.status}
+                  </span>
+                  
+                  <Link 
+                    to={`/pro/articles/${article.id}`}
+                    className="text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white flex items-center gap-1 transition-colors"
+                  >
+                    Détails <ArrowUpRight size={12} />
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* Empty State OLED */
+          <div className="flex flex-col items-center justify-center py-24 bg-[#080808] border border-white/5 rounded-[3rem]">
+            <div className="h-20 w-20 bg-black border border-white/5 rounded-full flex items-center justify-center mb-6">
+              <Package className="h-10 w-10 text-zinc-800" />
+            </div>
+            <p className="text-zinc-500 font-bold uppercase tracking-widest mb-6">Aucun article dans l'inventaire</p>
             <Link
               to="/pro/articles/new"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-orange-500 hover:bg-orange-600"
+              className="px-8 py-3 bg-white text-black text-xs font-black uppercase tracking-[0.2em] rounded-full hover:bg-zinc-200 transition-all"
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Ajouter un article
+              Ajouter votre premier stock
             </Link>
           </div>
         )}
@@ -144,5 +166,3 @@ export const ProArticles = () => {
     </div>
   );
 };
-
-
