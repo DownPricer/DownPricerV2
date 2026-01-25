@@ -125,3 +125,4 @@ Certaines pages rendent encore le Header individuellement (ex: `Home.jsx`, `MesD
 **🎉 Header global restauré avec succès !**
 
 
+

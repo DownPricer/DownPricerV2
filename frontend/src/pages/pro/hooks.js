@@ -88,3 +88,4 @@ export const compressImage = (file, maxWidth = 800, quality = 0.8) => {
 };
 
 
+
