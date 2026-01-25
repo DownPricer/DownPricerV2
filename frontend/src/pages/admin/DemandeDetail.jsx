@@ -1,25 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../../components/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import {
-  ArrowLeft,
-  User,
-  Package,
-  DollarSign,
-  Truck,
-  Calendar,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  Loader2,
-  CreditCard,
-  Hash,
-  Eye,
-} from 'lucide-react';
+import { ArrowLeft, User, Package, DollarSign, Truck, Calendar, CheckCircle, XCircle, AlertCircle, Loader2, CreditCard, Hash, Eye } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
 import { Textarea } from '../../components/ui/textarea';
@@ -33,6 +19,7 @@ export const AdminDemandeDetail = () => {
 
   const [demande, setDemande] = useState(null);
   const [client, setClient] = useState(null);
+
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
 
@@ -42,92 +29,126 @@ export const AdminDemandeDetail = () => {
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [depositPaymentUrl, setDepositPaymentUrl] = useState('');
 
-  useEffect(() => {
-    fetchDemandeDetail();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fetchDemandeDetail = useCallback(async (aliveRef) => {
+    try {
+      const [demandeRes, usersRes] = await Promise.all([
+        api.get(`/demandes/${id}`),
+        api.get('/admin/users'),
+      ]);
+
+      if (!aliveRef.alive) return;
+
+      const d = demandeRes.data;
+      setDemande(d);
+
+      const users = usersRes.data || [];
+      const found = users.find((u) => u.id === d.client_id) || null;
+      setClient(found);
+    } catch (error) {
+      if (!aliveRef.alive) return;
+      toast.error('Erreur lors du chargement');
+      // option: navigate back si tu veux
+      // navigate('/admin/demandes');
+    } finally {
+      if (aliveRef.alive) setLoading(false);
+    }
   }, [id]);
 
-  const fetchDemandeDetail = async () => {
-    try {
-      const response = await api.get(`/demandes/${id}`);
-      setDemande(response.data);
+  useEffect(() => {
+    const aliveRef = { alive: true };
+    setLoading(true);
+    fetchDemandeDetail(aliveRef);
+    return () => {
+      aliveRef.alive = false;
+    };
+  }, [fetchDemandeDetail]);
 
-      const usersResponse = await api.get('/admin/users');
-      const userFound = (usersResponse.data || []).find((u) => u.id === response.data.client_id);
-      setClient(userFound || null);
-    } catch (error) {
-      toast.error('Erreur lors du chargement');
-    }
-    setLoading(false);
-  };
+  const safeRefresh = useCallback(async () => {
+    const aliveRef = { alive: true };
+    await fetchDemandeDetail(aliveRef);
+    // pas de cleanup nécessaire ici (c'est une action user), mais on garde le pattern
+    aliveRef.alive = false;
+  }, [fetchDemandeDetail]);
 
-  const handleStatusChange = async (newStatus) => {
+  const handleStatusChange = useCallback(async (newStatus) => {
     setUpdating(true);
     try {
       await api.put(`/admin/demandes/${id}/status`, { status: newStatus });
       toast.success('Statut mis à jour');
-      fetchDemandeDetail();
+      await safeRefresh();
     } catch (error) {
       toast.error('Erreur technique');
+    } finally {
+      setUpdating(false);
     }
-    setUpdating(false);
-  };
+  }, [id, safeRefresh]);
 
-  const handleQuickAction = async (action) => {
-    setUpdating(true);
+  const handleQuickAction = useCallback(async (action) => {
     const statusMap = {
       accept: 'ACCEPTED',
       analysis: 'IN_ANALYSIS',
       proposal: 'PROPOSAL_FOUND',
       complete: 'COMPLETED',
     };
+
+    const status = statusMap[action];
+    if (!status) {
+      toast.error('Action invalide');
+      return;
+    }
+
+    setUpdating(true);
     try {
-      await api.put(`/admin/demandes/${id}/status`, { status: statusMap[action] });
+      await api.put(`/admin/demandes/${id}/status`, { status });
       toast.success(`Action : ${action} validée`);
-      fetchDemandeDetail();
+      await safeRefresh();
     } catch (error) {
       toast.error('Erreur de mise à jour');
+    } finally {
+      setUpdating(false);
     }
-    setUpdating(false);
-  };
+  }, [id, safeRefresh]);
 
-  const handleCancel = async () => {
+  const handleCancel = useCallback(async () => {
     if (!cancelReason.trim()) {
       toast.error('Raison obligatoire');
       return;
     }
+
     setUpdating(true);
     try {
-      await api.patch(`/admin/demandes/${id}/cancel`, { reason: cancelReason });
+      await api.patch(`/admin/demandes/${id}/cancel`, { reason: cancelReason.trim() });
       toast.success('Demande annulée');
       setShowCancelModal(false);
       setCancelReason('');
-      fetchDemandeDetail();
+      await safeRefresh();
     } catch (error) {
       toast.error("Erreur lors de l'annulation");
+    } finally {
+      setUpdating(false);
     }
-    setUpdating(false);
-  };
+  }, [id, cancelReason, safeRefresh]);
 
-  const handleRequestDeposit = async () => {
-    if (!depositPaymentUrl.trim()) {
+  const handleRequestDeposit = useCallback(async () => {
+    const url = depositPaymentUrl.trim();
+    if (!url) {
       toast.error('Lien Stripe manquant');
       return;
     }
+
     setUpdating(true);
     try {
-      await api.patch(`/admin/demandes/${id}/request-deposit`, {
-        deposit_payment_url: depositPaymentUrl.trim(),
-      });
+      await api.patch(`/admin/demandes/${id}/request-deposit`, { deposit_payment_url: url });
       toast.success('Acompte réclamé');
       setShowDepositModal(false);
       setDepositPaymentUrl('');
-      fetchDemandeDetail();
+      await safeRefresh();
     } catch (error) {
       toast.error('Erreur Stripe');
+    } finally {
+      setUpdating(false);
     }
-    setUpdating(false);
-  };
+  }, [id, depositPaymentUrl, safeRefresh]);
 
   if (loading) {
     return (
@@ -141,19 +162,21 @@ export const AdminDemandeDetail = () => {
 
   if (!demande) return null;
 
-  const statusUpper = String(demande.status || '').toUpperCase();
-  const canCancel = !['CANCELLED', 'COMPLETED'].includes(statusUpper);
+  const statusUpper = useMemo(() => String(demande.status || '').toUpperCase(), [demande.status]);
+  const canCancel = useMemo(() => !['CANCELLED', 'COMPLETED'].includes(statusUpper), [statusUpper]);
 
-  // Compat : certains statuts diffèrent selon tes pages
-  const showDepositAction =
-    statusUpper.includes('ANALYSIS') || statusUpper === 'AWAITING_DEPOSIT' || statusUpper === 'DEPOSIT_PENDING';
+  const showDepositAction = useMemo(() => (
+    statusUpper.includes('ANALYSIS') ||
+    statusUpper === 'AWAITING_DEPOSIT' ||
+    statusUpper === 'DEPOSIT_PENDING'
+  ), [statusUpper]);
 
   return (
     <AdminLayout>
-      {/* Fond moins noir + gradient */}
       <div className="min-h-screen text-white p-4 sm:p-6 md:p-12 selection:bg-orange-500/30 bg-gradient-to-b from-[#090909] via-[#070707] to-black">
         <div className="max-w-6xl mx-auto">
-          {/* Navigation + Header */}
+
+          {/* Header */}
           <div className="mb-8 md:mb-10">
             <button
               onClick={() => navigate('/admin/demandes')}
@@ -166,10 +189,7 @@ export const AdminDemandeDetail = () => {
             <div className="flex flex-col xl:flex-row justify-between items-start gap-8">
               <div className="w-full xl:w-auto">
                 <div className="flex flex-wrap items-center gap-3 mb-4">
-                  <h1
-                    className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tighter uppercase italic"
-                    style={{ fontFamily: 'Outfit, sans-serif' }}
-                  >
+                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tighter uppercase italic" style={{ fontFamily: 'Outfit, sans-serif' }}>
                     Détail <span className="text-orange-500">Sourcing</span>
                   </h1>
                   <Badge className={`${getStatusStyle(demande.status)} border rounded-full text-[9px] font-black uppercase px-3 py-1 whitespace-nowrap`}>
@@ -254,7 +274,8 @@ export const AdminDemandeDetail = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* MAIN */}
+
+            {/* Main */}
             <div className="lg:col-span-2 space-y-6">
               <Card className="bg-[#0E0E0E] border-white/10 ring-1 ring-white/[0.03] rounded-[1.5rem] md:rounded-[2rem] overflow-hidden hover:ring-white/[0.06] transition-all">
                 <CardHeader className="p-6 md:p-8 pb-0">
@@ -299,8 +320,8 @@ export const AdminDemandeDetail = () => {
                 </CardContent>
               </Card>
 
-              {/* PHOTOS */}
-              {demande.photos && demande.photos.length > 0 && (
+              {/* Photos */}
+              {Array.isArray(demande.photos) && demande.photos.length > 0 && (
                 <Card className="bg-[#0E0E0E] border-white/10 ring-1 ring-white/[0.03] rounded-[1.5rem] md:rounded-[2rem] overflow-hidden hover:ring-white/[0.06] transition-all">
                   <CardHeader className="p-6 md:p-8 pb-0">
                     <CardTitle className="text-[10px] sm:text-xs font-black uppercase tracking-[0.3em] text-zinc-500">
@@ -309,10 +330,7 @@ export const AdminDemandeDetail = () => {
                   </CardHeader>
                   <CardContent className="p-6 md:p-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                     {demande.photos.map((photo, index) => (
-                      <div
-                        key={index}
-                        className="aspect-square rounded-2xl overflow-hidden border border-white/10 bg-[#0B0B0B] group relative"
-                      >
+                      <div key={index} className="aspect-square rounded-2xl overflow-hidden border border-white/10 bg-[#0B0B0B] group relative">
                         <img
                           src={photo}
                           alt="Ref"
@@ -329,7 +347,7 @@ export const AdminDemandeDetail = () => {
               )}
             </div>
 
-            {/* SIDEBAR */}
+            {/* Sidebar */}
             <div className="space-y-6">
               <Card className="bg-[#0E0E0E] border-white/10 ring-1 ring-white/[0.03] rounded-[1.5rem] md:rounded-[2.5rem] shadow-2xl relative overflow-hidden hover:ring-white/[0.06] transition-all">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 blur-3xl rounded-full -mr-16 -mt-16" />
@@ -368,9 +386,7 @@ export const AdminDemandeDetail = () => {
                           <p className="text-sm font-bold text-white uppercase truncate">
                             {client.first_name} {client.last_name}
                           </p>
-                          <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">
-                            Membre S-Tier
-                          </p>
+                          <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Membre S-Tier</p>
                         </div>
                       </div>
 
@@ -396,7 +412,7 @@ export const AdminDemandeDetail = () => {
             </div>
           </div>
 
-          {/* MODAL CANCEL */}
+          {/* Cancel Modal */}
           <Dialog open={showCancelModal} onOpenChange={setShowCancelModal}>
             <DialogContent className="bg-[#0E0E0E] border-white/10 ring-1 ring-white/[0.03] text-white rounded-[1.5rem] sm:rounded-[2rem] p-6 md:p-10 w-[95vw] max-w-lg">
               <DialogHeader>
@@ -436,7 +452,7 @@ export const AdminDemandeDetail = () => {
             </DialogContent>
           </Dialog>
 
-          {/* MODAL DEPOSIT */}
+          {/* Deposit Modal */}
           <Dialog open={showDepositModal} onOpenChange={setShowDepositModal}>
             <DialogContent className="bg-[#0E0E0E] border-white/10 ring-1 ring-white/[0.03] text-white rounded-[1.5rem] sm:rounded-[2rem] p-6 md:p-10 w-[95vw] max-w-lg">
               <DialogHeader>
@@ -446,7 +462,9 @@ export const AdminDemandeDetail = () => {
               </DialogHeader>
 
               <div className="py-6 space-y-4">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Stripe Checkout URL</Label>
+                <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">
+                  Stripe Checkout URL
+                </Label>
                 <Input
                   type="url"
                   value={depositPaymentUrl}
@@ -474,6 +492,7 @@ export const AdminDemandeDetail = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
         </div>
       </div>
     </AdminLayout>

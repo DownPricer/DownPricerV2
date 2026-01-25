@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../../components/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -19,7 +19,7 @@ import {
   Calendar,
   Loader2,
   AlertCircle,
-  Package
+  Package,
 } from 'lucide-react';
 import api from '../../utils/api';
 import { toast } from 'sonner';
@@ -40,59 +40,114 @@ export const AdminVenteDetail = () => {
 
   const [actionLoading, setActionLoading] = useState(false);
 
-  useEffect(() => {
-    fetchVenteDetail();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
-  const fetchVenteDetail = async () => {
+  const fetchVenteDetail = useCallback(async (aliveRef) => {
     try {
       const response = await api.get(`/admin/sales/${id}`);
+      if (!aliveRef.alive) return;
       setData(response.data);
     } catch (error) {
+      if (!aliveRef.alive) return;
       toast.error('Vente non trouvée');
       navigate('/admin/ventes');
     } finally {
-      setLoading(false);
+      if (aliveRef.alive) setLoading(false);
     }
-  };
+  }, [id, navigate]);
 
-  const handleAction = async (endpoint, payload = {}, successMsg) => {
+  useEffect(() => {
+    const aliveRef = { alive: true };
+    setLoading(true);
+    fetchVenteDetail(aliveRef);
+
+    return () => {
+      aliveRef.alive = false;
+    };
+  }, [fetchVenteDetail]);
+
+  const resetDialogs = useCallback(() => {
+    setShowRejectDialog(false);
+    setShowShipDialog(false);
+    setRejectReason('');
+    setTrackingNumber('');
+  }, []);
+
+  const handleAction = useCallback(async (endpoint, payload = {}, successMsg) => {
     setActionLoading(true);
     try {
       await api.post(`/admin/sales/${id}/${endpoint}`, payload);
       toast.success(successMsg);
-      await fetchVenteDetail();
-      setShowRejectDialog(false);
-      setShowShipDialog(false);
-      setRejectReason('');
-      setTrackingNumber('');
+
+      // refresh (sans setState après unmount)
+      const aliveRef = { alive: true };
+      await fetchVenteDetail(aliveRef);
+      aliveRef.alive = false;
+
+      resetDialogs();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur technique');
+      toast.error(error?.response?.data?.detail || 'Erreur technique');
     } finally {
       setActionLoading(false);
     }
-  };
+  }, [fetchVenteDetail, id, resetDialogs]);
 
-  // --- Handlers cohérents avec tes routes déjà utilisées ailleurs ---
-  const handleValidate = () => handleAction('validate', {}, 'Vente approuvée');
-  const handleConfirmPayment = () => handleAction('confirm-payment', {}, 'Paiement confirmé');
-  const handleComplete = () => handleAction('complete', {}, 'Vente finalisée');
+  // Routes / endpoints cohérents
+  const handleValidate = useCallback(
+    () => handleAction('validate', {}, 'Vente approuvée'),
+    [handleAction]
+  );
 
-  const handleReject = () => {
-    if (!rejectReason.trim()) return toast.error('Motif obligatoire');
-    return handleAction('reject', { reason: rejectReason.trim() }, 'Vente refusée');
-  };
+  const handleConfirmPayment = useCallback(
+    () => handleAction('confirm-payment', {}, 'Paiement confirmé'),
+    [handleAction]
+  );
 
-  const handleRejectPayment = () => {
-    if (!rejectReason.trim()) return toast.error('Motif obligatoire');
-    return handleAction('reject-payment', { reason: rejectReason.trim() }, 'Paiement refusé');
-  };
+  const handleComplete = useCallback(
+    () => handleAction('complete', {}, 'Vente finalisée'),
+    [handleAction]
+  );
 
-  const handleMarkShipped = () => {
-    if (!trackingNumber.trim()) return toast.error('Tracking requis');
-    return handleAction('mark-shipped', { tracking_number: trackingNumber.trim() }, 'Expédition confirmée');
-  };
+  const handleReject = useCallback(() => {
+    if (!rejectReason.trim()) {
+      toast.error('Motif obligatoire');
+      return;
+    }
+    handleAction('reject', { reason: rejectReason.trim() }, 'Vente refusée');
+  }, [handleAction, rejectReason]);
+
+  const handleRejectPayment = useCallback(() => {
+    if (!rejectReason.trim()) {
+      toast.error('Motif obligatoire');
+      return;
+    }
+    handleAction('reject-payment', { reason: rejectReason.trim() }, 'Paiement refusé');
+  }, [handleAction, rejectReason]);
+
+  const handleMarkShipped = useCallback(() => {
+    if (!trackingNumber.trim()) {
+      toast.error('Tracking requis');
+      return;
+    }
+    handleAction('mark-shipped', { tracking_number: trackingNumber.trim() }, 'Expédition confirmée');
+  }, [handleAction, trackingNumber]);
+
+  const openProof = useCallback((url) => {
+    if (!url) return;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, []);
+
+  const sale = data?.sale;
+  const article = data?.article;
+  const seller = data?.seller;
+
+  const createdAtLabel = useMemo(() => {
+    if (!sale?.created_at) return '';
+    return new Date(sale.created_at).toLocaleString('fr-FR');
+  }, [sale?.created_at]);
+
+  const shortSaleId = useMemo(() => {
+    if (!sale?.id) return '';
+    return String(sale.id).slice(0, 8).toUpperCase();
+  }, [sale?.id]);
 
   if (loading) {
     return (
@@ -104,8 +159,7 @@ export const AdminVenteDetail = () => {
     );
   }
 
-  if (!data) return null;
-  const { sale, article, seller } = data;
+  if (!data || !sale) return null;
 
   return (
     <AdminLayout>
@@ -127,23 +181,23 @@ export const AdminVenteDetail = () => {
                   className="text-3xl md:text-4xl font-black tracking-tighter uppercase italic"
                   style={{ fontFamily: 'Outfit, sans-serif' }}
                 >
-                  Vente <span className="text-orange-500">#{sale.id.slice(0, 8).toUpperCase()}</span>
+                  Vente <span className="text-orange-500">#{shortSaleId}</span>
                 </h1>
                 <Badge className={`${getStatusStyle(sale.status)} border rounded-full text-[9px] font-black uppercase px-3 py-1`}>
                   {getStatusLabel(sale.status)}
                 </Badge>
               </div>
               <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                <Calendar size={12} /> {new Date(sale.created_at).toLocaleString('fr-FR')}
+                <Calendar size={12} /> {createdAtLabel}
               </p>
             </div>
           </div>
         </div>
 
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Info Column */}
+          {/* Main */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Financial Overview Card */}
+            {/* Financial */}
             <Card className="bg-[#0E0E0E] border-white/10 ring-1 ring-white/[0.03] rounded-[2rem] overflow-hidden shadow-2xl relative">
               <div className="absolute top-0 right-0 w-40 h-40 bg-orange-500/10 blur-3xl rounded-full -mr-16 -mt-16" />
               <CardHeader className="p-8 pb-0">
@@ -161,28 +215,31 @@ export const AdminVenteDetail = () => {
                     <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">Coût Vendeur</p>
                     <p className="text-3xl font-black text-zinc-300">{sale.seller_cost}€</p>
                   </div>
-                  <div className="relative">
+                  <div>
                     <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">Net DownPricer</p>
-                    <p className="text-3xl font-black text-emerald-400">+{sale.profit}€</p>
+                    <p className="text-3xl font-black text-emerald-400">
+                      +{Number.isFinite(sale.profit) ? sale.profit : 0}€
+                    </p>
                   </div>
                 </div>
 
-                {/* Proof of Payment */}
+                {/* Proof */}
                 {sale.payment_proof && (
                   <div className="mt-10 pt-8 border-t border-white/[0.06] space-y-4">
                     <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Preuve de Règlement</p>
                     <div className="p-5 bg-black/50 border border-white/10 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="space-y-1">
                         <p className="text-sm font-bold text-white uppercase">{sale.payment_method || 'Virement Manuel'}</p>
-                        {sale.payment_proof.note && (
+                        {sale.payment_proof?.note && (
                           <p className="text-xs text-zinc-400 italic">"{sale.payment_proof.note}"</p>
                         )}
                       </div>
-                      {sale.payment_proof.proof_url && (
+                      {sale.payment_proof?.proof_url && (
                         <Button
+                          type="button"
                           variant="outline"
                           className="rounded-xl border-white/10 bg-white hover:bg-zinc-200 text-black font-black uppercase text-[10px] px-6 h-10 shadow-lg shadow-white/5"
-                          onClick={() => window.open(sale.payment_proof.proof_url, '_blank')}
+                          onClick={() => openProof(sale.payment_proof.proof_url)}
                         >
                           <ExternalLink size={14} className="mr-2" /> Ouvrir Preuve
                         </Button>
@@ -206,7 +263,7 @@ export const AdminVenteDetail = () => {
               </CardContent>
             </Card>
 
-            {/* Article Detail Card */}
+            {/* Article */}
             <Card className="bg-[#0E0E0E] border-white/10 ring-1 ring-white/[0.03] rounded-[2rem] overflow-hidden">
               <CardContent className="p-8">
                 {article ? (
@@ -214,8 +271,8 @@ export const AdminVenteDetail = () => {
                     <div className="w-32 h-32 md:w-40 md:h-40 shrink-0 bg-black/60 rounded-3xl overflow-hidden border border-white/10 flex items-center justify-center">
                       {article.photos?.[0] ? (
                         <img
-                          src={resolveImageUrl(article.photos?.[0])}
-                          alt={article.name}
+                          src={resolveImageUrl(article.photos[0])}
+                          alt={article.name || 'Article'}
                           className="w-full h-full object-cover"
                           loading="lazy"
                         />
@@ -232,8 +289,8 @@ export const AdminVenteDetail = () => {
                         {article.description || 'Aucune description.'}
                       </p>
                       <div className="mt-6 flex flex-wrap justify-center sm:justify-start gap-4">
-                        <DataSnippet label="Ref. Price" value={`${article.reference_price}€`} />
-                        <DataSnippet label="Sale Price" value={`${article.price}€`} />
+                        <DataSnippet label="Ref. Price" value={`${article.reference_price ?? 0}€`} />
+                        <DataSnippet label="Sale Price" value={`${article.price ?? 0}€`} />
                       </div>
                     </div>
                   </div>
@@ -246,7 +303,7 @@ export const AdminVenteDetail = () => {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Seller Info */}
+            {/* Seller */}
             <Card className="bg-[#0E0E0E] border-white/10 ring-1 ring-white/[0.03] rounded-[2.5rem]">
               <CardHeader className="p-8 pb-4">
                 <CardTitle className="text-xs font-black uppercase tracking-[0.3em] text-zinc-400 flex items-center gap-3">
@@ -274,7 +331,7 @@ export const AdminVenteDetail = () => {
               </CardContent>
             </Card>
 
-            {/* Actions Panel */}
+            {/* Actions */}
             <Card className="bg-[#0E0E0E] border-orange-500/20 ring-1 ring-orange-500/[0.06] rounded-[2.5rem] overflow-hidden">
               <CardHeader className="p-8 pb-4 bg-orange-500/10 border-b border-orange-500/20">
                 <CardTitle className="text-xs font-black uppercase tracking-[0.3em] text-orange-400">
@@ -351,8 +408,6 @@ export const AdminVenteDetail = () => {
           </div>
         </div>
 
-        {/* --- MODALS --- */}
-
         {/* Reject Dialog */}
         <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
           <DialogContent className="bg-[#0B0B0B] border-red-500/20 text-white rounded-[2rem] p-8 max-w-lg">
@@ -361,6 +416,7 @@ export const AdminVenteDetail = () => {
                 <AlertCircle className="text-red-500" /> Annuler l'opération
               </DialogTitle>
             </DialogHeader>
+
             <div className="py-6 space-y-4">
               <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
                 Motif administratif (Obligatoire)
@@ -372,8 +428,10 @@ export const AdminVenteDetail = () => {
                 className="bg-[#0E0E0E] border-white/10 rounded-2xl min-h-[120px] focus:border-red-500/50 text-zinc-100 placeholder:text-zinc-700"
               />
             </div>
+
             <DialogFooter className="gap-2">
               <Button
+                type="button"
                 variant="ghost"
                 onClick={() => setShowRejectDialog(false)}
                 className="rounded-xl text-zinc-400 hover:text-white uppercase text-[10px] h-11"
@@ -381,6 +439,7 @@ export const AdminVenteDetail = () => {
                 Abandonner
               </Button>
               <Button
+                type="button"
                 disabled={actionLoading}
                 onClick={sale.status === 'PAYMENT_SUBMITTED' ? handleRejectPayment : handleReject}
                 className="bg-red-600 hover:bg-red-500 text-white font-black uppercase text-[10px] px-8 rounded-xl h-11"
@@ -399,6 +458,7 @@ export const AdminVenteDetail = () => {
                 Confirmation <span className="text-orange-500">Expédition</span>
               </DialogTitle>
             </DialogHeader>
+
             <div className="py-6 space-y-4">
               <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
                 Numéro de suivi (Tracking)
@@ -410,8 +470,10 @@ export const AdminVenteDetail = () => {
                 className="bg-[#0E0E0E] border-white/10 h-12 rounded-xl text-white placeholder:text-zinc-700 focus:border-orange-500/50"
               />
             </div>
+
             <DialogFooter>
               <Button
+                type="button"
                 disabled={actionLoading}
                 onClick={handleMarkShipped}
                 className="bg-orange-600 hover:bg-orange-500 text-white font-black uppercase text-[10px] w-full h-12 rounded-xl shadow-lg shadow-orange-900/10"
@@ -426,7 +488,8 @@ export const AdminVenteDetail = () => {
   );
 };
 
-// --- Sub-components ---
+// ---- Sub-components (simples, sans dépendances bizarres) ----
+
 const DataSnippet = ({ label, value }) => (
   <div className="bg-black/60 border border-white/10 px-4 py-2 rounded-xl">
     <p className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">{label}</p>
@@ -436,18 +499,15 @@ const DataSnippet = ({ label, value }) => (
 
 const MainAction = ({ label, color, icon, onClick, loading }) => {
   const colors = {
-    green:
-      'bg-emerald-500/10 text-emerald-300 border-emerald-500/20 hover:bg-emerald-500 hover:text-white shadow-emerald-900/10',
-    red:
-      'bg-red-500/10 text-red-300 border-red-500/20 hover:bg-red-500 hover:text-white shadow-red-900/10',
-    blue:
-      'bg-blue-500/10 text-blue-300 border-blue-500/20 hover:bg-blue-500 hover:text-white shadow-blue-900/10',
-    orange:
-      'bg-orange-500/10 text-orange-300 border-orange-500/20 hover:bg-orange-500 hover:text-white shadow-orange-900/10'
+    green: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20 hover:bg-emerald-500 hover:text-white shadow-emerald-900/10',
+    red: 'bg-red-500/10 text-red-300 border-red-500/20 hover:bg-red-500 hover:text-white shadow-red-900/10',
+    blue: 'bg-blue-500/10 text-blue-300 border-blue-500/20 hover:bg-blue-500 hover:text-white shadow-blue-900/10',
+    orange: 'bg-orange-500/10 text-orange-300 border-orange-500/20 hover:bg-orange-500 hover:text-white shadow-orange-900/10',
   };
 
   return (
     <Button
+      type="button"
       onClick={onClick}
       disabled={loading}
       className={`w-full justify-start h-12 px-6 rounded-2xl border font-black uppercase text-[10px] tracking-widest transition-all shadow-lg active:scale-[0.98] ${colors[color]}`}
@@ -470,7 +530,7 @@ const getStatusStyle = (status) => {
     SHIPPING_PENDING: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
     SHIPPED: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
     COMPLETED: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-    REJECTED: 'bg-red-500/10 text-red-400 border-red-500/20'
+    REJECTED: 'bg-red-500/10 text-red-400 border-red-500/20',
   };
   return map[status] || 'bg-white/5 text-zinc-300 border-white/10';
 };
@@ -483,7 +543,7 @@ const getStatusLabel = (status) => {
     SHIPPING_PENDING: 'Prêt Envoi',
     SHIPPED: 'En Transit',
     COMPLETED: 'Soldée',
-    REJECTED: 'Annulée'
+    REJECTED: 'Annulée',
   };
   return labels[status] || status;
 };
