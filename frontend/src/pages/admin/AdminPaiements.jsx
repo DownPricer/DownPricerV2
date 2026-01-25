@@ -41,7 +41,7 @@ export const AdminPaiementsPage = () => {
   const handleRejectPayment = async (saleId) => {
     const reason = prompt('Motif du refus (sera envoyé au vendeur):');
     if (!reason) return;
-    
+
     try {
       await api.post(`/admin/sales/${saleId}/reject-payment`, { reason });
       toast.success('Paiement refusé');
@@ -51,108 +51,117 @@ export const AdminPaiementsPage = () => {
     }
   };
 
-  const pendingSales = sales.filter(s => s.status === 'PAYMENT_SUBMITTED');
-  const confirmedSales = sales.filter(s => ['SHIPPING_PENDING', 'SHIPPED', 'COMPLETED'].includes(s.status));
+  const pendingSales = sales.filter((s) => s.status === 'PAYMENT_SUBMITTED');
+  const confirmedSales = sales.filter((s) => ['SHIPPING_PENDING', 'SHIPPED', 'COMPLETED'].includes(s.status));
 
-  const filteredPending = pendingSales.filter(s => 
-    s.article_name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredConfirmed = confirmedSales.filter(s => 
-    s.article_name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredPending = pendingSales.filter((s) => s.article_name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredConfirmed = confirmedSales.filter((s) => s.article_name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
     <AdminLayout>
-      <div className="min-h-screen bg-black text-white p-6 md:p-12 selection:bg-orange-500/30">
-        
-        {/* Header Section */}
-        <div className="mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[10px] font-black uppercase tracking-widest mb-4">
+      {/* Fond moins noir + gradient léger */}
+      <div className="min-h-screen text-white p-4 sm:p-6 md:p-12 selection:bg-orange-500/30 bg-gradient-to-b from-[#090909] via-[#070707] to-black">
+        {/* Header */}
+        <div className="mb-8 md:mb-12 max-w-7xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500 text-[9px] md:text-[10px] font-black uppercase tracking-widest mb-4">
             <DollarSign className="h-3 w-3" /> Audit financier
           </div>
-          <h2 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic" style={{ fontFamily: 'Outfit, sans-serif' }}>
+          <h2
+            className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tighter uppercase italic leading-tight"
+            style={{ fontFamily: 'Outfit, sans-serif' }}
+          >
             Gestion des <span className="text-orange-500">Paiements</span>
           </h2>
-          <p className="mt-2 text-zinc-500 text-sm font-medium uppercase tracking-wider italic">Vérification des preuves et validation des transactions</p>
+          <p className="mt-2 text-zinc-500 text-[10px] sm:text-sm font-medium uppercase tracking-wider italic">
+            Vérification des preuves et validation des transactions
+          </p>
         </div>
 
-        {/* Search Bar OLED */}
-        <div className="relative group max-w-md mb-10">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-600 group-focus-within:text-orange-500 transition-colors" />
-          <Input
-            placeholder="Rechercher une transaction, un article..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-[#080808] border-white/5 pl-12 h-12 rounded-2xl focus:border-orange-500/50 focus:ring-orange-500/10 text-white placeholder:text-zinc-700"
-          />
-        </div>
-
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
+        {/* Search */}
+        <div className="max-w-7xl mx-auto">
+          <div className="relative group max-w-md mb-8 md:mb-10">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-600 group-focus-within:text-orange-500 transition-colors" />
+            <Input
+              placeholder="Rechercher une transaction, un article..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-[#0E0E0E] border-white/10 ring-1 ring-white/[0.03] pl-12 h-12 rounded-2xl focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/20 text-white placeholder:text-zinc-600"
+            />
           </div>
-        ) : (
-          <Tabs defaultValue="pending" className="space-y-8">
-            <TabsList className="bg-[#080808] border border-white/5 p-1 rounded-full inline-flex h-12">
-              <TabsTrigger value="pending" className="rounded-full px-8 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-                <Clock className="h-3.5 w-3.5 mr-2" /> En attente ({pendingSales.length})
-              </TabsTrigger>
-              <TabsTrigger value="confirmed" className="rounded-full px-8 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-                <CheckCircle className="h-3.5 w-3.5 mr-2" /> Historique ({confirmedSales.length})
-              </TabsTrigger>
-            </TabsList>
 
-            <TabsContent value="pending" className="animate-in fade-in duration-500">
-              {filteredPending.length === 0 ? (
-                <EmptyState text="Aucun paiement en attente de validation" />
-              ) : (
-                <div className="grid gap-4">
-                  {filteredPending.map((sale) => (
-                    <PaymentCard 
-                      key={sale.id} 
-                      sale={sale} 
-                      isPending={true}
-                      onConfirm={() => handleConfirmPayment(sale.id)}
-                      onReject={() => handleRejectPayment(sale.id)}
-                    />
-                  ))}
-                </div>
-              )}
-            </TabsContent>
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
+            </div>
+          ) : (
+            <Tabs defaultValue="pending" className="space-y-8">
+              <TabsList className="bg-[#0E0E0E] border border-white/10 ring-1 ring-white/[0.03] p-1 rounded-full inline-flex h-12">
+                <TabsTrigger
+                  value="pending"
+                  className="rounded-full px-6 sm:px-8 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-orange-500 data-[state=active]:text-white"
+                >
+                  <Clock className="h-3.5 w-3.5 mr-2" /> En attente ({pendingSales.length})
+                </TabsTrigger>
+                <TabsTrigger
+                  value="confirmed"
+                  className="rounded-full px-6 sm:px-8 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-orange-500 data-[state=active]:text-white"
+                >
+                  <CheckCircle className="h-3.5 w-3.5 mr-2" /> Historique ({confirmedSales.length})
+                </TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="confirmed" className="animate-in fade-in duration-500">
-              {filteredConfirmed.length === 0 ? (
-                <EmptyState text="Aucun historique de paiement confirmé" />
-              ) : (
-                <div className="grid gap-4">
-                  {filteredConfirmed.map((sale) => (
-                    <PaymentCard key={sale.id} sale={sale} isPending={false} />
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        )}
+              <TabsContent value="pending" className="animate-in fade-in duration-500">
+                {filteredPending.length === 0 ? (
+                  <EmptyState text="Aucun paiement en attente de validation" />
+                ) : (
+                  <div className="grid gap-4">
+                    {filteredPending.map((sale) => (
+                      <PaymentCard
+                        key={sale.id}
+                        sale={sale}
+                        isPending={true}
+                        onConfirm={() => handleConfirmPayment(sale.id)}
+                        onReject={() => handleRejectPayment(sale.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="confirmed" className="animate-in fade-in duration-500">
+                {filteredConfirmed.length === 0 ? (
+                  <EmptyState text="Aucun historique de paiement confirmé" />
+                ) : (
+                  <div className="grid gap-4">
+                    {filteredConfirmed.map((sale) => (
+                      <PaymentCard key={sale.id} sale={sale} isPending={false} />
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          )}
+        </div>
       </div>
     </AdminLayout>
   );
 };
 
-// --- COMPOSANTS INTERNES ---
+// ---------------- INTERNAL COMPONENTS ----------------
 
 const PaymentCard = ({ sale, isPending, onConfirm, onReject }) => (
-  <Card className="bg-[#080808] border-white/5 rounded-[2rem] overflow-hidden hover:border-white/10 transition-all group">
-    <CardContent className="p-8">
+  <Card className="bg-[#0E0E0E] border-white/10 ring-1 ring-white/[0.03] rounded-[2rem] overflow-hidden hover:border-white/15 hover:bg-[#111111] hover:ring-white/[0.06] transition-all group">
+    <CardContent className="p-6 sm:p-8">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-        
         <div className="flex-1 space-y-4">
           <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-black border border-white/10 flex items-center justify-center text-zinc-600 group-hover:text-orange-500 transition-colors">
+            <div className="h-12 w-12 rounded-xl bg-[#0B0B0B] border border-white/10 flex items-center justify-center text-zinc-500 group-hover:text-orange-500 transition-colors">
               <Receipt size={24} />
             </div>
-            <div>
-              <h3 className="font-bold text-lg text-white group-hover:text-orange-500 transition-colors">{sale.article_name}</h3>
+            <div className="min-w-0">
+              <h3 className="font-bold text-lg text-white group-hover:text-orange-500 transition-colors truncate">
+                {sale.article_name}
+              </h3>
               <p className="text-[10px] font-black font-mono text-zinc-600 uppercase tracking-[0.2em] flex items-center gap-1">
                 <Hash size={10} /> {sale.id.slice(0, 8)}
               </p>
@@ -179,9 +188,9 @@ const PaymentCard = ({ sale, isPending, onConfirm, onReject }) => (
 
         <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto">
           {sale.payment_proof?.proof_url && (
-            <Button 
-              variant="outline" 
-              className="rounded-xl border-white/5 bg-black hover:bg-white/5 text-[10px] font-black uppercase tracking-widest h-12 px-6"
+            <Button
+              variant="outline"
+              className="rounded-xl border-white/10 bg-[#0B0B0B] hover:bg-white/5 text-[10px] font-black uppercase tracking-widest h-12 px-6"
               onClick={() => window.open(sale.payment_proof.proof_url, '_blank')}
             >
               <ExternalLink className="h-3.5 w-3.5 mr-2" /> Preuve
@@ -205,11 +214,13 @@ const PaymentCard = ({ sale, isPending, onConfirm, onReject }) => (
               </Button>
             </div>
           ) : (
-            <Badge className={`h-10 px-6 rounded-xl border font-black uppercase text-[10px] tracking-widest ${
-              sale.status === 'COMPLETED' 
-                ? 'bg-green-500/10 text-green-500 border-green-500/20' 
-                : 'bg-orange-500/10 text-orange-500 border-orange-500/20'
-            }`}>
+            <Badge
+              className={`h-10 px-6 rounded-xl border font-black uppercase text-[10px] tracking-widest ${
+                sale.status === 'COMPLETED'
+                  ? 'bg-green-500/10 text-green-500 border-green-500/20'
+                  : 'bg-orange-500/10 text-orange-500 border-orange-500/20'
+              }`}
+            >
               {sale.status === 'SHIPPING_PENDING' ? 'Payé (Prêt envoi)' : sale.status}
             </Badge>
           )}
@@ -220,10 +231,10 @@ const PaymentCard = ({ sale, isPending, onConfirm, onReject }) => (
 );
 
 const EmptyState = ({ text }) => (
-  <div className="bg-[#080808] border border-white/5 p-20 rounded-[3rem] text-center max-w-2xl mx-auto">
-    <div className="h-16 w-16 bg-black border border-white/5 rounded-full flex items-center justify-center mx-auto mb-6 text-zinc-800">
+  <div className="bg-[#0E0E0E] border border-white/10 ring-1 ring-white/[0.03] p-10 sm:p-20 rounded-2xl sm:rounded-[3rem] text-center max-w-2xl mx-auto">
+    <div className="h-16 w-16 bg-[#0B0B0B] border border-white/10 rounded-full flex items-center justify-center mx-auto mb-6 text-zinc-700">
       <Clock size={32} />
     </div>
-    <p className="text-zinc-600 text-xs font-bold uppercase tracking-[0.2em]">{text}</p>
+    <p className="text-zinc-500 text-[10px] sm:text-xs font-bold uppercase tracking-[0.2em]">{text}</p>
   </div>
 );
