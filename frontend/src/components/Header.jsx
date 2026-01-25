@@ -29,7 +29,7 @@ export const Header = () => {
     loadUser();
   }, [location.pathname]);
 
-  // Bloquer le scroll du site quand le menu est ouvert
+  // Bloquer le scroll du site quand le menu mobile est ouvert
   useEffect(() => {
     document.body.style.overflow = mobileMenuOpen ? 'hidden' : 'unset';
     return () => { document.body.style.overflow = 'unset'; };
@@ -49,7 +49,6 @@ export const Header = () => {
   };
 
   return (
-    /* HEADER AVEC DÉGRADÉ : NOIR EN BAS (from-black), GRIS EN HAUT (to-zinc-900) */
     <header className="sticky top-0 z-[100] w-full border-b border-white/[0.06] bg-gradient-to-t from-black to-zinc-900/95 backdrop-blur-xl">
       <div className="container mx-auto px-4 md:px-6">
         <div className="flex h-16 items-center justify-between gap-8">
@@ -75,7 +74,7 @@ export const Header = () => {
             </form>
           </div>
 
-          {/* DESKTOP NAV - TOUS TES BOUTONS SONT ICI */}
+          {/* DESKTOP NAV - TOUS TES BOUTONS DESKTOP COMPLETS */}
           <nav className="hidden md:flex items-center gap-1">
             {!user ? (
               <>
