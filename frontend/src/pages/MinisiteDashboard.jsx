@@ -726,27 +726,27 @@ export const MinisiteDashboard = () => {
 
   const pollTimeoutsRef = useRef([]);
   const isMountedRef = useRef(true);
+  const didRunRef = useRef(false);
 
   useEffect(() => {
+    if (didRunRef.current) return;
+    didRunRef.current = true;
     isMountedRef.current = true;
-    
+
     fetchMinisiteData();
     fetchSettings();
     fetchSubscription();
-    
+
     // Vérifier si on revient d'un paiement Stripe réussi
     const urlParams = new URLSearchParams(window.location.search);
     const stripeSuccess = urlParams.get('stripe');
     const sessionId = urlParams.get('session_id');
-    
+
     if (stripeSuccess === 'success' && sessionId) {
-      // Poller pour vérifier l'activation de l'abonnement
-      pollSubscriptionActivation();
-      
-      // Nettoyer l'URL
+      // Pas de polling ici: un seul check (déjà fait au mount)
       window.history.replaceState({}, '', window.location.pathname);
     }
-    
+
     // Cleanup: annuler tous les timeouts à l'unmount
     return () => {
       isMountedRef.current = false;
