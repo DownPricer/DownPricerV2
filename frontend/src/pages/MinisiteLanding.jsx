@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -8,36 +8,29 @@ import { Check, Globe, Zap, TrendingUp, MessageCircle, Users, Loader2, CreditCar
 import { getUser, getToken } from '../utils/auth';
 import api from '../utils/api';
 import { toast } from 'sonner';
-import { resolveMinisiteRoute } from '../utils/minisiteRoute';
 
 export const MinisiteLanding = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const [checkingMinisite, setCheckingMinisite] = useState(true);
   const [hasMinisite, setHasMinisite] = useState(false);
   const [startingCheckout, setStartingCheckout] = useState(false);
   const isMountedRef = useRef(true);
-
-  // Extraire les query params de manière stable (ne change que si location.search change)
-  const queryParams = useMemo(() => {
-    const params = new URLSearchParams(location.search);
-    return {
-      autopay: params.get('autopay'),
-      plan: params.get('plan')
-    };
-  }, [location.search]);
+  const didRunRef = useRef(false);
 
   useEffect(() => {
+    if (didRunRef.current) return;
+    didRunRef.current = true;
     isMountedRef.current = true;
     let cancelled = false;
-    
-    // Fonction unique pour résoudre la route minisite
+    const params = new URLSearchParams(window.location.search);
+    const autopay = params.get('autopay');
+    const plan = params.get('plan');
+
     const checkMinisite = async () => {
-      // Si pas de token et autopay demandé, rediriger vers login
       const token = getToken();
       if (!token) {
-        if (queryParams.autopay === '1' && queryParams.plan) {
-          navigate(`/login?redirect=/minisite?autopay=1&plan=${queryParams.plan}`, { replace: true });
+        if (autopay === '1' && plan) {
+          navigate(`/login?redirect=/minisite?autopay=1&plan=${plan}`, { replace: true });
           return;
         }
         if (isMountedRef.current && !cancelled) {
@@ -45,40 +38,61 @@ export const MinisiteLanding = () => {
         }
         return;
       }
-      
-      // Utiliser la fonction centralisée pour résoudre la route
-      const resolvedRoute = await resolveMinisiteRoute(navigate, () => cancelled);
-      
-      // Si une redirection a été effectuée, ne pas continuer
-      if (resolvedRoute && resolvedRoute !== null) {
-        return;
+
+      try {
+        const response = await api.get('/minisites/my');
+        if (cancelled) return;
+        if (response.data && response.data.id) {
+          navigate('/minisite/dashboard', { replace: true });
+          return;
+        }
+      } catch (error) {
+        if (cancelled) return;
+        const status = error.response?.status;
+        if (status === 404) {
+          try {
+            const userResponse = await api.get('/auth/me');
+            if (cancelled) return;
+            const user = userResponse.data;
+            const hasPlanRole = user.roles?.some(role =>
+              ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(role)
+            );
+            if (hasPlanRole) {
+              navigate('/minisite/create', { replace: true });
+              return;
+            }
+          } catch (userError) {
+            // Erreur lors de la vérification, rester sur la landing
+            console.error('Erreur lors de la vérification de l\'utilisateur:', userError);
+          }
+        } else if (status === 401 || status === 403) {
+          // Token manquant ou invalide -> rester sur la landing
+        } else {
+          console.error('Erreur lors de la vérification du minisite:', error);
+          toast.error('Erreur lors du chargement. Veuillez réessayer.');
+        }
       }
-      
-      // Pas de redirection nécessaire, afficher la page pricing
+
       if (isMountedRef.current && !cancelled) {
         setCheckingMinisite(false);
       }
 
-      // Vérifier si autopay est demandé (après login)
-      if (queryParams.autopay === '1' && queryParams.plan && 
-          (queryParams.plan === 'starter' || queryParams.plan === 'standard' || queryParams.plan === 'premium')) {
-        // Lancer automatiquement le checkout
+      if (autopay === '1' && plan && (plan === 'starter' || plan === 'standard' || plan === 'premium')) {
         setTimeout(() => {
           if (isMountedRef.current && !cancelled) {
-            startCheckout(queryParams.plan);
+            startCheckout(plan);
           }
         }, 500);
       }
     };
-    
+
     checkMinisite();
 
-    // Cleanup: marquer comme démonté et annulé
     return () => {
       cancelled = true;
       isMountedRef.current = false;
     };
-  }, [navigate, queryParams.autopay, queryParams.plan, startCheckout]);
+  }, []);
 
   const plans = [
     {

@@ -634,7 +634,6 @@
 // };
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { resolveMinisiteRoute } from '../utils/minisiteRoute';
 import { Header } from '../components/Header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -867,8 +866,7 @@ export const MinisiteDashboard = () => {
       
       if (status === 404) {
         // 404 = pas de minisite encore créé (CAS NORMAL)
-        // Utiliser resolveMinisiteRoute pour déterminer la bonne redirection
-        await resolveMinisiteRoute(navigate, () => !isMountedRef.current);
+        navigate('/minisite/create', { replace: true });
         return;
       } else if (status === 403) {
         // 403 = token manquant ou invalide
