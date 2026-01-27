@@ -634,6 +634,7 @@
 // };
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { resolveMinisiteRoute } from '../utils/minisiteRoute';
 import { Header } from '../components/Header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -847,31 +848,45 @@ export const MinisiteDashboard = () => {
   const fetchMinisiteData = async () => {
     try {
       const siteRes = await api.get('/minisites/my');
-      setMinisite(siteRes.data);
-      setSettingsForm({
-        site_name: siteRes.data.site_name,
-        logo_url: siteRes.data.logo_url || '',
-        welcome_text: siteRes.data.welcome_text || '',
-        template: siteRes.data.template || 'modern-grid',
-        primary_color: siteRes.data.primary_color || '#FF5722',
-        font_family: siteRes.data.font_family || 'Arial'
-      });
-      
-      const articlesResponse = await api.get(`/minisites/${siteRes.data.id}/articles`);
-      setArticles(articlesResponse.data);
+      if (isMountedRef.current) {
+        setMinisite(siteRes.data);
+        setSettingsForm({
+          site_name: siteRes.data.site_name,
+          logo_url: siteRes.data.logo_url || '',
+          welcome_text: siteRes.data.welcome_text || '',
+          template: siteRes.data.template || 'modern-grid',
+          primary_color: siteRes.data.primary_color || '#FF5722',
+          font_family: siteRes.data.font_family || 'Arial'
+        });
+        
+        const articlesResponse = await api.get(`/minisites/${siteRes.data.id}/articles`);
+        setArticles(articlesResponse.data);
+      }
     } catch (error) {
-      if (error.response?.status === 404) {
-        // 404 est normal si pas de minisite encore créé - ne pas logger comme erreur
-        // Rediriger directement vers la création pour éviter les boucles (avec replace pour éviter l'historique)
-        navigate('/minisite/create', { replace: true });
+      const status = error.response?.status;
+      
+      if (status === 404) {
+        // 404 = pas de minisite encore créé (CAS NORMAL)
+        // Utiliser resolveMinisiteRoute pour déterminer la bonne redirection
+        await resolveMinisiteRoute(navigate, () => !isMountedRef.current);
+        return;
+      } else if (status === 403) {
+        // 403 = token manquant ou invalide
+        console.error('Missing auth header? 403 on /minisites/my', error);
+        navigate('/login?redirect=/minisite/dashboard', { replace: true });
         return;
       } else {
         // Autre erreur => afficher un message d'erreur
         console.error('Erreur lors du chargement du minisite:', error);
-        toast.error('Erreur lors du chargement du dashboard');
+        if (isMountedRef.current) {
+          toast.error('Erreur lors du chargement du dashboard');
+        }
       }
     }
-    setLoading(false);
+    
+    if (isMountedRef.current) {
+      setLoading(false);
+    }
   };
 
   const fetchSettings = async () => {

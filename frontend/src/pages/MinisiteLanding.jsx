@@ -8,6 +8,7 @@ import { Check, Globe, Zap, TrendingUp, MessageCircle, Users, Loader2, CreditCar
 import { getUser, getToken } from '../utils/auth';
 import api from '../utils/api';
 import { toast } from 'sonner';
+import { resolveMinisiteRoute } from '../utils/minisiteRoute';
 
 export const MinisiteLanding = () => {
   const navigate = useNavigate();
@@ -28,62 +29,33 @@ export const MinisiteLanding = () => {
 
   useEffect(() => {
     isMountedRef.current = true;
+    let cancelled = false;
     
-    // Vérifier si l'utilisateur a déjà un mini-site
+    // Fonction unique pour résoudre la route minisite
     const checkMinisite = async () => {
+      // Si pas de token et autopay demandé, rediriger vers login
       const token = getToken();
       if (!token) {
-        if (isMountedRef.current) {
-          setCheckingMinisite(false);
-        }
-        // Vérifier si autopay est demandé après login
         if (queryParams.autopay === '1' && queryParams.plan) {
-          // Pas connecté mais autopay demandé -> rediriger vers login
           navigate(`/login?redirect=/minisite?autopay=1&plan=${queryParams.plan}`, { replace: true });
+          return;
+        }
+        if (isMountedRef.current && !cancelled) {
+          setCheckingMinisite(false);
         }
         return;
       }
       
-      try {
-        const response = await api.get('/minisites/my');
-        if (response.data && response.data.id) {
-          // L'utilisateur a un mini-site, rediriger vers le dashboard
-          if (isMountedRef.current) {
-            navigate('/minisite/dashboard', { replace: true });
-          }
-          return;
-        }
-      } catch (error) {
-        // Pas de mini-site : vérifier si l'utilisateur a un rôle plan
-        if (error.response?.status === 404) {
-          // 404 est normal si pas de minisite encore créé - ne pas logger comme erreur
-          try {
-            const userResponse = await api.get('/auth/me');
-            const user = userResponse.data;
-            const hasPlanRole = user.roles?.some(role => 
-              ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(role)
-            );
-            
-            if (hasPlanRole && isMountedRef.current) {
-              // L'utilisateur a un plan mais pas de minisite => rediriger vers la création
-              navigate('/minisite/create', { replace: true });
-              return;
-            }
-          } catch (userError) {
-            // Erreur lors de la vérification, continuer normalement
-            console.error('Erreur lors de la vérification de l\'utilisateur:', userError);
-          }
-        } else {
-          // Autre erreur (pas un 404) => afficher un message d'erreur
-          console.error('Erreur lors de la vérification du minisite:', error);
-          if (isMountedRef.current) {
-            toast.error('Erreur lors du chargement. Veuillez réessayer.');
-          }
-        }
-        // Pas de mini-site et pas de plan, afficher la page pricing
+      // Utiliser la fonction centralisée pour résoudre la route
+      const resolvedRoute = await resolveMinisiteRoute(navigate, () => cancelled);
+      
+      // Si une redirection a été effectuée, ne pas continuer
+      if (resolvedRoute && resolvedRoute !== null) {
+        return;
       }
       
-      if (isMountedRef.current) {
+      // Pas de redirection nécessaire, afficher la page pricing
+      if (isMountedRef.current && !cancelled) {
         setCheckingMinisite(false);
       }
 
@@ -92,7 +64,7 @@ export const MinisiteLanding = () => {
           (queryParams.plan === 'starter' || queryParams.plan === 'standard' || queryParams.plan === 'premium')) {
         // Lancer automatiquement le checkout
         setTimeout(() => {
-          if (isMountedRef.current) {
+          if (isMountedRef.current && !cancelled) {
             startCheckout(queryParams.plan);
           }
         }, 500);
@@ -101,8 +73,9 @@ export const MinisiteLanding = () => {
     
     checkMinisite();
 
-    // Cleanup: marquer comme démonté
+    // Cleanup: marquer comme démonté et annulé
     return () => {
+      cancelled = true;
       isMountedRef.current = false;
     };
   }, [navigate, queryParams.autopay, queryParams.plan, startCheckout]);

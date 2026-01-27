@@ -33,6 +33,11 @@ axiosInstance.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
+    // Log temporaire pour debug (peut être retiré en production)
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('AUTH HEADER SET', Boolean(token), config.url);
+    }
+    
     // Protection contre le double préfixe /api
     // Si l'URL commence par /api/api, corriger en /api
     if (config.url && config.url.startsWith('/api/api/')) {
