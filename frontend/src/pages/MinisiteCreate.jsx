@@ -30,30 +30,73 @@ export const MinisiteCreate = () => {
   useEffect(() => {
     const fetchPlan = async () => {
       try {
-        const response = await api.get('/billing/subscription');
-        if (response.data.has_subscription && response.data.site_plan) {
-          // Auto-sélectionner le plan depuis l'API (source de vérité unique)
-          setFormData(prev => ({ ...prev, plan_id: response.data.site_plan }));
-        } else {
-          // Pas d'abonnement actif, utiliser le plan depuis l'URL ou défaut
-          const planFromUrl = searchParams.get('plan');
-          if (planFromUrl && ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(planFromUrl)) {
-            setFormData(prev => ({ ...prev, plan_id: planFromUrl }));
-          } else {
-            // Pas de plan valide, rediriger vers la landing
-            navigate('/minisite');
-            return;
+        // 1. Essayer de récupérer le plan depuis /billing/subscription
+        const subscriptionResponse = await api.get('/billing/subscription');
+        const subscription = subscriptionResponse.data;
+        
+        let planId = null;
+        
+        // Priorité 1: site_plan (SITE_PLAN_1/2/3) - source de vérité
+        if (subscription.site_plan && ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(subscription.site_plan)) {
+          planId = subscription.site_plan;
+        }
+        // Priorité 2: mapper plan string (starter/standard/premium) vers SITE_PLAN_X
+        else if (subscription.plan) {
+          const planMapping = {
+            'starter': 'SITE_PLAN_1',
+            'standard': 'SITE_PLAN_2',
+            'premium': 'SITE_PLAN_3'
+          };
+          planId = planMapping[subscription.plan];
+        }
+        
+        // Si on a trouvé un plan, l'utiliser
+        if (planId) {
+          setFormData(prev => ({ ...prev, plan_id: planId }));
+          setLoadingPlan(false);
+          return;
+        }
+        
+        // Priorité 3: vérifier les rôles de l'utilisateur via /auth/me
+        if (subscription.has_subscription) {
+          try {
+            const userResponse = await api.get('/auth/me');
+            const user = userResponse.data;
+            const planRoles = user.roles?.filter(role => 
+              ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(role)
+            );
+            
+            if (planRoles && planRoles.length > 0) {
+              // Prendre le premier rôle plan trouvé (normalement il n'y en a qu'un)
+              planId = planRoles[0];
+              setFormData(prev => ({ ...prev, plan_id: planId }));
+              setLoadingPlan(false);
+              return;
+            }
+          } catch (userError) {
+            console.error('Error fetching user:', userError);
           }
         }
+        
+        // Priorité 4: utiliser le plan depuis l'URL (query param)
+        const planFromUrl = searchParams.get('plan');
+        if (planFromUrl && ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(planFromUrl)) {
+          setFormData(prev => ({ ...prev, plan_id: planFromUrl }));
+          setLoadingPlan(false);
+          return;
+        }
+        
+        // Aucun plan trouvé : rediriger vers la landing
+        navigate('/minisite', { replace: true });
       } catch (error) {
         console.error('Error fetching subscription:', error);
-        // En cas d'erreur, utiliser le plan depuis l'URL ou rediriger
+        // En cas d'erreur, essayer le plan depuis l'URL
         const planFromUrl = searchParams.get('plan');
         if (planFromUrl && ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(planFromUrl)) {
           setFormData(prev => ({ ...prev, plan_id: planFromUrl }));
         } else {
-          navigate('/minisite');
-          return;
+          // Pas de plan valide, rediriger vers la landing
+          navigate('/minisite', { replace: true });
         }
       } finally {
         setLoadingPlan(false);

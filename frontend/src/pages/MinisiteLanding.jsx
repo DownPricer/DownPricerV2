@@ -52,7 +52,7 @@ export const MinisiteLanding = () => {
             
             if (hasPlanRole) {
               // L'utilisateur a un plan mais pas de minisite => rediriger vers la création
-              navigate('/minisite/create');
+              navigate('/minisite/create', { replace: true });
               return;
             }
           } catch (userError) {

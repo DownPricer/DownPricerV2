@@ -632,7 +632,7 @@
 //     </div>
 //   );
 // };
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
@@ -724,7 +724,12 @@ export const MinisiteDashboard = () => {
     font_family: 'Arial'
   });
 
+  const pollTimeoutsRef = useRef([]);
+  const isMountedRef = useRef(true);
+
   useEffect(() => {
+    isMountedRef.current = true;
+    
     fetchMinisiteData();
     fetchSettings();
     fetchSubscription();
@@ -741,13 +746,23 @@ export const MinisiteDashboard = () => {
       // Nettoyer l'URL
       window.history.replaceState({}, '', window.location.pathname);
     }
+    
+    // Cleanup: annuler tous les timeouts à l'unmount
+    return () => {
+      isMountedRef.current = false;
+      pollTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+      pollTimeoutsRef.current = [];
+    };
   }, []);
   
-  const pollSubscriptionActivation = async (maxAttempts = 20) => {
+  const pollSubscriptionActivation = (maxAttempts = 20) => {
     let attempts = 0;
     const pollInterval = 2000; // 2 secondes
     
     const poll = async () => {
+      // Arrêter si le composant est démonté
+      if (!isMountedRef.current) return;
+      
       attempts++;
       
       try {
@@ -769,56 +784,64 @@ export const MinisiteDashboard = () => {
             const siteRes = await api.get('/minisites/my');
             if (siteRes.data && siteRes.data.id) {
               // Minisite créé !
-              toast.success('Abonnement activé avec succès !');
-              fetchMinisiteData();
-              fetchSubscription();
+              if (isMountedRef.current) {
+                toast.success('Abonnement activé avec succès !');
+                fetchMinisiteData();
+                fetchSubscription();
+              }
               return;
             } else {
               // Pas encore de minisite créé, continuer à poller
-              if (attempts < maxAttempts) {
-                setTimeout(poll, pollInterval);
-              } else {
+              if (attempts < maxAttempts && isMountedRef.current) {
+                const timeout = setTimeout(poll, pollInterval);
+                pollTimeoutsRef.current.push(timeout);
+              } else if (isMountedRef.current) {
                 // Après plusieurs tentatives, rediriger vers la création
                 toast.info('Abonnement activé ! Redirection vers la création de votre mini-site...');
-                navigate('/minisite/create');
-                return;
+                navigate('/minisite/create', { replace: true });
               }
+              return;
             }
           } catch (siteError) {
             // 404 est normal si pas de minisite encore créé
             if (siteError.response?.status === 404) {
               // Pas de minisite encore, continuer à poller
-              if (attempts < maxAttempts) {
-                setTimeout(poll, pollInterval);
-              } else {
+              if (attempts < maxAttempts && isMountedRef.current) {
+                const timeout = setTimeout(poll, pollInterval);
+                pollTimeoutsRef.current.push(timeout);
+              } else if (isMountedRef.current) {
                 // Après plusieurs tentatives, rediriger vers la création
                 toast.info('Abonnement activé ! Redirection vers la création de votre mini-site...');
-                navigate('/minisite/create');
-                return;
+                navigate('/minisite/create', { replace: true });
               }
+              return;
             } else {
               // Autre erreur => logger et continuer à poller
               console.error('Erreur lors de la vérification du minisite:', siteError);
-              if (attempts < maxAttempts) {
-                setTimeout(poll, pollInterval);
+              if (attempts < maxAttempts && isMountedRef.current) {
+                const timeout = setTimeout(poll, pollInterval);
+                pollTimeoutsRef.current.push(timeout);
               }
             }
           }
-        } else if (attempts < maxAttempts) {
-          setTimeout(poll, pollInterval);
-        } else {
+        } else if (attempts < maxAttempts && isMountedRef.current) {
+          const timeout = setTimeout(poll, pollInterval);
+          pollTimeoutsRef.current.push(timeout);
+        } else if (isMountedRef.current) {
           toast.warning('L\'activation prend plus de temps que prévu. Veuillez rafraîchir la page dans quelques instants.');
         }
       } catch (error) {
         console.error('Error polling subscription:', error);
-        if (attempts < maxAttempts) {
-          setTimeout(poll, pollInterval);
+        if (attempts < maxAttempts && isMountedRef.current) {
+          const timeout = setTimeout(poll, pollInterval);
+          pollTimeoutsRef.current.push(timeout);
         }
       }
     };
     
     // Démarrer le polling après un court délai
-    setTimeout(poll, 1000);
+    const initialTimeout = setTimeout(poll, 1000);
+    pollTimeoutsRef.current.push(initialTimeout);
   };
 
   const fetchMinisiteData = async () => {
@@ -839,8 +862,8 @@ export const MinisiteDashboard = () => {
     } catch (error) {
       if (error.response?.status === 404) {
         // 404 est normal si pas de minisite encore créé - ne pas logger comme erreur
-        // Rediriger directement vers la création pour éviter les boucles
-        navigate('/minisite/create');
+        // Rediriger directement vers la création pour éviter les boucles (avec replace pour éviter l'historique)
+        navigate('/minisite/create', { replace: true });
         return;
       } else {
         // Autre erreur => afficher un message d'erreur
