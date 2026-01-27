@@ -42,6 +42,7 @@ export const MinisiteLanding = () => {
       } catch (error) {
         // Pas de mini-site : vérifier si l'utilisateur a un rôle plan
         if (error.response?.status === 404) {
+          // 404 est normal si pas de minisite encore créé - ne pas logger comme erreur
           try {
             const userResponse = await api.get('/auth/me');
             const user = userResponse.data;
@@ -50,13 +51,18 @@ export const MinisiteLanding = () => {
             );
             
             if (hasPlanRole) {
-              // L'utilisateur a un plan mais pas de minisite => rediriger vers dashboard qui affichera le CTA
-              navigate('/minisite/dashboard');
+              // L'utilisateur a un plan mais pas de minisite => rediriger vers la création
+              navigate('/minisite/create');
               return;
             }
           } catch (userError) {
             // Erreur lors de la vérification, continuer normalement
+            console.error('Erreur lors de la vérification de l\'utilisateur:', userError);
           }
+        } else {
+          // Autre erreur (pas un 404) => afficher un message d'erreur
+          console.error('Erreur lors de la vérification du minisite:', error);
+          toast.error('Erreur lors du chargement. Veuillez réessayer.');
         }
         // Pas de mini-site et pas de plan, afficher la page pricing
       }

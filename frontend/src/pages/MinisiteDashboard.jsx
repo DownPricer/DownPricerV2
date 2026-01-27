@@ -778,20 +778,30 @@ export const MinisiteDashboard = () => {
               if (attempts < maxAttempts) {
                 setTimeout(poll, pollInterval);
               } else {
-                // Après plusieurs tentatives, proposer de créer le minisite
-                toast.info('Abonnement activé ! Vous pouvez maintenant configurer votre mini-site.');
-                fetchMinisiteData(); // Recharger pour afficher le CTA
-                fetchSubscription();
+                // Après plusieurs tentatives, rediriger vers la création
+                toast.info('Abonnement activé ! Redirection vers la création de votre mini-site...');
+                navigate('/minisite/create');
+                return;
               }
             }
           } catch (siteError) {
-            // Pas de minisite encore, continuer à poller
-            if (attempts < maxAttempts) {
-              setTimeout(poll, pollInterval);
+            // 404 est normal si pas de minisite encore créé
+            if (siteError.response?.status === 404) {
+              // Pas de minisite encore, continuer à poller
+              if (attempts < maxAttempts) {
+                setTimeout(poll, pollInterval);
+              } else {
+                // Après plusieurs tentatives, rediriger vers la création
+                toast.info('Abonnement activé ! Redirection vers la création de votre mini-site...');
+                navigate('/minisite/create');
+                return;
+              }
             } else {
-              toast.info('Abonnement activé ! Vous pouvez maintenant configurer votre mini-site.');
-              fetchMinisiteData();
-              fetchSubscription();
+              // Autre erreur => logger et continuer à poller
+              console.error('Erreur lors de la vérification du minisite:', siteError);
+              if (attempts < maxAttempts) {
+                setTimeout(poll, pollInterval);
+              }
             }
           }
         } else if (attempts < maxAttempts) {
@@ -828,26 +838,13 @@ export const MinisiteDashboard = () => {
       setArticles(articlesResponse.data);
     } catch (error) {
       if (error.response?.status === 404) {
-        // Pas de minisite : vérifier si l'utilisateur a un rôle plan
-        try {
-          const userRes = await api.get('/auth/me');
-          const user = userRes.data;
-          const hasPlanRole = user.roles?.some(role => 
-            ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(role)
-          );
-          
-          if (hasPlanRole) {
-            // L'utilisateur a un plan mais pas de minisite => proposer de créer
-            setMinisite(null); // Indique qu'il faut créer le minisite
-          } else {
-            // Pas de plan => rediriger vers la landing
-            navigate('/minisite');
-          }
-        } catch (userError) {
-          // Erreur lors de la vérification de l'utilisateur => rediriger vers landing
-          navigate('/minisite');
-        }
+        // 404 est normal si pas de minisite encore créé - ne pas logger comme erreur
+        // Rediriger directement vers la création pour éviter les boucles
+        navigate('/minisite/create');
+        return;
       } else {
+        // Autre erreur => afficher un message d'erreur
+        console.error('Erreur lors du chargement du minisite:', error);
         toast.error('Erreur lors du chargement du dashboard');
       }
     }
