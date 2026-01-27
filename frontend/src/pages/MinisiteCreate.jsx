@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { ArrowLeft } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'sonner';
-import { resolvePlanId } from '../utils/minisitePlan';
+import { validatePlanAccess, getUserPlanRole } from '../utils/minisiteAccess';
 
 export const MinisiteCreate = () => {
   const navigate = useNavigate();
@@ -38,45 +38,45 @@ export const MinisiteCreate = () => {
     return null;
   }, [location.search]);
 
-  // Charger le plan depuis l'API au montage du composant
+  // Charger et valider le plan au montage du composant
   useEffect(() => {
     isMountedRef.current = true;
     
-    const fetchPlan = async () => {
+    const fetchAndValidatePlan = async () => {
       try {
-        // Récupérer user et subscription en parallèle
-        const [userResponse, subscriptionResponse] = await Promise.all([
-          api.get('/auth/me').catch(() => ({ data: null })),
-          api.get('/billing/subscription').catch(() => ({ data: null }))
-        ]);
+        // Récupérer user pour valider l'accès
+        const userResponse = await api.get('/auth/me');
         
         if (!isMountedRef.current) return;
         
         const user = userResponse.data;
-        const subscription = subscriptionResponse.data;
         
-        // Utiliser resolvePlanId pour déterminer le plan (priorité: URL > roles > subscription)
-        const planId = resolvePlanId({
-          user,
-          subscription,
-          urlPlanParam: planFromUrl
-        });
+        // Valider que le plan dans l'URL correspond au rôle du user
+        const validPlan = validatePlanAccess(user, planFromUrl);
         
-        if (planId) {
-          // Plan trouvé => l'utiliser
-          setFormData(prev => ({ ...prev, plan_id: planId }));
-          setLoadingPlan(false);
-        } else {
-          // Aucun plan trouvé : rediriger vers la landing
-          console.warn('MinisiteCreate: Aucun plan trouvé, redirection vers /minisite');
+        if (!validPlan) {
+          // User n'a pas de plan => rediriger vers pricing
+          console.warn('MinisiteCreate: User n\'a pas de plan, redirection vers /minisite');
           navigate('/minisite', { replace: true });
+          return;
         }
+        
+        // Si le plan dans l'URL ne correspond pas, rediriger vers le bon plan
+        if (planFromUrl && planFromUrl !== validPlan) {
+          console.warn(`MinisiteCreate: Plan mismatch, redirecting to correct plan: ${validPlan}`);
+          navigate(`/minisite/create?plan=${validPlan}`, { replace: true });
+          return;
+        }
+        
+        // Plan valide => l'utiliser
+        setFormData(prev => ({ ...prev, plan_id: validPlan }));
+        setLoadingPlan(false);
       } catch (error) {
-        console.error('Error fetching plan data:', error);
+        console.error('Error fetching user data:', error);
         
         if (!isMountedRef.current) return;
         
-        // En cas d'erreur, essayer le plan depuis l'URL (dernier recours)
+        // En cas d'erreur, si on a un plan dans l'URL, l'utiliser (dernier recours)
         if (planFromUrl) {
           setFormData(prev => ({ ...prev, plan_id: planFromUrl }));
           setLoadingPlan(false);
@@ -91,7 +91,7 @@ export const MinisiteCreate = () => {
       }
     };
     
-    fetchPlan();
+    fetchAndValidatePlan();
 
     // Cleanup: marquer comme démonté
     return () => {

@@ -8,7 +8,7 @@ import { Check, Globe, Zap, TrendingUp, MessageCircle, Users, Loader2, CreditCar
 import { getUser, getToken } from '../utils/auth';
 import api from '../utils/api';
 import { toast } from 'sonner';
-import { resolvePlanId } from '../utils/minisitePlan';
+import { resolveMinisiteEntry, getUserPlanRole } from '../utils/minisiteAccess';
 
 export const MinisiteLanding = () => {
   const navigate = useNavigate();
@@ -46,75 +46,56 @@ export const MinisiteLanding = () => {
         return;
       }
 
-      // 1. Vérifier si minisite existe
-      let hasMinisite = false;
+      // Guard d'entrée : max 2 calls (/auth/me et /minisites/my)
       try {
-        const response = await api.get('/minisites/my');
+        // Appels en parallèle pour optimiser
+        const [userResponse, minisiteResponse] = await Promise.allSettled([
+          api.get('/auth/me'),
+          api.get('/minisites/my').catch(err => {
+            // 404 et 403 sont normaux (pas de minisite)
+            if (err.response?.status === 404 || err.response?.status === 403) {
+              return { data: null, exists: false };
+            }
+            throw err;
+          })
+        ]);
+
         if (cancelled) return;
-        if (response.data && response.data.id) {
-          hasMinisite = true;
-          navigate('/minisite/dashboard', { replace: true });
+
+        const user = userResponse.status === 'fulfilled' ? userResponse.value.data : null;
+        const minisiteExists = minisiteResponse.status === 'fulfilled' && 
+                               minisiteResponse.value.data?.id ? true : false;
+
+        // Résoudre la route d'entrée
+        const entryRoute = resolveMinisiteEntry(user, minisiteExists);
+
+        // Si on doit rediriger (pas pricing), le faire
+        if (entryRoute !== '/minisite') {
+          navigate(entryRoute, { replace: true });
           return;
         }
+
+        // Sinon, afficher pricing
+        if (isMountedRef.current && !cancelled) {
+          setCheckingMinisite(false);
+        }
+
+        if (autopay !== '1') {
+          sessionStorage.setItem(guardKey, '1');
+        }
+
+        if (autopay === '1' && plan && (plan === 'starter' || plan === 'standard' || plan === 'premium')) {
+          setTimeout(() => {
+            if (isMountedRef.current && !cancelled) {
+              startCheckout(plan);
+            }
+          }, 500);
+        }
       } catch (error) {
-        if (cancelled) return;
-        const status = error.response?.status;
-        // 404 = pas de minisite (normal), continuer pour vérifier le plan
-        // 403 = peut être ADMIN sans plan, continuer aussi
-        if (status !== 404 && status !== 403) {
-          console.error('Erreur lors de la vérification du minisite:', error);
-          if (status !== 401) {
-            toast.error('Erreur lors du chargement. Veuillez réessayer.');
-          }
+        console.error('Erreur lors de la vérification:', error);
+        if (isMountedRef.current && !cancelled) {
+          setCheckingMinisite(false);
         }
-      }
-
-      // 2. Si pas de minisite, vérifier le plan et rediriger vers create si nécessaire
-      if (!hasMinisite) {
-        try {
-          // Récupérer user et subscription en parallèle
-          const [userResponse, subscriptionResponse] = await Promise.all([
-            api.get('/auth/me').catch(() => ({ data: null })),
-            api.get('/billing/subscription').catch(() => ({ data: null }))
-          ]);
-          
-          if (cancelled) return;
-          
-          const user = userResponse.data;
-          const subscription = subscriptionResponse.data;
-          
-          // Résoudre le plan_id
-          const planId = resolvePlanId({
-            user,
-            subscription,
-            urlPlanParam: null // Pas de plan depuis URL ici
-          });
-          
-          if (planId) {
-            // Utilisateur a un plan => rediriger vers création
-            navigate(`/minisite/create?plan=${planId}`, { replace: true });
-            return;
-          }
-        } catch (error) {
-          console.error('Erreur lors de la vérification du plan:', error);
-        }
-      }
-
-      // Pas de plan ou erreur => afficher pricing
-      if (isMountedRef.current && !cancelled) {
-        setCheckingMinisite(false);
-      }
-
-      if (autopay !== '1') {
-        sessionStorage.setItem(guardKey, '1');
-      }
-
-      if (autopay === '1' && plan && (plan === 'starter' || plan === 'standard' || plan === 'premium')) {
-        setTimeout(() => {
-          if (isMountedRef.current && !cancelled) {
-            startCheckout(plan);
-          }
-        }, 500);
       }
     };
 

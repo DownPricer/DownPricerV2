@@ -634,7 +634,7 @@
 // };
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { resolvePlanId } from '../utils/minisitePlan';
+import { resolveMinisiteEntry, getUserPlanRole } from '../utils/minisiteAccess';
 import { Header } from '../components/Header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -869,33 +869,19 @@ export const MinisiteDashboard = () => {
         // 404 = pas de minisite encore créé (CAS NORMAL)
         // 403 = peut être ADMIN sans plan, vérifier quand même
         try {
-          // Récupérer user et subscription pour résoudre le plan
-          const [userResponse, subscriptionResponse] = await Promise.all([
-            api.get('/auth/me').catch(() => ({ data: null })),
-            api.get('/billing/subscription').catch(() => ({ data: null }))
-          ]);
+          // Récupérer user pour résoudre la route
+          const userResponse = await api.get('/auth/me');
           
           if (!isMountedRef.current) return;
           
           const user = userResponse.data;
-          const subscription = subscriptionResponse.data;
+          const minisiteExists = false; // On sait qu'il n'existe pas (404/403)
           
-          // Résoudre le plan_id
-          const planId = resolvePlanId({
-            user,
-            subscription,
-            urlPlanParam: null
-          });
-          
-          if (planId) {
-            // Utilisateur a un plan => rediriger vers création avec plan
-            navigate(`/minisite/create?plan=${planId}`, { replace: true });
-          } else {
-            // Pas de plan => rediriger vers landing pricing
-            navigate('/minisite', { replace: true });
-          }
+          // Résoudre la route d'entrée
+          const entryRoute = resolveMinisiteEntry(user, minisiteExists);
+          navigate(entryRoute, { replace: true });
         } catch (userError) {
-          console.error('Erreur lors de la vérification du plan:', userError);
+          console.error('Erreur lors de la vérification:', userError);
           // En cas d'erreur, rediriger vers landing
           if (isMountedRef.current) {
             navigate('/minisite', { replace: true });

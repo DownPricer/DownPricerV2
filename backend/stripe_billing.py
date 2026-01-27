@@ -158,8 +158,19 @@ async def create_checkout_session(
         
         logger.info(f"✅ Stripe customer ready - Customer ID: {customer_id}")
         
+        # Mapper le plan vers SITE_PLAN_X pour l'URL de succès
+        plan_mapping = {
+            "starter": "SITE_PLAN_1",
+            "standard": "SITE_PLAN_2",
+            "premium": "SITE_PLAN_3"
+        }
+        site_plan = plan_mapping.get(plan, "SITE_PLAN_1")  # Fallback sur SITE_PLAN_1
+        
+        # Construire l'URL de succès avec le plan dans l'URL
+        success_url_with_plan = f"{BASE_URL}/minisite/create?plan={site_plan}&stripe=success&session_id={{CHECKOUT_SESSION_ID}}"
+        
         # Créer la session Checkout
-        logger.info(f"🔄 Creating Stripe checkout session - Customer: {customer_id}, Price: {price_id}")
+        logger.info(f"🔄 Creating Stripe checkout session - Customer: {customer_id}, Price: {price_id}, Site Plan: {site_plan}")
         session = stripe.checkout.Session.create(
             customer=customer_id,
             payment_method_types=["card"],
@@ -168,7 +179,7 @@ async def create_checkout_session(
                 "quantity": 1,
             }],
             mode="subscription",
-            success_url=SUCCESS_URL,
+            success_url=success_url_with_plan,
             cancel_url=CANCEL_URL,
             metadata={
                 "user_id": user_id,

@@ -16,7 +16,9 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "./ui/dropdown-menu";
-import { getUser, logout, hasRole, hasSTier, refreshUser } from "../utils/auth";
+import { getUser, logout, hasRole, hasSTier, refreshUser, getToken } from "../utils/auth";
+import api from "../utils/api";
+import { resolveMinisiteEntry } from "../utils/minisiteAccess";
 
 export const Header = () => {
   const navigate = useNavigate();
@@ -63,6 +65,41 @@ export const Header = () => {
     navigate("/");
   };
 
+  const handleMinisiteClick = async () => {
+    const token = getToken();
+    if (!token) {
+      // Pas connecté => pricing
+      navigate("/minisite");
+      return;
+    }
+
+    try {
+      // Guard d'entrée : max 2 calls (/auth/me et /minisites/my)
+      const [userResponse, minisiteResponse] = await Promise.allSettled([
+        api.get('/auth/me'),
+        api.get('/minisites/my').catch(err => {
+          // 404 et 403 sont normaux (pas de minisite)
+          if (err.response?.status === 404 || err.response?.status === 403) {
+            return { data: null, exists: false };
+          }
+          throw err;
+        })
+      ]);
+
+      const user = userResponse.status === 'fulfilled' ? userResponse.value.data : null;
+      const minisiteExists = minisiteResponse.status === 'fulfilled' && 
+                             minisiteResponse.value.data?.id ? true : false;
+
+      // Résoudre la route d'entrée
+      const entryRoute = resolveMinisiteEntry(user, minisiteExists);
+      navigate(entryRoute);
+    } catch (error) {
+      console.error('Erreur lors de la vérification minisite:', error);
+      // En cas d'erreur, rediriger vers pricing
+      navigate("/minisite");
+    }
+  };
+
   return (
     <header
       className="sticky top-0 z-50 w-full border-b border-white/5 bg-gradient-to-t from-black to-zinc-900/95 backdrop-blur-sm"
@@ -96,7 +133,7 @@ export const Header = () => {
             {!user ? (
               <>
                 <NavLink onClick={() => navigate("/faire-demande")}>Demande</NavLink>
-                <NavLink onClick={() => navigate("/minisite")}>Mon Site</NavLink>
+                <NavLink onClick={handleMinisiteClick}>Mon Site</NavLink>
                 <NavLink onClick={() => navigate("/devenir-vendeur")}>Vendre</NavLink>
                 <div className="h-4 w-[1px] bg-white/10 mx-2" />
                 <Button
@@ -109,7 +146,7 @@ export const Header = () => {
             ) : (
               <div className="flex items-center gap-1">
                 {hasRole("CLIENT") && <NavLink onClick={() => navigate("/mes-demandes")}>Mes demandes</NavLink>}
-                <NavLink onClick={() => navigate("/minisite")}>Mon Site</NavLink>
+                <NavLink onClick={handleMinisiteClick}>Mon Site</NavLink>
 
                 {hasRole("SELLER") ? (
                   <NavLink onClick={() => navigate("/seller/dashboard")}>Vendeur</NavLink>
@@ -215,7 +252,7 @@ export const Header = () => {
                   </MobileNavLink>
                 )}
 
-                <MobileNavLink icon={LayoutDashboard} onClick={() => { navigate("/minisite"); closeMobile(); }}>
+                <MobileNavLink icon={LayoutDashboard} onClick={() => { handleMinisiteClick(); closeMobile(); }}>
                   Mon site
                 </MobileNavLink>
 
