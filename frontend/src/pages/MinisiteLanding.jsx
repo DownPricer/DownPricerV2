@@ -25,6 +25,12 @@ export const MinisiteLanding = () => {
     const params = new URLSearchParams(window.location.search);
     const autopay = params.get('autopay');
     const plan = params.get('plan');
+    const guardKey = 'minisiteLandingChecked';
+
+    if (autopay !== '1' && sessionStorage.getItem(guardKey) === '1') {
+      setCheckingMinisite(false);
+      return;
+    }
 
     const checkMinisite = async () => {
       const token = getToken();
@@ -75,6 +81,10 @@ export const MinisiteLanding = () => {
 
       if (isMountedRef.current && !cancelled) {
         setCheckingMinisite(false);
+      }
+
+      if (autopay !== '1') {
+        sessionStorage.setItem(guardKey, '1');
       }
 
       if (autopay === '1' && plan && (plan === 'starter' || plan === 'standard' || plan === 'premium')) {
