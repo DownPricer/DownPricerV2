@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -13,9 +13,10 @@ import { toast } from 'sonner';
 
 export const MinisiteCreate = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
   const [creating, setCreating] = useState(false);
   const [loadingPlan, setLoadingPlan] = useState(true);
+  const isMountedRef = useRef(true);
   const [formData, setFormData] = useState({
     site_name: '',
     slug: '',
@@ -26,8 +27,20 @@ export const MinisiteCreate = () => {
     font_family: 'Arial'
   });
 
+  // Extraire le plan depuis l'URL de manière stable
+  const planFromUrl = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const plan = params.get('plan');
+    if (plan && ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(plan)) {
+      return plan;
+    }
+    return null;
+  }, [location.search]);
+
   // Charger le plan depuis l'API au montage du composant
   useEffect(() => {
+    isMountedRef.current = true;
+    
     const fetchPlan = async () => {
       try {
         // 1. Essayer de récupérer le plan depuis /billing/subscription
@@ -51,7 +64,7 @@ export const MinisiteCreate = () => {
         }
         
         // Si on a trouvé un plan, l'utiliser
-        if (planId) {
+        if (planId && isMountedRef.current) {
           setFormData(prev => ({ ...prev, plan_id: planId }));
           setLoadingPlan(false);
           return;
@@ -66,7 +79,7 @@ export const MinisiteCreate = () => {
               ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(role)
             );
             
-            if (planRoles && planRoles.length > 0) {
+            if (planRoles && planRoles.length > 0 && isMountedRef.current) {
               // Prendre le premier rôle plan trouvé (normalement il n'y en a qu'un)
               planId = planRoles[0];
               setFormData(prev => ({ ...prev, plan_id: planId }));
@@ -79,31 +92,39 @@ export const MinisiteCreate = () => {
         }
         
         // Priorité 4: utiliser le plan depuis l'URL (query param)
-        const planFromUrl = searchParams.get('plan');
-        if (planFromUrl && ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(planFromUrl)) {
+        if (planFromUrl && isMountedRef.current) {
           setFormData(prev => ({ ...prev, plan_id: planFromUrl }));
           setLoadingPlan(false);
           return;
         }
         
         // Aucun plan trouvé : rediriger vers la landing
-        navigate('/minisite', { replace: true });
+        if (isMountedRef.current) {
+          navigate('/minisite', { replace: true });
+        }
       } catch (error) {
         console.error('Error fetching subscription:', error);
         // En cas d'erreur, essayer le plan depuis l'URL
-        const planFromUrl = searchParams.get('plan');
-        if (planFromUrl && ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(planFromUrl)) {
+        if (planFromUrl && isMountedRef.current) {
           setFormData(prev => ({ ...prev, plan_id: planFromUrl }));
-        } else {
+        } else if (isMountedRef.current) {
           // Pas de plan valide, rediriger vers la landing
           navigate('/minisite', { replace: true });
         }
       } finally {
-        setLoadingPlan(false);
+        if (isMountedRef.current) {
+          setLoadingPlan(false);
+        }
       }
     };
+    
     fetchPlan();
-  }, [navigate, searchParams]);
+
+    // Cleanup: marquer comme démonté
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [navigate, planFromUrl]);
 
   const generateSlug = (name) => {
     return name
@@ -134,7 +155,7 @@ export const MinisiteCreate = () => {
     try {
       const response = await api.post('/minisites', formData);
       toast.success('Mini-site créé avec succès !');
-      navigate('/minisite/dashboard');
+      navigate('/minisite/dashboard', { replace: true });
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erreur lors de la création');
     }

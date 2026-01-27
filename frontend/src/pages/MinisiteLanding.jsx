@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -11,23 +11,35 @@ import { toast } from 'sonner';
 
 export const MinisiteLanding = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
   const [checkingMinisite, setCheckingMinisite] = useState(true);
   const [hasMinisite, setHasMinisite] = useState(false);
   const [startingCheckout, setStartingCheckout] = useState(false);
+  const isMountedRef = useRef(true);
+
+  // Extraire les query params de manière stable (ne change que si location.search change)
+  const queryParams = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return {
+      autopay: params.get('autopay'),
+      plan: params.get('plan')
+    };
+  }, [location.search]);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    
     // Vérifier si l'utilisateur a déjà un mini-site
     const checkMinisite = async () => {
       const token = getToken();
       if (!token) {
-        setCheckingMinisite(false);
+        if (isMountedRef.current) {
+          setCheckingMinisite(false);
+        }
         // Vérifier si autopay est demandé après login
-        const autopay = searchParams.get('autopay');
-        const plan = searchParams.get('plan');
-        if (autopay === '1' && plan) {
+        if (queryParams.autopay === '1' && queryParams.plan) {
           // Pas connecté mais autopay demandé -> rediriger vers login
-          navigate(`/login?redirect=/minisite?autopay=1&plan=${plan}`);
+          navigate(`/login?redirect=/minisite?autopay=1&plan=${queryParams.plan}`, { replace: true });
         }
         return;
       }
@@ -36,7 +48,9 @@ export const MinisiteLanding = () => {
         const response = await api.get('/minisites/my');
         if (response.data && response.data.id) {
           // L'utilisateur a un mini-site, rediriger vers le dashboard
-          navigate('/minisite/dashboard');
+          if (isMountedRef.current) {
+            navigate('/minisite/dashboard', { replace: true });
+          }
           return;
         }
       } catch (error) {
@@ -50,7 +64,7 @@ export const MinisiteLanding = () => {
               ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(role)
             );
             
-            if (hasPlanRole) {
+            if (hasPlanRole && isMountedRef.current) {
               // L'utilisateur a un plan mais pas de minisite => rediriger vers la création
               navigate('/minisite/create', { replace: true });
               return;
@@ -62,25 +76,36 @@ export const MinisiteLanding = () => {
         } else {
           // Autre erreur (pas un 404) => afficher un message d'erreur
           console.error('Erreur lors de la vérification du minisite:', error);
-          toast.error('Erreur lors du chargement. Veuillez réessayer.');
+          if (isMountedRef.current) {
+            toast.error('Erreur lors du chargement. Veuillez réessayer.');
+          }
         }
         // Pas de mini-site et pas de plan, afficher la page pricing
       }
-      setCheckingMinisite(false);
+      
+      if (isMountedRef.current) {
+        setCheckingMinisite(false);
+      }
 
       // Vérifier si autopay est demandé (après login)
-      const autopay = searchParams.get('autopay');
-      const plan = searchParams.get('plan');
-      if (autopay === '1' && plan && (plan === 'starter' || plan === 'standard' || plan === 'premium')) {
+      if (queryParams.autopay === '1' && queryParams.plan && 
+          (queryParams.plan === 'starter' || queryParams.plan === 'standard' || queryParams.plan === 'premium')) {
         // Lancer automatiquement le checkout
         setTimeout(() => {
-          startCheckout(plan);
+          if (isMountedRef.current) {
+            startCheckout(queryParams.plan);
+          }
         }, 500);
       }
     };
     
     checkMinisite();
-  }, [navigate, searchParams]);
+
+    // Cleanup: marquer comme démonté
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [navigate, queryParams.autopay, queryParams.plan, startCheckout]);
 
   const plans = [
     {
@@ -141,7 +166,7 @@ export const MinisiteLanding = () => {
     }
   ];
 
-  const startCheckout = async (planKey) => {
+  const startCheckout = useCallback(async (planKey) => {
     if (!planKey || !['starter', 'standard', 'premium'].includes(planKey)) {
       toast.error('Plan invalide');
       return;
@@ -167,7 +192,7 @@ export const MinisiteLanding = () => {
     } finally {
       setStartingCheckout(false);
     }
-  };
+  }, []);
 
   const handleSelectPlan = (planKey) => {
     if (!getUser()) {
