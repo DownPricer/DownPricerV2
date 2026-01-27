@@ -8,6 +8,7 @@ import { Check, Globe, Zap, TrendingUp, MessageCircle, Users, Loader2, CreditCar
 import { getUser, getToken } from '../utils/auth';
 import api from '../utils/api';
 import { toast } from 'sonner';
+import { resolvePlanId } from '../utils/minisitePlan';
 
 export const MinisiteLanding = () => {
   const navigate = useNavigate();
@@ -45,43 +46,61 @@ export const MinisiteLanding = () => {
         return;
       }
 
+      // 1. Vérifier si minisite existe
+      let hasMinisite = false;
       try {
         const response = await api.get('/minisites/my');
         if (cancelled) return;
         if (response.data && response.data.id) {
+          hasMinisite = true;
           navigate('/minisite/dashboard', { replace: true });
           return;
         }
       } catch (error) {
         if (cancelled) return;
         const status = error.response?.status;
-        if (status === 404) {
-          try {
-            const userResponse = await api.get('/auth/me');
-            if (cancelled) return;
-            const user = userResponse.data;
-            const planRoles = user.roles?.filter(role =>
-              ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(role)
-            );
-            
-            if (planRoles && planRoles.length > 0) {
-              // Rediriger vers /minisite/create avec le plan en query param pour garantir la détection
-              const planId = planRoles[0];
-              navigate(`/minisite/create?plan=${planId}`, { replace: true });
-              return;
-            }
-          } catch (userError) {
-            // Erreur lors de la vérification, rester sur la landing
-            console.error('Erreur lors de la vérification de l\'utilisateur:', userError);
-          }
-        } else if (status === 401 || status === 403) {
-          // Token manquant ou invalide -> rester sur la landing
-        } else {
+        // 404 = pas de minisite (normal), continuer pour vérifier le plan
+        // 403 = peut être ADMIN sans plan, continuer aussi
+        if (status !== 404 && status !== 403) {
           console.error('Erreur lors de la vérification du minisite:', error);
-          toast.error('Erreur lors du chargement. Veuillez réessayer.');
+          if (status !== 401) {
+            toast.error('Erreur lors du chargement. Veuillez réessayer.');
+          }
         }
       }
 
+      // 2. Si pas de minisite, vérifier le plan et rediriger vers create si nécessaire
+      if (!hasMinisite) {
+        try {
+          // Récupérer user et subscription en parallèle
+          const [userResponse, subscriptionResponse] = await Promise.all([
+            api.get('/auth/me').catch(() => ({ data: null })),
+            api.get('/billing/subscription').catch(() => ({ data: null }))
+          ]);
+          
+          if (cancelled) return;
+          
+          const user = userResponse.data;
+          const subscription = subscriptionResponse.data;
+          
+          // Résoudre le plan_id
+          const planId = resolvePlanId({
+            user,
+            subscription,
+            urlPlanParam: null // Pas de plan depuis URL ici
+          });
+          
+          if (planId) {
+            // Utilisateur a un plan => rediriger vers création
+            navigate(`/minisite/create?plan=${planId}`, { replace: true });
+            return;
+          }
+        } catch (error) {
+          console.error('Erreur lors de la vérification du plan:', error);
+        }
+      }
+
+      // Pas de plan ou erreur => afficher pricing
       if (isMountedRef.current && !cancelled) {
         setCheckingMinisite(false);
       }

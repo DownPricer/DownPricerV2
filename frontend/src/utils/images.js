@@ -1,6 +1,7 @@
 /**
  * Résout une URL d'image pour l'affichage
  * Gère les URLs relatives, absolues et les placeholders
+ * Normalise les URLs pour éviter les erreurs de certificat SSL
  * 
  * @param {string|null|undefined} imageUrl - URL de l'image (peut être relative, absolue, ou vide)
  * @returns {string|null} - URL résolue ou null pour afficher un placeholder
@@ -12,15 +13,39 @@ export const resolveImageUrl = (imageUrl) => {
   }
 
   const trimmedUrl = imageUrl.trim();
-
-  // URL externe (http/https) : retourner tel quel
-  if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
-    return trimmedUrl;
-  }
+  const currentOrigin = window.location.origin; // https://downpricer.com
 
   // Data URL (base64) : retourner tel quel
   if (trimmedUrl.startsWith('data:')) {
     return trimmedUrl;
+  }
+
+  // URL externe (http/https) : normaliser si nécessaire
+  if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
+    try {
+      const url = new URL(trimmedUrl);
+      
+      // Si l'URL pointe vers un domaine/IP différent du domaine actuel, normaliser
+      // Cela évite les erreurs de certificat SSL (ERR_CERT_COMMON_NAME_INVALID)
+      if (url.origin !== currentOrigin) {
+        // Si c'est une URL vers /api/uploads/ ou /uploads/, utiliser le domaine actuel
+        if (url.pathname.startsWith('/api/uploads/') || url.pathname.startsWith('/uploads/')) {
+          return `${currentOrigin}${url.pathname}`;
+        }
+        
+        // Si c'est une IP ou un domaine différent, filtrer (probablement une mauvaise URL)
+        // On retourne null pour éviter les erreurs de certificat
+        console.warn('Image URL points to different domain/IP, filtering:', trimmedUrl);
+        return null;
+      }
+      
+      // URL externe valide vers le même domaine : retourner tel quel
+      return trimmedUrl;
+    } catch (e) {
+      // URL malformée : filtrer
+      console.warn('Invalid image URL format:', trimmedUrl);
+      return null;
+    }
   }
 
   // URL relative commençant par /api/uploads/ : convertir en /uploads/ (standard)
@@ -38,8 +63,11 @@ export const resolveImageUrl = (imageUrl) => {
     return trimmedUrl;
   }
 
-  // Filtrer les URLs d'exemple/test
-  if (trimmedUrl.includes('example.com') || trimmedUrl.includes('localhost:8001')) {
+  // Filtrer les URLs d'exemple/test/localhost
+  if (trimmedUrl.includes('example.com') || 
+      trimmedUrl.includes('localhost:') || 
+      trimmedUrl.includes('127.0.0.1') ||
+      /^\d+\.\d+\.\d+\.\d+/.test(trimmedUrl)) { // IP directe
     return null;
   }
 

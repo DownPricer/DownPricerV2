@@ -634,6 +634,7 @@
 // };
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { resolvePlanId } from '../utils/minisitePlan';
 import { Header } from '../components/Header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -864,35 +865,42 @@ export const MinisiteDashboard = () => {
     } catch (error) {
       const status = error.response?.status;
       
-      if (status === 404) {
+      if (status === 404 || status === 403) {
         // 404 = pas de minisite encore créé (CAS NORMAL)
-        // Essayer de récupérer le plan depuis les rôles pour le passer en query param
+        // 403 = peut être ADMIN sans plan, vérifier quand même
         try {
-          const userResponse = await api.get('/auth/me');
-          if (isMountedRef.current) {
-            const user = userResponse.data;
-            const planRoles = user.roles?.filter(role =>
-              ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(role)
-            );
-            
-            if (planRoles && planRoles.length > 0) {
-              const planId = planRoles[0];
-              navigate(`/minisite/create?plan=${planId}`, { replace: true });
-            } else {
-              navigate('/minisite/create', { replace: true });
-            }
+          // Récupérer user et subscription pour résoudre le plan
+          const [userResponse, subscriptionResponse] = await Promise.all([
+            api.get('/auth/me').catch(() => ({ data: null })),
+            api.get('/billing/subscription').catch(() => ({ data: null }))
+          ]);
+          
+          if (!isMountedRef.current) return;
+          
+          const user = userResponse.data;
+          const subscription = subscriptionResponse.data;
+          
+          // Résoudre le plan_id
+          const planId = resolvePlanId({
+            user,
+            subscription,
+            urlPlanParam: null
+          });
+          
+          if (planId) {
+            // Utilisateur a un plan => rediriger vers création avec plan
+            navigate(`/minisite/create?plan=${planId}`, { replace: true });
+          } else {
+            // Pas de plan => rediriger vers landing pricing
+            navigate('/minisite', { replace: true });
           }
         } catch (userError) {
-          // En cas d'erreur, rediriger quand même vers create (sans plan)
+          console.error('Erreur lors de la vérification du plan:', userError);
+          // En cas d'erreur, rediriger vers landing
           if (isMountedRef.current) {
-            navigate('/minisite/create', { replace: true });
+            navigate('/minisite', { replace: true });
           }
         }
-        return;
-      } else if (status === 403) {
-        // 403 = token manquant ou invalide
-        console.error('Missing auth header? 403 on /minisites/my', error);
-        navigate('/login?redirect=/minisite/dashboard', { replace: true });
         return;
       } else {
         // Autre erreur => afficher un message d'erreur
@@ -1088,7 +1096,7 @@ export const MinisiteDashboard = () => {
             <div className="flex items-center gap-4">
               <div className="h-16 w-16 bg-zinc-800 rounded-xl flex items-center justify-center border border-zinc-700 shadow-inner">
                 {minisite.logo_url ? (
-                   <img src={minisite.logo_url} alt="Logo" className="w-full h-full object-cover rounded-xl" />
+                   <SafeImage src={minisite.logo_url} alt="Logo" className="w-full h-full object-cover rounded-xl" />
                 ) : (
                   <Globe className="h-8 w-8 text-orange-500" />
                 )}
