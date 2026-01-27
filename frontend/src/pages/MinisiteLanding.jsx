@@ -60,11 +60,14 @@ export const MinisiteLanding = () => {
             const userResponse = await api.get('/auth/me');
             if (cancelled) return;
             const user = userResponse.data;
-            const hasPlanRole = user.roles?.some(role =>
+            const planRoles = user.roles?.filter(role =>
               ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(role)
             );
-            if (hasPlanRole) {
-              navigate('/minisite/create', { replace: true });
+            
+            if (planRoles && planRoles.length > 0) {
+              // Rediriger vers /minisite/create avec le plan en query param pour garantir la détection
+              const planId = planRoles[0];
+              navigate(`/minisite/create?plan=${planId}`, { replace: true });
               return;
             }
           } catch (userError) {

@@ -866,7 +866,28 @@ export const MinisiteDashboard = () => {
       
       if (status === 404) {
         // 404 = pas de minisite encore créé (CAS NORMAL)
-        navigate('/minisite/create', { replace: true });
+        // Essayer de récupérer le plan depuis les rôles pour le passer en query param
+        try {
+          const userResponse = await api.get('/auth/me');
+          if (isMountedRef.current) {
+            const user = userResponse.data;
+            const planRoles = user.roles?.filter(role =>
+              ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(role)
+            );
+            
+            if (planRoles && planRoles.length > 0) {
+              const planId = planRoles[0];
+              navigate(`/minisite/create?plan=${planId}`, { replace: true });
+            } else {
+              navigate('/minisite/create', { replace: true });
+            }
+          }
+        } catch (userError) {
+          // En cas d'erreur, rediriger quand même vers create (sans plan)
+          if (isMountedRef.current) {
+            navigate('/minisite/create', { replace: true });
+          }
+        }
         return;
       } else if (status === 403) {
         // 403 = token manquant ou invalide

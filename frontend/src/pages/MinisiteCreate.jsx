@@ -37,53 +37,63 @@ export const MinisiteCreate = () => {
     return null;
   }, [location.search]);
 
+  // Mapping plan string vers SITE_PLAN_X (utilisé plusieurs fois)
+  const planMapping = {
+    'starter': 'SITE_PLAN_1',
+    'standard': 'SITE_PLAN_2',
+    'premium': 'SITE_PLAN_3'
+  };
+
   // Charger le plan depuis l'API au montage du composant
   useEffect(() => {
     isMountedRef.current = true;
     
     const fetchPlan = async () => {
+      let planId = null;
+      
       try {
         // 1. Essayer de récupérer le plan depuis /billing/subscription
         const subscriptionResponse = await api.get('/billing/subscription');
         const subscription = subscriptionResponse.data;
         
-        let planId = null;
-        
-        // Priorité 1: site_plan (SITE_PLAN_1/2/3) - source de vérité
+        // Priorité 1: site_plan (SITE_PLAN_1/2/3) - source de vérité depuis le backend
         if (subscription.site_plan && ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(subscription.site_plan)) {
           planId = subscription.site_plan;
         }
         // Priorité 2: mapper plan string (starter/standard/premium) vers SITE_PLAN_X
-        else if (subscription.plan) {
-          const planMapping = {
-            'starter': 'SITE_PLAN_1',
-            'standard': 'SITE_PLAN_2',
-            'premium': 'SITE_PLAN_3'
-          };
+        else if (subscription.plan && planMapping[subscription.plan]) {
           planId = planMapping[subscription.plan];
         }
+        // Priorité 2b: mapper plan_key si présent
+        else if (subscription.plan_key && planMapping[subscription.plan_key]) {
+          planId = planMapping[subscription.plan_key];
+        }
         
-        // Si on a trouvé un plan, l'utiliser
+        // Si on a trouvé un plan depuis subscription, l'utiliser
         if (planId && isMountedRef.current) {
           setFormData(prev => ({ ...prev, plan_id: planId }));
           setLoadingPlan(false);
           return;
         }
         
-        // Priorité 3: vérifier les rôles de l'utilisateur via /auth/me
+        // Priorité 3: vérifier les rôles de l'utilisateur via /auth/me (si has_subscription)
         if (subscription.has_subscription) {
           try {
             const userResponse = await api.get('/auth/me');
+            if (!isMountedRef.current) return;
+            
             const user = userResponse.data;
             const planRoles = user.roles?.filter(role => 
               ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(role)
             );
             
-            if (planRoles && planRoles.length > 0 && isMountedRef.current) {
+            if (planRoles && planRoles.length > 0) {
               // Prendre le premier rôle plan trouvé (normalement il n'y en a qu'un)
               planId = planRoles[0];
-              setFormData(prev => ({ ...prev, plan_id: planId }));
-              setLoadingPlan(false);
+              if (isMountedRef.current) {
+                setFormData(prev => ({ ...prev, plan_id: planId }));
+                setLoadingPlan(false);
+              }
               return;
             }
           } catch (userError) {
@@ -99,15 +109,20 @@ export const MinisiteCreate = () => {
         }
         
         // Aucun plan trouvé : rediriger vers la landing
+        console.warn('MinisiteCreate: Aucun plan trouvé, redirection vers /minisite');
         if (isMountedRef.current) {
           navigate('/minisite', { replace: true });
         }
       } catch (error) {
         console.error('Error fetching subscription:', error);
+        
+        if (!isMountedRef.current) return;
+        
         // En cas d'erreur, essayer le plan depuis l'URL
-        if (planFromUrl && isMountedRef.current) {
+        if (planFromUrl) {
           setFormData(prev => ({ ...prev, plan_id: planFromUrl }));
-        } else if (isMountedRef.current) {
+          setLoadingPlan(false);
+        } else {
           // Pas de plan valide, rediriger vers la landing
           navigate('/minisite', { replace: true });
         }
@@ -124,7 +139,7 @@ export const MinisiteCreate = () => {
     return () => {
       isMountedRef.current = false;
     };
-  }, [navigate, planFromUrl]);
+  }, [navigate]); // Dépendances vides: planFromUrl lu une seule fois au début
 
   const generateSlug = (name) => {
     return name
