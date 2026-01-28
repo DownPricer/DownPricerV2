@@ -885,9 +885,8 @@ export const MinisitePublic = () => {
   };
 
   const handleArticleClick = (article) => {
-    setSelectedArticle(article);
-    setCurrentPhotoIndex(0);
-    setIsZoomed(false);
+    // Rediriger vers la page détail au lieu d'ouvrir une modal
+    window.location.href = `/s/${slug}/article/${article.id}`;
   };
 
   const closeModal = () => {
@@ -980,7 +979,7 @@ export const MinisitePublic = () => {
         )}
       </section>
 
-      {/* Footer */}
+      {/* Footer - Branding uniquement pour plan 1 */}
       {minisite.plan_id === 'SITE_PLAN_1' && (
         <footer className="border-t border-zinc-800 py-4 text-center">
           <p className="text-xs text-zinc-500">

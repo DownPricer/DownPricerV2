@@ -409,11 +409,13 @@ async def get_articles(
     
     # Filtrer pour ne garder que ceux dont le mini-site est actif et Premium
     for article in minisite_articles_raw:
-        minisite = await db.minisites.find_one({"id": article.get("minisite_id")}, {"_id": 0, "status": 1, "plan_id": 1})
+        minisite = await db.minisites.find_one({"id": article.get("minisite_id")}, {"_id": 0, "status": 1, "plan_id": 1, "user_id": 1})
         if minisite and minisite.get("status") == "active" and minisite.get("plan_id") == "SITE_PLAN_3":
             # Ajouter la source pour distinguer
             article["source"] = "minisite"
             article["minisite_id"] = article.get("minisite_id")
+            # Marquer comme vendeur tiers (créé par un user minisite, pas admin)
+            article["is_third_party"] = True
             # Filtrer par recherche si nécessaire (déjà fait dans la query MongoDB)
             if not search or search.lower() in article.get("name", "").lower() or search.lower() in article.get("description", "").lower():
                 all_articles.append(article)
@@ -1856,6 +1858,8 @@ async def add_minisite_article(site_id: str, article_data: MiniSiteArticleCreate
         "show_in_reseller_catalog": article_data.show_in_reseller_catalog,
         "condition": article_data.condition,
         "show_in_public_catalog": article_data.show_in_public_catalog,
+        "contact_email": article_data.contact_email,
+        "discord_tag": article_data.discord_tag,
         "created_at": now
     }
     
@@ -1910,7 +1914,9 @@ async def update_minisite_article(site_id: str, article_id: str, article_data: M
         "platform_links": article_data.platform_links,
         "show_in_reseller_catalog": article_data.show_in_reseller_catalog,
         "condition": article_data.condition,
-        "show_in_public_catalog": article_data.show_in_public_catalog
+        "show_in_public_catalog": article_data.show_in_public_catalog,
+        "contact_email": article_data.contact_email,
+        "discord_tag": article_data.discord_tag
     }
     
     result = await db.minisite_articles.update_one(

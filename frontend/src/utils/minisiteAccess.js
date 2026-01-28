@@ -4,6 +4,27 @@
  */
 
 /**
+ * Normalise un plan vers SITE_PLAN_1/2/3 (corrige les legacy SITE_PLAN_10/15)
+ * 
+ * @param {string|null|undefined} planStr - Plan à normaliser
+ * @returns {string|null} - 'SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3' ou null
+ */
+export const normalizePlan = (planStr) => {
+  if (!planStr) return null;
+  
+  // Mapping des plans legacy vers les plans normalisés
+  const planMapping = {
+    'SITE_PLAN_10': 'SITE_PLAN_2',
+    'SITE_PLAN_15': 'SITE_PLAN_3',
+    'SITE_PLAN_1': 'SITE_PLAN_1',
+    'SITE_PLAN_2': 'SITE_PLAN_2',
+    'SITE_PLAN_3': 'SITE_PLAN_3'
+  };
+  
+  return planMapping[planStr] || null;
+};
+
+/**
  * Extrait le rôle plan de l'utilisateur (SITE_PLAN_1, SITE_PLAN_2, ou SITE_PLAN_3)
  * ADMIN ne compte pas comme un plan
  * 
@@ -16,9 +37,10 @@ export const getUserPlanRole = (user) => {
   }
 
   // Chercher le premier rôle plan trouvé (un user ne peut avoir qu'un seul plan)
-  const planRoles = user.roles.filter(role =>
-    ['SITE_PLAN_1', 'SITE_PLAN_2', 'SITE_PLAN_3'].includes(role)
-  );
+  // Normaliser les plans legacy
+  const planRoles = user.roles
+    .map(role => normalizePlan(role))
+    .filter(role => role !== null);
 
   if (planRoles.length > 0) {
     return planRoles[0]; // Retourner le premier (normalement il n'y en a qu'un)

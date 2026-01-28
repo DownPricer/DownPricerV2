@@ -217,6 +217,10 @@ class MiniSiteArticle(BaseModel):
     condition: Optional[str] = None  # Neuf, Très bon état, Bon état, État correct, Pour pièces
     # Option pour afficher dans le catalogue public DownPricer (plan Premium uniquement)
     show_in_public_catalog: bool = False
+    # Email de contact pour articles dans catalogue public (vendeur tiers)
+    contact_email: Optional[str] = None
+    # Pseudo Discord pour articles B2B (plan 3)
+    discord_tag: Optional[str] = None
 
 class MiniSiteArticleCreate(BaseModel):
     name: str
@@ -228,6 +232,8 @@ class MiniSiteArticleCreate(BaseModel):
     show_in_reseller_catalog: bool = False
     condition: Optional[str] = None  # Neuf, Très bon état, Bon état, État correct, Pour pièces
     show_in_public_catalog: bool = False
+    contact_email: Optional[str] = None  # Email de contact pour catalogue public
+    discord_tag: Optional[str] = None  # Pseudo Discord pour B2B
 
 class Setting(BaseModel):
     model_config = ConfigDict(extra="ignore")

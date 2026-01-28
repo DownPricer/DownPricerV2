@@ -166,8 +166,16 @@ async def create_checkout_session(
         }
         site_plan = plan_mapping.get(plan, "SITE_PLAN_1")  # Fallback sur SITE_PLAN_1
         
-        # Construire l'URL de succès avec le plan dans l'URL
-        success_url_with_plan = f"{BASE_URL}/minisite/create?plan={site_plan}&stripe=success&session_id={{CHECKOUT_SESSION_ID}}"
+        # Vérifier si le minisite existe déjà pour déterminer l'URL de succès
+        # Si minisite existe -> dashboard, sinon -> create avec plan
+        minisite_exists = await db.minisites.find_one({"user_id": user_id, "status": {"$ne": "deleted"}})
+        
+        if minisite_exists:
+            # Minisite existe -> rediriger vers dashboard (upgrade)
+            success_url_with_plan = f"{BASE_URL}/minisite/dashboard?stripe=success&session_id={{CHECKOUT_SESSION_ID}}&plan={site_plan}"
+        else:
+            # Pas de minisite -> rediriger vers create
+            success_url_with_plan = f"{BASE_URL}/minisite/create?plan={site_plan}&stripe=success&session_id={{CHECKOUT_SESSION_ID}}"
         
         # Créer la session Checkout
         logger.info(f"🔄 Creating Stripe checkout session - Customer: {customer_id}, Price: {price_id}, Site Plan: {site_plan}")

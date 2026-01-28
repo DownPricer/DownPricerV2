@@ -186,9 +186,9 @@ export const Home = () => {
                     
                     {/* Badges Flottants */}
                     <div className="absolute top-2 left-2 flex flex-col gap-1">
-                      {article.from_minisite && (
+                      {(article.source === "minisite" || article.is_third_party) && (
                         <Badge className="bg-blue-600/90 backdrop-blur-sm text-white border-none shadow-sm hover:bg-blue-700">
-                          Partenaire
+                          Vendeur tiers
                         </Badge>
                       )}
                     </div>

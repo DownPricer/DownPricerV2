@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
@@ -10,26 +10,26 @@
         body, table, td {font-family: Arial, sans-serif !important;}
     </style>
     <![endif]-->
-</head>
+<!-- </head>
 <body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
         <tr>
             <td align="center" style="padding: 20px 0;">
                 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <!-- Header -->
-                    <tr>
+                    <!-- <tr>
                         <td style="background-color: #18181b; padding: 30px 20px; text-align: center;">
                             <h1 style="margin: 0; font-size: 24px; font-weight: 900; color: #f97316; font-family: 'Outfit', 'Arial Black', Arial, sans-serif; letter-spacing: -0.5px;">{{ brand_name }}</h1>
                         </td>
                     </tr>
                     <!-- Body -->
-                    <tr>
+                    <!-- <tr>
                         <td style="padding: 30px 20px;">
                             {{ content }}
                         </td>
                     </tr>
                     <!-- Footer -->
-                    <tr>
+                    <!-- <tr>
                         <td style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
                             <p style="margin: 0 0 10px 0; font-size: 12px; color: #6b7280; line-height: 1.6;">
                                 <strong style="color: #18181b;">{{ brand_name }}</strong><br>
@@ -44,9 +44,134 @@
             </td>
         </tr>
     </table>
+</body> 
+</html>  -->
+
+<!DOCTYPE html>
+<html lang="fr" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="x-apple-disable-message-reformatting">
+    <title>{{ title }}</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        /* --- RESET & BASE --- */
+        html, body { margin: 0 auto !important; padding: 0 !important; height: 100% !important; width: 100% !important; background-color: #09090b; }
+        * { -ms-text-size-adjust: 100%; -webkit-text-size-adjust: 100%; }
+        div[style*="margin: 16px 0"] { margin: 0 !important; }
+        table, td { mso-table-lspace: 0pt !important; mso-table-rspace: 0pt !important; }
+        table { border-spacing: 0 !important; border-collapse: collapse !important; table-layout: fixed !important; margin: 0 auto !important; }
+        img { -ms-interpolation-mode: bicubic; }
+        a { text-decoration: none; }
+
+        /* --- TYPOGRAPHIE GLOBALE --- */
+        .outfit { font-family: 'Outfit', Arial, sans-serif; }
+        p, td, li { font-family: 'Outfit', Arial, sans-serif; color: #a1a1aa; font-size: 16px; line-height: 1.6; }
+        h1, h2, h3 { color: #ffffff; font-family: 'Outfit', Arial, sans-serif; font-weight: 700; margin-top: 0; }
+        strong { color: #ffffff; font-weight: 600; }
+        
+        /* --- CLASSES UTILITAIRES (Pour le contenu injecté) --- */
+        
+        /* Bouton standard */
+        .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #f97316; /* Orange-500 */
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 15px;
+            margin: 20px 0;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(249, 115, 22, 0.2);
+        }
+        .button:hover { background-color: #ea580c; }
+
+        /* Liens texte */
+        .link { color: #f97316; text-decoration: underline; }
+
+        /* Boites d'info/alerte */
+        .info-box, .success-box, .warning-box {
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            font-size: 14px;
+            background-color: #27272a; /* Zinc-800 */
+            border-left-width: 4px;
+            border-left-style: solid;
+            color: #d4d4d8;
+        }
+        .info-box { border-left-color: #3b82f6; }    /* Bleu */
+        .success-box { border-left-color: #22c55e; } /* Vert */
+        .warning-box { border-left-color: #f97316; } /* Orange */
+
+        /* Tableaux de données simples */
+        .simple-table { width: 100%; border: 1px solid #27272a; border-radius: 8px; overflow: hidden; margin: 20px 0; }
+        .simple-table td { padding: 12px 15px; border-bottom: 1px solid #27272a; color: #d4d4d8; font-size: 14px; }
+        .simple-table td:first-child { color: #a1a1aa; width: 40%; background-color: #202023; border-right: 1px solid #27272a; font-weight: 500; }
+        .simple-table tr:last-child td { border-bottom: none; }
+
+        /* --- MOBILE --- */
+        @media only screen and (max-width: 600px) {
+            .email-container { width: 100% !important; max-width: 100% !important; }
+            .mobile-padding { padding-left: 20px !important; padding-right: 20px !important; }
+            .header-text { font-size: 24px !important; }
+        }
+    </style>
+</head>
+<body width="100%" style="margin: 0; padding: 0 !important; mso-line-height-rule: exactly; background-color: #09090b;">
+    <center style="width: 100%; background-color: #09090b;">
+        
+        <div style="height: 40px; line-height: 40px; font-size: 10px;">&nbsp;</div>
+
+        <table align="center" role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto;" class="email-container">
+            
+            <tr>
+                <td align="center" style="padding: 30px 0; background-color: #09090b;">
+                    <h1 class="outfit" style="margin: 0; font-size: 28px; font-weight: 800; color: #ffffff; letter-spacing: -1px; text-transform: uppercase;">
+                        Down<span style="color: #f97316;">Pricer</span>
+                    </h1>
+                </td>
+            </tr>
+
+            <tr>
+                <td bgcolor="#18181b" style="border-radius: 12px; border: 1px solid #27272a; padding: 40px;" class="mobile-padding">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                            <td class="outfit" style="color: #a1a1aa; font-size: 16px; line-height: 1.6;">
+                                
+                                {{ content }}
+                                </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <tr>
+                <td class="outfit" style="padding: 30px; text-align: center; font-size: 12px; color: #52525b;">
+                    <p style="margin: 0 0 10px 0;"><strong>{{ brand_name }}</strong></p>
+                    <p style="margin: 0 0 10px 0;">
+                        Pour toute question, contactez-nous à <a href="mailto:{{ support_email }}" style="color: #f97316; text-decoration: none;">{{ support_email }}</a>
+                    </p>
+                    <p style="margin: 0; opacity: 0.6;">
+                        Cet email a été envoyé automatiquement. Merci de ne pas y répondre.
+                    </p>
+                </td>
+            </tr>
+
+        </table>
+        
+        <div style="height: 40px; line-height: 40px; font-size: 10px;">&nbsp;</div>
+
+    </center>
 </body>
 </html>
 
-
-
-
+ 

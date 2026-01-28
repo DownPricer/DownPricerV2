@@ -136,6 +136,11 @@ export const ArticleDetail = () => {
 
           <div className="space-y-6">
             <div>
+              {(article.source === "minisite" || article.is_third_party) && (
+                <Badge className="bg-blue-600/90 backdrop-blur-sm text-white border-none shadow-sm hover:bg-blue-700 mb-3">
+                  Vendeur tiers
+                </Badge>
+              )}
               <h1 className="text-3xl md:text-4xl font-bold text-white mb-4" style={{fontFamily: 'Outfit, sans-serif'}}>
                 {article.name}
               </h1>
@@ -188,31 +193,60 @@ export const ArticleDetail = () => {
               </Card>
             )}
 
-            <Card className="bg-zinc-900 border-zinc-800">
-              <CardContent className="p-6 space-y-4">
-                <h2 className="text-xl font-semibold text-white">Remise en main propre</h2>
-                <p className="text-zinc-300 text-sm">
-                  Pour une remise en main propre (souvent moins cher), contactez-nous.
-                </p>
-                {settings.contact_phone && (
-                  <p className="text-white">
-                    Téléphone : <span className="text-orange-500">{settings.contact_phone}</span>
+            {/* Contact pour articles vendeur tiers */}
+            {(article.source === "minisite" || article.is_third_party) && article.contact_email && (
+              <Card className="bg-zinc-900 border-zinc-800">
+                <CardContent className="p-6 space-y-4">
+                  <h2 className="text-xl font-semibold text-white">Contact</h2>
+                  <p className="text-zinc-300 text-sm">
+                    Pour contacter le vendeur de cet article :
                   </p>
-                )}
-                {settings.contact_email && (
                   <p className="text-white">
-                    Email : <span className="text-orange-500">{settings.contact_email}</span>
+                    Email : <a href={`mailto:${article.contact_email}`} className="text-orange-500 hover:underline">{article.contact_email}</a>
                   </p>
-                )}
-                <Button
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white rounded-full"
-                  onClick={() => navigate('/faire-demande')}
-                  data-testid="article-request-btn"
-                >
-                  Demander une remise en main propre
-                </Button>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Remise en main propre uniquement pour articles admin */}
+            {article.source !== "minisite" && !article.is_third_party && (
+              <Card className="bg-zinc-900 border-zinc-800">
+                <CardContent className="p-6 space-y-4">
+                  <h2 className="text-xl font-semibold text-white">Remise en main propre</h2>
+                  <p className="text-zinc-300 text-sm">
+                    Pour une remise en main propre (souvent moins cher), contactez-nous.
+                  </p>
+                  {settings.contact_phone && (
+                    <p className="text-white">
+                      Téléphone : <span className="text-orange-500">{settings.contact_phone}</span>
+                    </p>
+                  )}
+                  {settings.contact_email && (
+                    <p className="text-white">
+                      Email : <span className="text-orange-500">{settings.contact_email}</span>
+                    </p>
+                  )}
+                  <Button
+                    className="w-full bg-orange-500 hover:bg-orange-600 text-white rounded-full"
+                    onClick={() => {
+                      const subject = encodeURIComponent(`Demande remise en main propre - DownPricer - ${article.name}`);
+                      const body = encodeURIComponent(
+                        `Bonjour,\n\nJe souhaite demander une remise en main propre pour l'article suivant :\n\n` +
+                        `- Nom : ${article.name}\n` +
+                        `- Prix : ${article.price}€\n` +
+                        `- ID : ${article.id}\n` +
+                        `- Lien : ${window.location.href}\n\n` +
+                        `Merci de me contacter pour organiser la remise.\n\nCordialement`
+                      );
+                      window.location.href = `mailto:${settings.contact_email || 'contact@downpricer.com'}?subject=${subject}&body=${body}`;
+                    }}
+                    data-testid="article-request-btn"
+                  >
+                    Demander une remise en main propre
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </main>

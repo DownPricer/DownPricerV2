@@ -382,6 +382,7 @@ import { MinisiteLanding } from './pages/MinisiteLanding';
 import { MinisiteCreate } from './pages/MinisiteCreate';
 import { MinisiteDashboard } from './pages/MinisiteDashboard';
 import { MinisitePublic } from './pages/MinisitePublic';
+import { MinisiteArticleDetail } from './pages/MinisiteArticleDetail';
 import { MinisiteUpgrade } from './pages/MinisiteUpgrade'; // Importé ici
 
 // --- PRO MODULE IMPORTS ---
@@ -504,6 +505,7 @@ function App() {
 
           {/* Route publique pour voir un minisite */}
           <Route path="/s/:slug" element={<MinisitePublic />} />
+          <Route path="/s/:slug/article/:id" element={<MinisiteArticleDetail />} />
           
           {/* Seller routes */}
           <Route

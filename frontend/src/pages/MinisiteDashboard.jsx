@@ -176,7 +176,7 @@
 //       });
 //       toast.success('Article ajouté');
 //       setShowArticleModal(false);
-//       setArticleForm({ name: '', description: '', photos: [], price: '', reference_price: '', platform_links: { vinted: '', leboncoin: '' }, show_in_reseller_catalog: false, condition: '', show_in_public_catalog: false });
+//       setArticleForm({ name: '', description: '', photos: [], price: '', reference_price: '', platform_links: { vinted: '', leboncoin: '' }, show_in_reseller_catalog: false, condition: '', show_in_public_catalog: false, contact_email: '', discord_tag: '' });
 //       fetchMinisiteData();
 //     } catch (error) {
 //       toast.error(error.response?.data?.detail || 'Erreur');
@@ -698,6 +698,7 @@ export const MinisiteDashboard = () => {
   const [showArticleModal, setShowArticleModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [editingArticleId, setEditingArticleId] = useState(null);
   
   // Logic state
   const [deleteReason, setDeleteReason] = useState('');
@@ -715,7 +716,9 @@ export const MinisiteDashboard = () => {
     platform_links: { vinted: '', leboncoin: '' },
     show_in_reseller_catalog: false,
     condition: '',
-    show_in_public_catalog: false
+    show_in_public_catalog: false,
+    contact_email: '',
+    discord_tag: ''
   });
 
   const [settingsForm, setSettingsForm] = useState({
@@ -975,17 +978,28 @@ export const MinisiteDashboard = () => {
       return;
     }
     try {
-      await api.post(`/minisites/${minisite.id}/articles`, {
+      const articleData = {
         ...articleForm,
         price: parseFloat(articleForm.price),
         reference_price: parseFloat(articleForm.reference_price) || parseFloat(articleForm.price)
-      });
-      toast.success('Article ajouté avec succès');
+      };
+      
+      if (editingArticleId) {
+        // Mise à jour d'un article existant
+        await api.put(`/minisites/${minisite.id}/articles/${editingArticleId}`, articleData);
+        toast.success('Article modifié avec succès');
+      } else {
+        // Création d'un nouvel article
+        await api.post(`/minisites/${minisite.id}/articles`, articleData);
+        toast.success('Article ajouté avec succès');
+      }
+      
       setShowArticleModal(false);
-      setArticleForm({ name: '', description: '', photos: [], price: '', reference_price: '', platform_links: { vinted: '', leboncoin: '' }, show_in_reseller_catalog: false, condition: '', show_in_public_catalog: false });
+      setEditingArticleId(null);
+      setArticleForm({ name: '', description: '', photos: [], price: '', reference_price: '', platform_links: { vinted: '', leboncoin: '' }, show_in_reseller_catalog: false, condition: '', show_in_public_catalog: false, contact_email: '', discord_tag: '' });
       fetchMinisiteData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erreur lors de l\'ajout');
+      toast.error(error.response?.data?.detail || 'Erreur lors de l\'opération');
     }
   };
 
@@ -1158,7 +1172,11 @@ export const MinisiteDashboard = () => {
 
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-bold text-white">Catalogue</h2>
-              <Button onClick={() => setShowArticleModal(true)} disabled={articles.length >= quota} className="bg-orange-500 hover:bg-orange-600 text-white">
+              <Button onClick={() => {
+              setEditingArticleId(null);
+              setArticleForm({ name: '', description: '', photos: [], price: '', reference_price: '', platform_links: { vinted: '', leboncoin: '' }, show_in_reseller_catalog: false, condition: '', show_in_public_catalog: false, contact_email: '', discord_tag: '' });
+              setShowArticleModal(true);
+            }} disabled={articles.length >= quota} className="bg-orange-500 hover:bg-orange-600 text-white">
                 <Plus className="h-4 w-4 mr-2" /> Nouvel article
               </Button>
             </div>
@@ -1177,7 +1195,28 @@ export const MinisiteDashboard = () => {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {articles.map((article) => (
-                  <Card key={article.id} className="bg-zinc-900 border-zinc-800 overflow-hidden group hover:border-zinc-700 transition-all duration-300">
+                  <Card 
+                    key={article.id} 
+                    className="bg-zinc-900 border-zinc-800 overflow-hidden group hover:border-zinc-700 transition-all duration-300 cursor-pointer"
+                    onClick={() => {
+                      // Remplir le formulaire avec les données de l'article
+                      setArticleForm({
+                        name: article.name,
+                        description: article.description || '',
+                        photos: article.photos || [],
+                        price: article.price.toString(),
+                        reference_price: article.reference_price.toString(),
+                        platform_links: article.platform_links || { vinted: '', leboncoin: '' },
+                        show_in_reseller_catalog: article.show_in_reseller_catalog || false,
+                        condition: article.condition || '',
+                        show_in_public_catalog: article.show_in_public_catalog || false,
+                        contact_email: article.contact_email || '',
+                        discord_tag: article.discord_tag || ''
+                      });
+                      setEditingArticleId(article.id);
+                      setShowArticleModal(true);
+                    }}
+                  >
                     <div className="relative aspect-square bg-zinc-800 overflow-hidden">
                       <SafeImage src={article.photos?.[0]} alt={article.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                       <div className="absolute top-2 right-2 flex flex-col gap-1">
@@ -1200,7 +1239,15 @@ export const MinisiteDashboard = () => {
                             {article.platform_links?.leboncoin && <div className="h-2 w-2 rounded-full bg-orange-400" title="Leboncoin" />}
                          </div>
                       </div>
-                      <Button variant="outline" size="sm" className="w-full border-zinc-700 hover:bg-red-950/30 hover:text-red-400 hover:border-red-900/50 transition-colors text-zinc-400" onClick={() => handleDeleteArticle(article.id)}>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full border-zinc-700 hover:bg-red-950/30 hover:text-red-400 hover:border-red-900/50 transition-colors text-zinc-400" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteArticle(article.id);
+                        }}
+                      >
                         <Trash2 className="h-3 w-3 mr-2" /> Supprimer
                       </Button>
                     </CardContent>
@@ -1347,9 +1394,15 @@ export const MinisiteDashboard = () => {
                             <Label>Nom du site</Label>
                             <Input value={settingsForm.site_name} onChange={(e) => setSettingsForm({...settingsForm, site_name: e.target.value})} className="bg-zinc-950 border-zinc-700 text-white" />
                          </div>
-                         <div className="space-y-2">
-                            <Label>Logo (URL)</Label>
-                            <Input value={settingsForm.logo_url} onChange={(e) => setSettingsForm({...settingsForm, logo_url: e.target.value})} placeholder="https://..." className="bg-zinc-950 border-zinc-700 text-white" />
+                         <div className="space-y-2 md:col-span-2">
+                            <Label>Logo</Label>
+                            <ImageUpload 
+                              images={settingsForm.logo_url ? [settingsForm.logo_url] : []} 
+                              onChange={(logos) => setSettingsForm({...settingsForm, logo_url: logos[0] || ''})} 
+                              maxImages={1}
+                              label="Logo du site"
+                              placeholder="https://exemple.com/logo.png"
+                            />
                          </div>
                       </div>
                       <div className="space-y-2">
@@ -1357,74 +1410,6 @@ export const MinisiteDashboard = () => {
                          <Textarea value={settingsForm.welcome_text} onChange={(e) => setSettingsForm({...settingsForm, welcome_text: e.target.value})} className="bg-zinc-950 border-zinc-700 text-white min-h-[100px]" />
                       </div>
                       <Button onClick={handleSaveSettings} className="bg-orange-600 hover:bg-orange-700">Enregistrer les infos</Button>
-                   </CardContent>
-                </Card>
-
-                {/* Subscription */}
-                <Card className="bg-zinc-900 border-zinc-800">
-                   <CardHeader><CardTitle>Abonnement</CardTitle></CardHeader>
-                   <CardContent className="space-y-4">
-                      {subscription?.has_subscription ? (
-                        <>
-                          <div className="flex items-center justify-between p-4 bg-zinc-950 rounded-lg border border-zinc-800">
-                             <div>
-                                <p className="font-bold text-white">
-                                  {subscription.plan === 'starter' ? 'Starter (1€/mois)' :
-                                   subscription.plan === 'standard' ? 'Standard (10€/mois)' :
-                                   subscription.plan === 'premium' ? 'Premium (15€/mois)' :
-                                   getPlanLabel(minisite.plan_id)}
-                                </p>
-                                <p className="text-xs text-zinc-500">
-                                  Statut: <span className={subscription.status === 'active' ? 'text-green-400' : subscription.status === 'trialing' ? 'text-blue-400' : 'text-yellow-400'}>
-                                    {subscription.status === 'active' ? 'Actif' :
-                                     subscription.status === 'trialing' ? 'Essai' :
-                                     subscription.status === 'canceled' ? 'Annulé' :
-                                     subscription.status === 'past_due' ? 'En retard' :
-                                     subscription.status}
-                                  </span>
-                                </p>
-                                {subscription.current_period_end && (
-                                  <p className="text-xs text-zinc-500 mt-1">
-                                    Prochaine échéance : {new Date(subscription.current_period_end).toLocaleDateString('fr-FR')}
-                                  </p>
-                                )}
-                             </div>
-                          </div>
-                          <Button 
-                            variant="outline" 
-                            className="w-full border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white" 
-                            onClick={handleManageSubscription}
-                          >
-                            <Settings className="h-4 w-4 mr-2" /> Gérer mon abonnement
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <div className="p-4 bg-zinc-950 rounded-lg border border-zinc-800 text-center">
-                            {paymentsEnabled ? (
-                              <>
-                                <p className="text-zinc-400 mb-4">Aucun abonnement actif</p>
-                                <div className="flex flex-col gap-2">
-                                  <Button size="sm" onClick={() => handleSubscribe('starter')} className="bg-green-600 hover:bg-green-700">
-                                    Souscrire Starter (1€/mois)
-                                  </Button>
-                                  <Button size="sm" onClick={() => handleSubscribe('standard')} className="bg-blue-600 hover:bg-blue-700">
-                                    Souscrire Standard (10€/mois)
-                                  </Button>
-                                  <Button size="sm" onClick={() => handleSubscribe('premium')} className="bg-purple-600 hover:bg-purple-700">
-                                    Souscrire Premium (15€/mois)
-                                  </Button>
-                                </div>
-                              </>
-                            ) : (
-                              <div>
-                                <p className="text-zinc-400 mb-2">Aucun abonnement actif</p>
-                                <p className="text-xs text-orange-500">Les paiements sont actuellement désactivés</p>
-                              </div>
-                            )}
-                          </div>
-                        </>
-                      )}
                    </CardContent>
                 </Card>
 
@@ -1449,8 +1434,8 @@ export const MinisiteDashboard = () => {
       <Dialog open={showArticleModal} onOpenChange={setShowArticleModal}>
         <DialogContent className="bg-zinc-900 text-white border-zinc-800 max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Ajouter un article</DialogTitle>
-            <DialogDescription>Remplissez les informations ci-dessous pour publier votre article.</DialogDescription>
+            <DialogTitle>{editingArticleId ? 'Modifier l\'article' : 'Ajouter un article'}</DialogTitle>
+            <DialogDescription>{editingArticleId ? 'Modifiez les informations de l\'article ci-dessous.' : 'Remplissez les informations ci-dessous pour publier votre article.'}</DialogDescription>
           </DialogHeader>
           <div className="space-y-6 py-4">
              <ImageUpload images={articleForm.photos} onChange={(photos) => setArticleForm({...articleForm, photos})} maxImages={5} label="Photos du produit" />
@@ -1501,26 +1486,62 @@ export const MinisiteDashboard = () => {
              </div>
 
              {features.canShowInResellerCatalog && (
-                <div className="flex items-center space-x-2 bg-blue-900/20 p-3 rounded-lg border border-blue-900/30">
-                   <input type="checkbox" id="reseller" checked={articleForm.show_in_reseller_catalog} onChange={(e) => setArticleForm({...articleForm, show_in_reseller_catalog: e.target.checked})} className="rounded border-zinc-700 bg-zinc-950 text-orange-500 focus:ring-orange-500" />
-                   <label htmlFor="reseller" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                      Rendre visible dans le catalogue revendeur (B2B)
-                   </label>
-                </div>
+                <>
+                  <div className="flex items-center space-x-2 bg-blue-900/20 p-3 rounded-lg border border-blue-900/30">
+                     <input type="checkbox" id="reseller" checked={articleForm.show_in_reseller_catalog} onChange={(e) => setArticleForm({...articleForm, show_in_reseller_catalog: e.target.checked})} className="rounded border-zinc-700 bg-zinc-950 text-orange-500 focus:ring-orange-500" />
+                     <label htmlFor="reseller" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        Rendre visible dans le catalogue revendeur (B2B)
+                     </label>
+                  </div>
+                  {articleForm.show_in_reseller_catalog && minisite?.plan_id === 'SITE_PLAN_3' && (
+                    <div className="space-y-2">
+                      <Label className="text-zinc-300">Pseudo Discord *</Label>
+                      <Input
+                        type="text"
+                        value={articleForm.discord_tag}
+                        onChange={(e) => setArticleForm({...articleForm, discord_tag: e.target.value})}
+                        placeholder="votre_pseudo#1234"
+                        required={articleForm.show_in_reseller_catalog}
+                        className="bg-zinc-800 border-zinc-700 text-white"
+                      />
+                      <p className="text-xs text-zinc-500">Votre pseudo Discord pour les contacts B2B</p>
+                    </div>
+                  )}
+                </>
              )}
 
              {minisite?.plan_id === 'SITE_PLAN_3' && (
-                <div className="flex items-center space-x-2 bg-purple-900/20 p-3 rounded-lg border border-purple-900/30">
-                   <input type="checkbox" id="public_catalog" checked={articleForm.show_in_public_catalog} onChange={(e) => setArticleForm({...articleForm, show_in_public_catalog: e.target.checked})} className="rounded border-zinc-700 bg-zinc-950 text-purple-500 focus:ring-purple-500" />
-                   <label htmlFor="public_catalog" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                      Afficher cet article dans le catalogue public DownPricer (downpricer.com)
-                   </label>
-                </div>
+                <>
+                  <div className="flex items-center space-x-2 bg-purple-900/20 p-3 rounded-lg border border-purple-900/30">
+                     <input type="checkbox" id="public_catalog" checked={articleForm.show_in_public_catalog} onChange={(e) => setArticleForm({...articleForm, show_in_public_catalog: e.target.checked})} className="rounded border-zinc-700 bg-zinc-950 text-purple-500 focus:ring-purple-500" />
+                     <label htmlFor="public_catalog" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        Afficher cet article dans le catalogue public DownPricer (downpricer.com)
+                     </label>
+                  </div>
+                  {articleForm.show_in_public_catalog && (
+                    <div className="space-y-2">
+                      <Label className="text-zinc-300">Email de contact *</Label>
+                      <Input
+                        type="email"
+                        value={articleForm.contact_email}
+                        onChange={(e) => setArticleForm({...articleForm, contact_email: e.target.value})}
+                        placeholder="votre@email.com"
+                        required={articleForm.show_in_public_catalog}
+                        className="bg-zinc-800 border-zinc-700 text-white"
+                      />
+                      <p className="text-xs text-zinc-500">Cet email sera affiché sur la page détail de l'article dans le catalogue public</p>
+                    </div>
+                  )}
+                </>
              )}
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowArticleModal(false)}>Annuler</Button>
-            <Button onClick={handleAddArticle} className="bg-orange-600 hover:bg-orange-700">Ajouter l'article</Button>
+            <Button variant="ghost" onClick={() => {
+              setShowArticleModal(false);
+              setEditingArticleId(null);
+              setArticleForm({ name: '', description: '', photos: [], price: '', reference_price: '', platform_links: { vinted: '', leboncoin: '' }, show_in_reseller_catalog: false, condition: '', show_in_public_catalog: false, contact_email: '', discord_tag: '' });
+            }}>Annuler</Button>
+            <Button onClick={handleAddArticle} className="bg-orange-600 hover:bg-orange-700">{editingArticleId ? 'Enregistrer les modifications' : 'Ajouter l\'article'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
