@@ -373,6 +373,7 @@ import { SellerVentes } from './pages/seller/SellerVentes';
 import { SellerTresorerie } from './pages/seller/SellerTresorerie';
 import { SellerStats } from './pages/seller/SellerStats';
 import { SellerArticleDetail } from './pages/seller/SellerArticleDetail';
+import { SellerArticleNew } from './pages/seller/SellerArticleNew';
 import { SellerPaiementsEnAttente } from './pages/seller/SellerPaiementsEnAttente';
 import { SellerVenteDetail } from './pages/seller/SellerVenteDetail';
 
@@ -526,6 +527,14 @@ function App() {
             element={
               <ProtectedRoute requiredRole="SELLER">
                 <SellerArticleDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/seller/articles/new"
+            element={
+              <ProtectedRoute requiredRole="SELLER">
+                <SellerArticleNew />
               </ProtectedRoute>
             }
           />

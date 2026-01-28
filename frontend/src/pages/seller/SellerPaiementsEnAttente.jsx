@@ -24,6 +24,8 @@ export const SellerPaiementsEnAttente = () => {
   const [proofUrl, setProofUrl] = useState('');
   const [proofNote, setProofNote] = useState('');
   const [proofLink, setProofLink] = useState('');
+  const [proofFile, setProofFile] = useState(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   
   const itemsPerPage = 10;
@@ -50,6 +52,37 @@ export const SellerPaiementsEnAttente = () => {
     setProofUrl('');
     setProofNote('');
     setProofLink('');
+    setProofFile(null);
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingFile(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await api.post('/upload/image?payment_proof=true&no_restrictions=true', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (response.data.success && response.data.url) {
+        setProofUrl(response.data.url);
+        toast.success('Fichier uploadé avec succès');
+      } else {
+        toast.error('Erreur lors de l\'upload');
+      }
+    } catch (error) {
+      const errorDetail = error.response?.data?.detail;
+      const errorMessage = typeof errorDetail === 'object' && errorDetail?.detail 
+        ? errorDetail.detail 
+        : (typeof errorDetail === 'string' ? errorDetail : error.message || 'Erreur lors de l\'upload');
+      toast.error(errorMessage);
+    }
+    setUploadingFile(false);
+    e.target.value = '';
   };
 
   const handleSubmitPayment = async () => {
@@ -233,17 +266,63 @@ export const SellerPaiementsEnAttente = () => {
               </div>
 
               {paymentMethod === 'paypal' && (
-                <div>
-                  <Label htmlFor="proof-url" className="text-zinc-300">Capture d'écran PayPal (URL)</Label>
-                  <Input
-                    id="proof-url"
-                    type="text"
-                    placeholder="https://exemple.com/capture.png"
-                    value={proofUrl}
-                    onChange={(e) => setProofUrl(e.target.value)}
-                    className="bg-zinc-800 border-zinc-700 text-white mt-1"
-                  />
-                  <p className="text-xs text-zinc-500 mt-1">Uploadez votre capture sur un hébergeur (Imgur, etc.) et collez le lien</p>
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="proof-file" className="text-zinc-300">Upload capture d'écran PayPal</Label>
+                    <div className="border-2 border-dashed border-zinc-600 rounded-lg p-4 text-center hover:border-orange-500/50 transition-colors bg-zinc-800/30 mt-1">
+                      <input
+                        type="file"
+                        accept="*/*"
+                        onChange={handleFileUpload}
+                        disabled={uploadingFile}
+                        className="hidden"
+                        id="proof-file"
+                      />
+                      <label 
+                        htmlFor="proof-file" 
+                        className={`cursor-pointer ${uploadingFile ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {uploadingFile ? (
+                          <p className="text-sm text-zinc-300">Upload en cours...</p>
+                        ) : proofUrl ? (
+                          <div className="space-y-2">
+                            <img src={proofUrl} alt="Capture" className="max-h-32 mx-auto rounded" />
+                            <p className="text-xs text-green-400">Capture uploadée ✓</p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setProofUrl('');
+                                setProofFile(null);
+                              }}
+                              className="text-xs"
+                            >
+                              Changer
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <Upload className="h-8 w-8 mx-auto mb-2 text-zinc-400" />
+                            <p className="text-sm text-zinc-300 font-medium">Cliquez pour uploader</p>
+                            <p className="text-xs text-zinc-500 mt-1">Tous formats acceptés, taille illimitée</p>
+                          </>
+                        )}
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="proof-url" className="text-zinc-300">Ou URL externe (optionnel)</Label>
+                    <Input
+                      id="proof-url"
+                      type="text"
+                      placeholder="https://exemple.com/capture.png"
+                      value={proofUrl}
+                      onChange={(e) => setProofUrl(e.target.value)}
+                      className="bg-zinc-800 border-zinc-700 text-white mt-1"
+                    />
+                  </div>
                 </div>
               )}
 
@@ -260,31 +339,125 @@ export const SellerPaiementsEnAttente = () => {
                       className="bg-zinc-800 border-zinc-700 text-white mt-1"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="proof-url-vinted" className="text-zinc-300">Capture d'écran (optionnel)</Label>
-                    <Input
-                      id="proof-url-vinted"
-                      type="text"
-                      placeholder="https://exemple.com/capture.png"
-                      value={proofUrl}
-                      onChange={(e) => setProofUrl(e.target.value)}
-                      className="bg-zinc-800 border-zinc-700 text-white mt-1"
-                    />
+                  <div className="space-y-3">
+                    <div>
+                      <Label htmlFor="proof-file-vinted" className="text-zinc-300">Upload capture d'écran (optionnel)</Label>
+                      <div className="border-2 border-dashed border-zinc-600 rounded-lg p-4 text-center hover:border-orange-500/50 transition-colors bg-zinc-800/30 mt-1">
+                        <input
+                          type="file"
+                          accept="*/*"
+                          onChange={handleFileUpload}
+                          disabled={uploadingFile}
+                          className="hidden"
+                          id="proof-file-vinted"
+                        />
+                        <label 
+                          htmlFor="proof-file-vinted" 
+                          className={`cursor-pointer ${uploadingFile ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          {uploadingFile ? (
+                            <p className="text-sm text-zinc-300">Upload en cours...</p>
+                          ) : proofUrl ? (
+                            <div className="space-y-2">
+                              <img src={proofUrl} alt="Capture" className="max-h-32 mx-auto rounded" />
+                              <p className="text-xs text-green-400">Capture uploadée ✓</p>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setProofUrl('');
+                                  setProofFile(null);
+                                }}
+                                className="text-xs"
+                              >
+                                Changer
+                              </Button>
+                            </div>
+                          ) : (
+                            <>
+                              <Upload className="h-8 w-8 mx-auto mb-2 text-zinc-400" />
+                              <p className="text-sm text-zinc-300 font-medium">Cliquez pour uploader</p>
+                              <p className="text-xs text-zinc-500 mt-1">Tous formats acceptés</p>
+                            </>
+                          )}
+                        </label>
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="proof-url-vinted" className="text-zinc-300">Ou URL externe (optionnel)</Label>
+                      <Input
+                        id="proof-url-vinted"
+                        type="text"
+                        placeholder="https://exemple.com/capture.png"
+                        value={proofUrl}
+                        onChange={(e) => setProofUrl(e.target.value)}
+                        className="bg-zinc-800 border-zinc-700 text-white mt-1"
+                      />
+                    </div>
                   </div>
                 </>
               )}
 
               {paymentMethod === 'autre' && (
-                <div>
-                  <Label htmlFor="proof-url-autre" className="text-zinc-300">Preuve de paiement (URL)</Label>
-                  <Input
-                    id="proof-url-autre"
-                    type="text"
-                    placeholder="https://exemple.com/preuve.png"
-                    value={proofUrl}
-                    onChange={(e) => setProofUrl(e.target.value)}
-                    className="bg-zinc-800 border-zinc-700 text-white mt-1"
-                  />
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="proof-file-autre" className="text-zinc-300">Upload preuve de paiement</Label>
+                    <div className="border-2 border-dashed border-zinc-600 rounded-lg p-4 text-center hover:border-orange-500/50 transition-colors bg-zinc-800/30 mt-1">
+                      <input
+                        type="file"
+                        accept="*/*"
+                        onChange={handleFileUpload}
+                        disabled={uploadingFile}
+                        className="hidden"
+                        id="proof-file-autre"
+                      />
+                      <label 
+                        htmlFor="proof-file-autre" 
+                        className={`cursor-pointer ${uploadingFile ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {uploadingFile ? (
+                          <p className="text-sm text-zinc-300">Upload en cours...</p>
+                        ) : proofUrl ? (
+                          <div className="space-y-2">
+                            <img src={proofUrl} alt="Preuve" className="max-h-32 mx-auto rounded" />
+                            <p className="text-xs text-green-400">Preuve uploadée ✓</p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setProofUrl('');
+                                setProofFile(null);
+                              }}
+                              className="text-xs"
+                            >
+                              Changer
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <Upload className="h-8 w-8 mx-auto mb-2 text-zinc-400" />
+                            <p className="text-sm text-zinc-300 font-medium">Cliquez pour uploader</p>
+                            <p className="text-xs text-zinc-500 mt-1">Tous formats acceptés, taille illimitée</p>
+                          </>
+                        )}
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="proof-url-autre" className="text-zinc-300">Ou URL externe (optionnel)</Label>
+                    <Input
+                      id="proof-url-autre"
+                      type="text"
+                      placeholder="https://exemple.com/preuve.png"
+                      value={proofUrl}
+                      onChange={(e) => setProofUrl(e.target.value)}
+                      className="bg-zinc-800 border-zinc-700 text-white mt-1"
+                    />
+                  </div>
                 </div>
               )}
 

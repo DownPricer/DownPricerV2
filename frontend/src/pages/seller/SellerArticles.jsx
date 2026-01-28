@@ -3,10 +3,13 @@ import { Header } from '../../components/Header';
 import { Card, CardContent } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
+import { Button } from '../../components/ui/button';
+import { Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
 import { toast } from 'sonner';
 import { resolveImageUrl } from '../../utils/images';
+import { hasSPlan3 } from '../../utils/auth';
 
 export const SellerArticles = () => {
   const navigate = useNavigate();
@@ -41,9 +44,20 @@ export const SellerArticles = () => {
     <div className="min-h-screen bg-zinc-950 text-white">
       
       <main className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-orange-500 mb-6" style={{fontFamily: 'Outfit, sans-serif'}}>
-          Catalogue Articles Vendeur
-        </h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold text-orange-500" style={{fontFamily: 'Outfit, sans-serif'}}>
+            Catalogue Articles Vendeur
+          </h1>
+          {hasSPlan3() && (
+            <Button
+              onClick={() => navigate('/seller/articles/new')}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nouvel article B2B
+            </Button>
+          )}
+        </div>
 
         <Card className="bg-zinc-900 border-zinc-800 mb-6">
           <CardContent className="p-4">
@@ -76,7 +90,15 @@ export const SellerArticles = () => {
                         return <img src={imageUrl} alt={article.name} className="w-full h-full object-cover" loading="lazy" onError={(e) => e.target.style.display = 'none'} />;
                       })()}
                     </div>
-                    <h3 className="font-semibold text-white mb-1 line-clamp-1">{article.name}</h3>
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <h3 className="font-semibold text-white line-clamp-1 flex-1">{article.name}</h3>
+                      {article.is_third_party && (
+                        <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/50 text-xs flex-shrink-0">Vendeur tiers</Badge>
+                      )}
+                    </div>
+                    {article.posted_by_info && (
+                      <p className="text-xs text-zinc-500 mb-1">Posté par {article.posted_by_info.name || article.posted_by_info.username}</p>
+                    )}
                     <p className="text-sm text-zinc-400 line-clamp-2 mb-3">{article.description}</p>
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">

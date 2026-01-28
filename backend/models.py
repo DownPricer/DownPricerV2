@@ -85,6 +85,10 @@ class Article(BaseModel):
     # Champs de visibilité pour distinguer les catalogues
     visible_public: bool = True  # Visible sur le catalogue public
     visible_seller: bool = True  # Visible pour les vendeurs/revendeurs
+    # Champs pour vendeurs tiers (S_PLAN_3)
+    discord_contact: Optional[str] = None  # Pseudo Discord du vendeur (ex: "pseudo", "@pseudo", "pseudo#1234")
+    posted_by: Optional[str] = None  # ID de l'utilisateur qui a posté l'article
+    is_third_party: Optional[bool] = None  # True si posté par un seller S_PLAN_3 non-admin
 
 class ArticleCreate(BaseModel):
     name: str
@@ -97,6 +101,7 @@ class ArticleCreate(BaseModel):
     stock: int = 1
     visible_public: bool = True
     visible_seller: bool = True
+    discord_contact: Optional[str] = None  # Pseudo Discord (obligatoire pour S_PLAN_3 créant un article B2B)
 
 class Category(BaseModel):
     model_config = ConfigDict(extra="ignore")

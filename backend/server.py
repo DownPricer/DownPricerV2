@@ -181,14 +181,18 @@ async def get_me(current_user = Depends(get_current_user)):
 async def upload_image(
     file: UploadFile = File(...), 
     current_user = Depends(get_current_user), 
-    no_restrictions: bool = Query(False, description="Si True, accepte tous les formats image sans limite de taille")
+    no_restrictions: bool = Query(False, description="Si True, accepte tous les formats image sans limite de taille"),
+    payment_proof: bool = Query(False, description="Si True, utilise la limite très haute pour preuves de paiement")
 ):
     """
     Upload d'image avec ou sans restrictions selon le paramètre no_restrictions.
     Si no_restrictions=True : accepte tous les formats image, n'importe quelle taille.
     Sinon : restrictions par défaut (12MB max, formats jpg/jpeg/png/webp/gif).
     """
-    MAX_FILE_SIZE = 12 * 1024 * 1024  # 12MB max (augmenté pour correspondre à nginx)
+    MAX_FILE_SIZE_GLOBAL = 24 * 1024 * 1024  # 24MB limite globale sur tout le site
+    MAX_FILE_SIZE_DEFAULT = 12 * 1024 * 1024  # 12MB max par défaut (pour compatibilité)
+    # Pour paiements-en-attente : limite très haute configurable (désactivable)
+    MAX_FILE_SIZE_PAYMENT_PROOF = int(os.environ.get('MAX_FILE_SIZE_PAYMENT_PROOF', 100 * 1024 * 1024))  # 100MB par défaut, configurable via env
     COMPRESSION_THRESHOLD = 1 * 1024 * 1024  # 1MB - déclenche compression
     TARGET_SIZE = 400 * 1024  # 400KB cible après compression
     
@@ -219,13 +223,24 @@ async def upload_image(
         contents = await file.read()
         file_size = len(contents)
         
-        # Vérifier la taille maximale seulement si restrictions activées
-        if not no_restrictions and file_size > MAX_FILE_SIZE:
+        # Déterminer la limite de taille à appliquer
+        if payment_proof:
+            # Pour les preuves de paiement : limite très haute configurable
+            max_size = MAX_FILE_SIZE_PAYMENT_PROOF
+        elif no_restrictions:
+            # Si no_restrictions=True : limite globale de 24MB
+            max_size = MAX_FILE_SIZE_GLOBAL
+        else:
+            # Par défaut : limite standard
+            max_size = MAX_FILE_SIZE_DEFAULT
+        
+        # Vérifier la taille maximale (toujours appliquer une limite de sécurité)
+        if file_size > max_size:
             raise HTTPException(
                 status_code=413, 
                 detail={
                     "error": "file_too_large",
-                    "detail": f"Le fichier est trop volumineux. Taille maximale autorisée : {MAX_FILE_SIZE / (1024*1024):.0f}MB (fichier reçu : {file_size / (1024*1024):.2f}MB)"
+                    "detail": f"Le fichier est trop volumineux. Taille maximale autorisée : {max_size / (1024*1024):.0f}MB (fichier reçu : {file_size / (1024*1024):.2f}MB)"
                 }
             )
         
@@ -370,6 +385,14 @@ async def get_articles(
         ]
     
     general_articles = await db.articles.find(query_articles, {"_id": 0}).to_list(1000)
+    # Ne pas exposer discord_contact, is_third_party, posted_by dans le catalogue public
+    for article in general_articles:
+        if "discord_contact" in article:
+            del article["discord_contact"]
+        if "is_third_party" in article:
+            del article["is_third_party"]
+        if "posted_by" in article:
+            del article["posted_by"]
     all_articles.extend(general_articles)
     
     # 2. Articles de mini-site avec show_in_public_catalog=True (plan Premium uniquement)
@@ -840,6 +863,17 @@ async def get_seller_articles(
     for article in general_articles:
         article["potential_profit"] = article["reference_price"] - article["price"]
         article["source"] = "general"  # Marquer la source
+        
+        # Enrichir avec les infos posted_by si présent
+        if article.get("posted_by"):
+            posted_by_user = await db.users.find_one({"id": article["posted_by"]}, {"_id": 0, "email": 1, "first_name": 1, "last_name": 1})
+            if posted_by_user:
+                article["posted_by_info"] = {
+                    "id": article["posted_by"],
+                    "username": posted_by_user.get("email", "").split("@")[0],  # Pseudo basé sur email
+                    "name": f"{posted_by_user.get('first_name', '')} {posted_by_user.get('last_name', '')}".strip() or posted_by_user.get("email", "").split("@")[0]
+                }
+        
         all_articles.append(article)
     
     # 2. Articles de mini-site avec show_in_reseller_catalog=True
@@ -858,6 +892,10 @@ async def get_seller_articles(
                 article["potential_profit"] = article["reference_price"] - article["price"]
                 article["source"] = "minisite"  # Marquer la source
                 article["minisite_id"] = article.get("minisite_id")
+                
+                # Les articles mini-site n'ont pas de posted_by (créés par les propriétaires de mini-site)
+                # Pas de badge "Vendeur tiers" pour les articles mini-site
+                
                 if search:
                     # Filtrer par recherche si nécessaire
                     search_lower = search.lower()
@@ -998,6 +1036,79 @@ async def get_admin_dashboard():
         "recent_demandes": recent_demandes
     }
 
+@api_router.post("/seller/articles", dependencies=[Depends(require_roles([UserRole.SELLER, UserRole.ADMIN]))])
+async def create_seller_article(article_data: ArticleCreate, current_user = Depends(get_current_user)):
+    """
+    Permet aux sellers S_PLAN_3 de créer des articles B2B.
+    Le champ discord_contact est obligatoire pour S_PLAN_3.
+    """
+    user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0})
+    
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    
+    user_roles = user_doc.get("roles", [])
+    is_admin = "ADMIN" in user_roles
+    is_s_plan_3 = "S_PLAN_3" in user_roles
+    
+    # Vérifier que l'utilisateur est soit ADMIN soit S_PLAN_3
+    if not is_admin and not is_s_plan_3:
+        raise HTTPException(
+            status_code=403,
+            detail="Seuls les utilisateurs avec le plan S_PLAN_3 peuvent créer des articles B2B"
+        )
+    
+    # Pour S_PLAN_3 (non-admin), discord_contact est obligatoire
+    if is_s_plan_3 and not is_admin:
+        if not article_data.discord_contact or not article_data.discord_contact.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Le pseudo Discord est obligatoire pour créer un article B2B"
+            )
+        
+        # Validation : trim + longueur max 64
+        discord_contact = article_data.discord_contact.strip()
+        if len(discord_contact) > 64:
+            raise HTTPException(
+                status_code=400,
+                detail="Le pseudo Discord ne peut pas dépasser 64 caractères"
+            )
+        if len(discord_contact) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Le pseudo Discord ne peut pas être vide"
+            )
+    
+    article_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Déterminer si c'est un vendeur tiers
+    is_third_party = is_s_plan_3 and not is_admin
+    
+    article_doc = {
+        "id": article_id,
+        "name": article_data.name,
+        "description": article_data.description,
+        "photos": article_data.photos,
+        "price": article_data.price,
+        "reference_price": article_data.reference_price,
+        "category_id": article_data.category_id,
+        "platform_links": article_data.platform_links,
+        "stock": article_data.stock,
+        "status": "active",
+        "created_at": now,
+        "views": 0,
+        "visible_public": article_data.visible_public,
+        "visible_seller": True,  # Les articles créés par sellers sont toujours visibles pour les revendeurs
+        "discord_contact": article_data.discord_contact.strip() if article_data.discord_contact else None,
+        "posted_by": user_doc["id"],
+        "is_third_party": is_third_party
+    }
+    
+    await db.articles.insert_one(article_doc)
+    
+    return Article(**article_doc)
+
 @api_router.post("/admin/articles", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
 async def create_article(article_data: ArticleCreate):
     article_id = str(uuid.uuid4())
@@ -1013,7 +1124,12 @@ async def create_article(article_data: ArticleCreate):
         "stock": article_data.stock,
         "status": "active",
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "views": 0
+        "views": 0,
+        "visible_public": article_data.visible_public,
+        "visible_seller": article_data.visible_seller,
+        "discord_contact": article_data.discord_contact.strip() if article_data.discord_contact else None,
+        "posted_by": None,  # Admin n'a pas de posted_by
+        "is_third_party": False  # Admin n'est jamais vendeur tiers
     }
     
     await db.articles.insert_one(article_doc)

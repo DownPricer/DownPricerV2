@@ -7,7 +7,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
-import { Download, AlertTriangle } from 'lucide-react';
+import { Download, AlertTriangle, ExternalLink } from 'lucide-react';
 import api from '../../utils/api';
 import { toast } from 'sonner';
 import { resolveImageUrl } from '../../utils/images';
@@ -248,9 +248,19 @@ export const SellerArticleDetail = () => {
 
           <div className="space-y-6">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-white mb-4" style={{fontFamily: 'Outfit, sans-serif'}}>
-                {article.name}
-              </h1>
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <h1 className="text-3xl md:text-4xl font-bold text-white flex-1" style={{fontFamily: 'Outfit, sans-serif'}}>
+                  {article.name}
+                </h1>
+                {article.is_third_party && (
+                  <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/50">Vendeur tiers</Badge>
+                )}
+              </div>
+              {article.posted_by_info && (
+                <p className="text-sm text-zinc-400 mb-2">
+                  Posté par <span className="text-zinc-300 font-medium">{article.posted_by_info.name || article.posted_by_info.username}</span>
+                </p>
+              )}
             </div>
 
             <Card className="bg-zinc-900 border-zinc-800">

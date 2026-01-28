@@ -39,6 +39,13 @@ export const hasSTier = () => {
   return user.roles.some(role => sTierRoles.includes(role));
 };
 
+// Vérifier si l'utilisateur a le plan S_PLAN_3 (peut créer des articles B2B)
+export const hasSPlan3 = () => {
+  const user = getUser();
+  if (!user || !user.roles) return false;
+  return user.roles.includes('S_PLAN_3');
+};
+
 export const logout = () => {
   removeToken();
   removeUser();
