@@ -321,18 +321,53 @@ async def get_articles(
     skip: int = 0,
     limit: int = 20
 ):
-    # Catalogue public : seulement les articles avec visible_public != false
-    query = {"status": "active", "visible_public": {"$ne": False}}
+    """
+    Catalogue public DownPricer (downpricer.com).
+    Inclut :
+    - Les articles du catalogue général avec visible_public != false
+    - Les articles de mini-site avec show_in_public_catalog=True (plan Premium uniquement)
+    """
+    all_articles = []
+    
+    # 1. Articles du catalogue général (visible_public)
+    query_articles = {"status": "active", "visible_public": {"$ne": False}}
     
     if category_id:
-        query["category_id"] = category_id
+        query_articles["category_id"] = category_id
     
     if search:
-        query["$or"] = [
+        query_articles["$or"] = [
             {"name": {"$regex": search, "$options": "i"}},
             {"description": {"$regex": search, "$options": "i"}}
         ]
     
+    general_articles = await db.articles.find(query_articles, {"_id": 0}).to_list(1000)
+    all_articles.extend(general_articles)
+    
+    # 2. Articles de mini-site avec show_in_public_catalog=True (plan Premium uniquement)
+    query_minisite = {"show_in_public_catalog": True}
+    
+    if search:
+        # Ajouter le filtre de recherche pour les articles mini-site
+        query_minisite["$or"] = [
+            {"name": {"$regex": search, "$options": "i"}},
+            {"description": {"$regex": search, "$options": "i"}}
+        ]
+    
+    minisite_articles_raw = await db.minisite_articles.find(query_minisite, {"_id": 0}).to_list(1000)
+    
+    # Filtrer pour ne garder que ceux dont le mini-site est actif et Premium
+    for article in minisite_articles_raw:
+        minisite = await db.minisites.find_one({"id": article.get("minisite_id")}, {"_id": 0, "status": 1, "plan_id": 1})
+        if minisite and minisite.get("status") == "active" and minisite.get("plan_id") == "SITE_PLAN_3":
+            # Ajouter la source pour distinguer
+            article["source"] = "minisite"
+            article["minisite_id"] = article.get("minisite_id")
+            # Filtrer par recherche si nécessaire (déjà fait dans la query MongoDB)
+            if not search or search.lower() in article.get("name", "").lower() or search.lower() in article.get("description", "").lower():
+                all_articles.append(article)
+    
+    # Trier selon le paramètre sort
     sort_options = {
         "recent": ("created_at", -1),
         "price_low": ("price", 1),
@@ -341,10 +376,20 @@ async def get_articles(
     
     sort_field, sort_order = sort_options.get(sort, ("created_at", -1))
     
-    articles = await db.articles.find(query, {"_id": 0}).sort(sort_field, sort_order).skip(skip).limit(limit).to_list(limit)
-    total = await db.articles.count_documents(query)
+    # Trier les articles combinés
+    reverse_order = sort_order == -1
+    all_articles.sort(key=lambda x: x.get(sort_field, ""), reverse=reverse_order)
     
-    return {"articles": articles, "total": total}
+    # Filtrer par catégorie si nécessaire (pour les articles mini-site, on ne filtre pas par catégorie car ils n'ont pas ce champ)
+    if category_id:
+        all_articles = [a for a in all_articles if a.get("category_id") == category_id]
+    
+    total = len(all_articles)
+    
+    # Appliquer pagination
+    paginated_articles = all_articles[skip:skip + limit]
+    
+    return {"articles": paginated_articles, "total": total}
 
 @api_router.get("/articles/{article_id}")
 async def get_article(article_id: str):
@@ -715,20 +760,59 @@ async def get_seller_articles(
     limit: int = 20,
     current_user = Depends(get_current_user)
 ):
-    query = {"status": "active", "stock": {"$gt": 0}}
+    """
+    Retourne les articles disponibles pour les revendeurs.
+    Inclut :
+    - Les articles du catalogue général avec visible_seller=True
+    - Les articles de mini-site avec show_in_reseller_catalog=True (plans Standard/Premium)
+    """
+    all_articles = []
+    
+    # 1. Articles du catalogue général (visible_seller)
+    query_articles = {"status": "active", "stock": {"$gt": 0}, "visible_seller": {"$ne": False}}
     
     if search:
-        query["$or"] = [
+        query_articles["$or"] = [
             {"name": {"$regex": search, "$options": "i"}},
             {"description": {"$regex": search, "$options": "i"}}
         ]
     
-    articles = await db.articles.find(query, {"_id": 0}).skip(skip).limit(limit).to_list(limit)
-    
-    for article in articles:
+    general_articles = await db.articles.find(query_articles, {"_id": 0}).to_list(1000)
+    for article in general_articles:
         article["potential_profit"] = article["reference_price"] - article["price"]
+        article["source"] = "general"  # Marquer la source
+        all_articles.append(article)
     
-    return articles
+    # 2. Articles de mini-site avec show_in_reseller_catalog=True
+    query_minisite = {"show_in_reseller_catalog": True}
+    
+    # Vérifier que le mini-site est actif
+    minisite_articles_raw = await db.minisite_articles.find(query_minisite, {"_id": 0}).to_list(1000)
+    
+    # Filtrer pour ne garder que ceux dont le mini-site est actif
+    for article in minisite_articles_raw:
+        minisite = await db.minisites.find_one({"id": article.get("minisite_id")}, {"_id": 0, "status": 1, "plan_id": 1})
+        if minisite and minisite.get("status") == "active":
+            # Vérifier que le plan permet le catalogue revendeur (SITE_PLAN_2 ou SITE_PLAN_3)
+            plan_id = minisite.get("plan_id")
+            if plan_id in ["SITE_PLAN_2", "SITE_PLAN_3"]:
+                article["potential_profit"] = article["reference_price"] - article["price"]
+                article["source"] = "minisite"  # Marquer la source
+                article["minisite_id"] = article.get("minisite_id")
+                if search:
+                    # Filtrer par recherche si nécessaire
+                    search_lower = search.lower()
+                    if search_lower not in article.get("name", "").lower() and search_lower not in article.get("description", "").lower():
+                        continue
+                all_articles.append(article)
+    
+    # Trier par date de création (plus récent en premier)
+    all_articles.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    
+    # Appliquer pagination
+    paginated_articles = all_articles[skip:skip + limit]
+    
+    return paginated_articles
 
 @api_router.post("/seller/sales", dependencies=[Depends(require_roles([UserRole.SELLER, UserRole.ADMIN]))])
 async def create_seller_sale(
@@ -1586,6 +1670,9 @@ async def add_minisite_article(site_id: str, article_data: MiniSiteArticleCreate
         "price": article_data.price,
         "reference_price": article_data.reference_price,
         "platform_links": article_data.platform_links,
+        "show_in_reseller_catalog": article_data.show_in_reseller_catalog,
+        "condition": article_data.condition,
+        "show_in_public_catalog": article_data.show_in_public_catalog,
         "created_at": now
     }
     
@@ -1612,6 +1699,49 @@ async def get_minisite_articles(site_id: str, current_user = Depends(get_current
     articles = await db.minisite_articles.find({"minisite_id": site_id}, {"_id": 0}).to_list(100)
     
     return articles
+
+@api_router.put("/minisites/{site_id}/articles/{article_id}", dependencies=[Depends(require_roles([UserRole.CLIENT, UserRole.ADMIN]))])
+async def update_minisite_article(site_id: str, article_id: str, article_data: MiniSiteArticleCreate, current_user = Depends(get_current_user)):
+    """Mettre à jour un article de mini-site"""
+    user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0})
+    minisite = await db.minisites.find_one({"id": site_id}, {"_id": 0})
+    
+    if not minisite:
+        raise HTTPException(status_code=404, detail="Mini-site non trouvé")
+    
+    if "ADMIN" not in user_doc.get("roles", []) and minisite["user_id"] != user_doc["id"]:
+        raise HTTPException(status_code=403, detail="Non autorisé")
+    
+    # Vérifier que l'article existe et appartient au mini-site
+    existing_article = await db.minisite_articles.find_one({"id": article_id, "minisite_id": site_id}, {"_id": 0})
+    if not existing_article:
+        raise HTTPException(status_code=404, detail="Article non trouvé")
+    
+    # Mettre à jour l'article
+    update_data = {
+        "name": article_data.name,
+        "description": article_data.description,
+        "photos": article_data.photos,
+        "price": article_data.price,
+        "reference_price": article_data.reference_price,
+        "platform_links": article_data.platform_links,
+        "show_in_reseller_catalog": article_data.show_in_reseller_catalog,
+        "condition": article_data.condition,
+        "show_in_public_catalog": article_data.show_in_public_catalog
+    }
+    
+    result = await db.minisite_articles.update_one(
+        {"id": article_id, "minisite_id": site_id},
+        {"$set": update_data}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Article non trouvé ou aucune modification")
+    
+    # Récupérer l'article mis à jour
+    updated_article = await db.minisite_articles.find_one({"id": article_id, "minisite_id": site_id}, {"_id": 0})
+    
+    return {"success": True, "article": MiniSiteArticle(**updated_article)}
 
 @api_router.delete("/minisites/{site_id}/articles/{article_id}", dependencies=[Depends(require_roles([UserRole.CLIENT, UserRole.ADMIN]))])
 async def delete_minisite_article(site_id: str, article_id: str, current_user = Depends(get_current_user)):

@@ -176,7 +176,7 @@
 //       });
 //       toast.success('Article ajouté');
 //       setShowArticleModal(false);
-//       setArticleForm({ name: '', description: '', photos: [], price: '', reference_price: '', platform_links: { vinted: '', leboncoin: '' }, show_in_reseller_catalog: false });
+//       setArticleForm({ name: '', description: '', photos: [], price: '', reference_price: '', platform_links: { vinted: '', leboncoin: '' }, show_in_reseller_catalog: false, condition: '', show_in_public_catalog: false });
 //       fetchMinisiteData();
 //     } catch (error) {
 //       toast.error(error.response?.data?.detail || 'Erreur');
@@ -713,7 +713,9 @@ export const MinisiteDashboard = () => {
     price: '',
     reference_price: '',
     platform_links: { vinted: '', leboncoin: '' },
-    show_in_reseller_catalog: false
+    show_in_reseller_catalog: false,
+    condition: '',
+    show_in_public_catalog: false
   });
 
   const [settingsForm, setSettingsForm] = useState({
@@ -980,7 +982,7 @@ export const MinisiteDashboard = () => {
       });
       toast.success('Article ajouté avec succès');
       setShowArticleModal(false);
-      setArticleForm({ name: '', description: '', photos: [], price: '', reference_price: '', platform_links: { vinted: '', leboncoin: '' }, show_in_reseller_catalog: false });
+      setArticleForm({ name: '', description: '', photos: [], price: '', reference_price: '', platform_links: { vinted: '', leboncoin: '' }, show_in_reseller_catalog: false, condition: '', show_in_public_catalog: false });
       fetchMinisiteData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erreur lors de l\'ajout');
@@ -1482,11 +1484,36 @@ export const MinisiteDashboard = () => {
                 </div>
              </div>
 
+             <div className="space-y-2">
+                <Label>État de l'article</Label>
+                <Select value={articleForm.condition || ''} onValueChange={(value) => setArticleForm({...articleForm, condition: value})}>
+                   <SelectTrigger className="bg-zinc-950 border-zinc-700 text-white">
+                      <SelectValue placeholder="Sélectionner l'état..." />
+                   </SelectTrigger>
+                   <SelectContent className="bg-zinc-900 border-zinc-700 text-white">
+                      <SelectItem value="Neuf">Neuf</SelectItem>
+                      <SelectItem value="Très bon état">Très bon état</SelectItem>
+                      <SelectItem value="Bon état">Bon état</SelectItem>
+                      <SelectItem value="État correct">État correct</SelectItem>
+                      <SelectItem value="Pour pièces">Pour pièces</SelectItem>
+                   </SelectContent>
+                </Select>
+             </div>
+
              {features.canShowInResellerCatalog && (
                 <div className="flex items-center space-x-2 bg-blue-900/20 p-3 rounded-lg border border-blue-900/30">
                    <input type="checkbox" id="reseller" checked={articleForm.show_in_reseller_catalog} onChange={(e) => setArticleForm({...articleForm, show_in_reseller_catalog: e.target.checked})} className="rounded border-zinc-700 bg-zinc-950 text-orange-500 focus:ring-orange-500" />
                    <label htmlFor="reseller" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                       Rendre visible dans le catalogue revendeur (B2B)
+                   </label>
+                </div>
+             )}
+
+             {minisite?.plan_id === 'SITE_PLAN_3' && (
+                <div className="flex items-center space-x-2 bg-purple-900/20 p-3 rounded-lg border border-purple-900/30">
+                   <input type="checkbox" id="public_catalog" checked={articleForm.show_in_public_catalog} onChange={(e) => setArticleForm({...articleForm, show_in_public_catalog: e.target.checked})} className="rounded border-zinc-700 bg-zinc-950 text-purple-500 focus:ring-purple-500" />
+                   <label htmlFor="public_catalog" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Afficher cet article dans le catalogue public DownPricer (downpricer.com)
                    </label>
                 </div>
              )}

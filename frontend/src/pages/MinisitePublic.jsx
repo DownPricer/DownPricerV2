@@ -446,7 +446,8 @@ import { useParams } from 'react-router-dom';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { ExternalLink, Loader2, AlertCircle, ShoppingBag, Star, ChevronRight } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { ExternalLink, Loader2, AlertCircle, ShoppingBag, Star, ChevronRight, ChevronLeft, X, ZoomIn } from 'lucide-react';
 import { SafeImage } from '../components/SafeImage';
 import api from '../utils/api';
 
@@ -455,10 +456,10 @@ import api from '../utils/api';
 // ==========================================
 
 // Template 1: Grid classique (style e-commerce standard)
-const TemplateModernGrid = ({ articles, minisite }) => (
+const TemplateModernGrid = ({ articles, minisite, onArticleClick }) => (
   <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
     {articles.map((article) => (
-      <ArticleCardClassic key={article.id} article={article} minisite={minisite} />
+      <ArticleCardClassic key={article.id} article={article} minisite={minisite} onArticleClick={onArticleClick} />
     ))}
   </div>
 );
@@ -773,12 +774,15 @@ const TemplatePremiumElite = TemplateMagazineStyle;
 // COMPOSANTS RÉUTILISABLES
 // ==========================================
 
-const ArticleCardClassic = ({ article, minisite }) => {
+const ArticleCardClassic = ({ article, minisite, onArticleClick }) => {
   const discount = article.reference_price > article.price 
     ? Math.round(((article.reference_price - article.price) / article.reference_price) * 100) : 0;
 
   return (
-    <Card className="bg-zinc-900 border-zinc-800 hover:border-zinc-700 transition-all overflow-hidden">
+    <Card 
+      className="bg-zinc-900 border-zinc-800 hover:border-zinc-700 transition-all overflow-hidden cursor-pointer"
+      onClick={() => onArticleClick && onArticleClick(article)}
+    >
       <div className="relative">
         <SafeImage src={article.photos?.[0]} alt={article.name} className="w-full h-48 object-cover" />
         {discount > 0 && <Badge className="absolute top-2 right-2 bg-green-600 text-white">-{discount}%</Badge>}
@@ -850,6 +854,9 @@ export const MinisitePublic = () => {
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedArticle, setSelectedArticle] = useState(null);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [isZoomed, setIsZoomed] = useState(false);
 
   useEffect(() => {
     fetchMinisite();
@@ -865,6 +872,30 @@ export const MinisitePublic = () => {
       setError('Mini-site introuvable ou suspendu');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleArticleClick = (article) => {
+    setSelectedArticle(article);
+    setCurrentPhotoIndex(0);
+    setIsZoomed(false);
+  };
+
+  const closeModal = () => {
+    setSelectedArticle(null);
+    setCurrentPhotoIndex(0);
+    setIsZoomed(false);
+  };
+
+  const nextPhoto = () => {
+    if (selectedArticle && selectedArticle.photos && selectedArticle.photos.length > 0) {
+      setCurrentPhotoIndex((prev) => (prev + 1) % selectedArticle.photos.length);
+    }
+  };
+
+  const prevPhoto = () => {
+    if (selectedArticle && selectedArticle.photos && selectedArticle.photos.length > 0) {
+      setCurrentPhotoIndex((prev) => (prev - 1 + selectedArticle.photos.length) % selectedArticle.photos.length);
     }
   };
 
@@ -936,7 +967,7 @@ export const MinisitePublic = () => {
             </CardContent>
           </Card>
         ) : (
-          <TemplateComponent articles={articles} minisite={minisite} />
+          <TemplateComponent articles={articles} minisite={minisite} onArticleClick={handleArticleClick} />
         )}
       </section>
 
@@ -947,6 +978,157 @@ export const MinisitePublic = () => {
             Propulsé par <a href="/" className="text-orange-500 hover:underline">DownPricer</a>
           </p>
         </footer>
+      )}
+
+      {/* Modal Détails Article */}
+      {selectedArticle && (
+        <Dialog open={!!selectedArticle} onOpenChange={(open) => !open && closeModal()}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-zinc-900 border-zinc-800 text-white">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold">{selectedArticle.name}</DialogTitle>
+            </DialogHeader>
+            
+            <div className="mt-4">
+              {/* Carousel Photos */}
+              {selectedArticle.photos && selectedArticle.photos.length > 0 ? (
+                <div className="relative mb-6">
+                  <div className="relative aspect-square bg-zinc-800 rounded-lg overflow-hidden">
+                    <SafeImage 
+                      src={selectedArticle.photos[currentPhotoIndex]} 
+                      alt={selectedArticle.name}
+                      className={`w-full h-full object-cover ${isZoomed ? 'scale-150 cursor-zoom-out' : 'cursor-zoom-in'}`}
+                      onClick={() => setIsZoomed(!isZoomed)}
+                    />
+                    
+                    {/* Navigation photos */}
+                    {selectedArticle.photos.length > 1 && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-zinc-900/80 hover:bg-zinc-800 border-zinc-700"
+                          onClick={(e) => { e.stopPropagation(); prevPhoto(); }}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-zinc-900/80 hover:bg-zinc-800 border-zinc-700"
+                          onClick={(e) => { e.stopPropagation(); nextPhoto(); }}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                        
+                        {/* Indicateurs */}
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2">
+                          {selectedArticle.photos.map((_, idx) => (
+                            <button
+                              key={idx}
+                              className={`w-2 h-2 rounded-full transition-all ${
+                                idx === currentPhotoIndex ? 'bg-white' : 'bg-white/50'
+                              }`}
+                              onClick={(e) => { e.stopPropagation(); setCurrentPhotoIndex(idx); }}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    
+                    {/* Badge Zoom */}
+                    {!isZoomed && (
+                      <div className="absolute top-2 right-2 bg-zinc-900/80 px-2 py-1 rounded text-xs flex items-center gap-1">
+                        <ZoomIn className="h-3 w-3" />
+                        Zoom
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Miniatures */}
+                  {selectedArticle.photos.length > 1 && (
+                    <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
+                      {selectedArticle.photos.map((photo, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setCurrentPhotoIndex(idx)}
+                          className={`flex-shrink-0 w-20 h-20 rounded overflow-hidden border-2 transition-all ${
+                            idx === currentPhotoIndex ? 'border-white' : 'border-transparent opacity-60 hover:opacity-100'
+                          }`}
+                        >
+                          <SafeImage src={photo} alt={`${selectedArticle.name} ${idx + 1}`} className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="aspect-square bg-zinc-800 rounded-lg flex items-center justify-center mb-6">
+                  <p className="text-zinc-500">Aucune photo</p>
+                </div>
+              )}
+
+              {/* Informations */}
+              <div className="space-y-4">
+                {/* Prix */}
+                <div className="flex items-baseline gap-3">
+                  <span className="text-4xl font-bold" style={{ color: minisite.primary_color }}>
+                    {selectedArticle.price}€
+                  </span>
+                  {selectedArticle.reference_price > selectedArticle.price && (
+                    <>
+                      <span className="text-xl text-zinc-500 line-through">
+                        {selectedArticle.reference_price}€
+                      </span>
+                      <Badge className="bg-green-600">
+                        -{Math.round(((selectedArticle.reference_price - selectedArticle.price) / selectedArticle.reference_price) * 100)}%
+                      </Badge>
+                    </>
+                  )}
+                </div>
+
+                {/* Condition */}
+                {selectedArticle.condition && (
+                  <div>
+                    <span className="text-sm text-zinc-400">État : </span>
+                    <Badge className="bg-blue-600">{selectedArticle.condition}</Badge>
+                  </div>
+                )}
+
+                {/* Description */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Description</h3>
+                  <p className="text-zinc-300 whitespace-pre-wrap">{selectedArticle.description || 'Aucune description disponible.'}</p>
+                </div>
+
+                {/* Liens plateformes */}
+                <div className="flex flex-wrap gap-3 pt-4 border-t border-zinc-800">
+                  {selectedArticle.platform_links?.vinted && (
+                    <Button
+                      size="lg"
+                      style={{ backgroundColor: minisite.primary_color }}
+                      onClick={() => window.open(selectedArticle.platform_links.vinted, '_blank')}
+                      className="flex items-center gap-2"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Voir sur Vinted
+                    </Button>
+                  )}
+                  {selectedArticle.platform_links?.leboncoin && (
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="border-zinc-700 text-white hover:bg-zinc-800 flex items-center gap-2"
+                      onClick={() => window.open(selectedArticle.platform_links.leboncoin, '_blank')}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Voir sur Leboncoin
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

@@ -206,6 +206,10 @@ class MiniSiteArticle(BaseModel):
     created_at: str
     # Option pour afficher dans le catalogue revendeur (plan >= 10€)
     show_in_reseller_catalog: bool = False
+    # État de l'article (condition)
+    condition: Optional[str] = None  # Neuf, Très bon état, Bon état, État correct, Pour pièces
+    # Option pour afficher dans le catalogue public DownPricer (plan Premium uniquement)
+    show_in_public_catalog: bool = False
 
 class MiniSiteArticleCreate(BaseModel):
     name: str
@@ -215,6 +219,8 @@ class MiniSiteArticleCreate(BaseModel):
     reference_price: float
     platform_links: Dict[str, str] = {}
     show_in_reseller_catalog: bool = False
+    condition: Optional[str] = None  # Neuf, Très bon état, Bon état, État correct, Pour pièces
+    show_in_public_catalog: bool = False
 
 class Setting(BaseModel):
     model_config = ConfigDict(extra="ignore")
