@@ -153,6 +153,7 @@ class SellerSale(BaseModel):
     payment_proof: Optional[Dict[str, Any]] = None
     payment_method: Optional[str] = None
     tracking_number: Optional[str] = None
+    shipping_label: Optional[str] = None  # Bordereau d'expédition (obligatoire à la création)
     rejection_reason: Optional[str] = None
     created_at: str
     updated_at: Optional[str] = None
@@ -160,6 +161,7 @@ class SellerSale(BaseModel):
 class SellerSaleCreate(BaseModel):
     article_id: str
     sale_price: float
+    shipping_label: str  # URL ou base64 du bordereau d'expédition (obligatoire)
 
 class MiniSite(BaseModel):
     model_config = ConfigDict(extra="ignore")

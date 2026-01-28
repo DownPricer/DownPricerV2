@@ -465,10 +465,14 @@ const TemplateModernGrid = ({ articles, minisite, onArticleClick }) => (
 );
 
 // Template 2: Liste verticale (style YouTube/Reddit)
-const TemplateClassicList = ({ articles, minisite }) => (
+const TemplateClassicList = ({ articles, minisite, onArticleClick }) => (
   <div className="space-y-4 max-w-3xl mx-auto">
     {articles.map((article) => (
-      <Card key={article.id} className="bg-zinc-900 border-zinc-800 overflow-hidden">
+      <Card 
+        key={article.id} 
+        className="bg-zinc-900 border-zinc-800 overflow-hidden cursor-pointer hover:border-zinc-700 transition-all"
+        onClick={() => onArticleClick && onArticleClick(article)}
+      >
         <div className="flex flex-col sm:flex-row">
           <div className="w-full sm:w-48 h-48 sm:h-auto flex-shrink-0">
             <SafeImage src={article.photos?.[0]} alt={article.name} className="w-full h-full object-cover" />
@@ -488,7 +492,7 @@ const TemplateClassicList = ({ articles, minisite }) => (
 );
 
 // Template 3: Cards larges (REFAIT : Style Spotify / Tracklist)
-const TemplateCardStack = ({ articles, minisite }) => (
+const TemplateCardStack = ({ articles, minisite, onArticleClick }) => (
   <div className="space-y-2 max-w-5xl mx-auto">
     {/* Header de la "Playlist" (Visible sur desktop) */}
     <div className="hidden md:flex px-4 pb-2 text-xs font-medium text-zinc-500 uppercase tracking-wider border-b border-zinc-800/50 mb-4">
@@ -505,8 +509,9 @@ const TemplateCardStack = ({ articles, minisite }) => (
 
       return (
         <div 
-          key={article.id} 
-          className="group relative flex flex-col md:flex-row items-center gap-4 p-3 rounded-xl bg-zinc-900/40 border border-transparent hover:bg-zinc-800/80 hover:border-zinc-700/30 transition-all duration-200 ease-out"
+          key={article.id}
+          onClick={() => onArticleClick && onArticleClick(article)}
+          className="group relative flex flex-col md:flex-row items-center gap-4 p-3 rounded-xl bg-zinc-900/40 border border-transparent hover:bg-zinc-800/80 hover:border-zinc-700/30 transition-all duration-200 ease-out cursor-pointer"
         >
           {/* 1. Index (Numéro de piste) */}
           <div className="hidden md:flex w-12 items-center justify-center text-zinc-600 font-mono text-lg group-hover:text-white transition-colors">
@@ -585,11 +590,15 @@ const TemplateCardStack = ({ articles, minisite }) => (
 );
 
 // Template 4: Minimaliste (clean, espaces)
-const TemplateMinimalClean = ({ articles, minisite }) => (
+const TemplateMinimalClean = ({ articles, minisite, onArticleClick }) => (
   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
     {articles.map((article) => (
-      <div key={article.id} className="text-center">
-        <div className="aspect-square mb-4 bg-zinc-800 rounded-2xl overflow-hidden">
+      <div 
+        key={article.id} 
+        className="text-center cursor-pointer"
+        onClick={() => onArticleClick && onArticleClick(article)}
+      >
+        <div className="aspect-square mb-4 bg-zinc-800 rounded-2xl overflow-hidden hover:opacity-90 transition-opacity">
           <SafeImage src={article.photos?.[0]} alt={article.name} className="w-full h-full object-cover" />
         </div>
         <h3 className="font-medium text-white text-lg mb-1">{article.name}</h3>
@@ -601,7 +610,7 @@ const TemplateMinimalClean = ({ articles, minisite }) => (
 );
 
 // Template 5: Hero bold (gros visuels)
-const TemplateBoldHero = ({ articles, minisite }) => (
+const TemplateBoldHero = ({ articles, minisite, onArticleClick }) => (
   <div className="space-y-8">
     {articles.slice(0, 1).map((article) => (
       <Card key={article.id} className="bg-zinc-900 border-zinc-800 overflow-hidden">
@@ -622,7 +631,7 @@ const TemplateBoldHero = ({ articles, minisite }) => (
     ))}
     <div className="grid sm:grid-cols-3 gap-4">
       {articles.slice(1).map((article) => (
-        <ArticleCardClassic key={article.id} article={article} minisite={minisite} />
+        <ArticleCardClassic key={article.id} article={article} minisite={minisite} onArticleClick={onArticleClick} />
       ))}
     </div>
   </div>

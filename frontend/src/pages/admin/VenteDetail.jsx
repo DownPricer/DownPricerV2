@@ -248,6 +248,34 @@ export const AdminVenteDetail = () => {
                   </div>
                 )}
 
+                {/* Bordereau d'expédition */}
+                {sale.shipping_label && (
+                  <div className="mt-10 pt-8 border-t border-white/[0.06] space-y-4">
+                    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Bordereau d'Expédition</p>
+                    <div className="p-5 bg-black/50 border border-white/10 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="space-y-2">
+                        <img 
+                          src={sale.shipping_label.startsWith('http') ? sale.shipping_label : `${window.location.origin}${sale.shipping_label}`} 
+                          alt="Bordereau" 
+                          className="max-h-32 rounded cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => window.open(sale.shipping_label.startsWith('http') ? sale.shipping_label : `${window.location.origin}${sale.shipping_label}`, '_blank')}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl border-white/10 bg-white hover:bg-zinc-200 text-black font-black uppercase text-[10px] px-6 h-10 shadow-lg shadow-white/5"
+                        onClick={() => {
+                          const url = sale.shipping_label.startsWith('http') ? sale.shipping_label : `${window.location.origin}${sale.shipping_label}`;
+                          window.open(url, '_blank');
+                        }}
+                      >
+                        <ExternalLink size={14} className="mr-2" /> Télécharger Bordereau
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Tracking */}
                 {sale.tracking_number && (
                   <div className="mt-6 p-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex items-center justify-between">

@@ -19,6 +19,8 @@ export const SellerArticleDetail = () => {
   const [loading, setLoading] = useState(true);
   const [showSaleDialog, setShowSaleDialog] = useState(false);
   const [salePrice, setSalePrice] = useState('');
+  const [shippingLabel, setShippingLabel] = useState('');
+  const [uploadingLabel, setUploadingLabel] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
 
   useEffect(() => {
@@ -54,21 +56,63 @@ export const SellerArticleDetail = () => {
     toast.success(`${article.photos.length} photo(s) téléchargée(s)`);
   };
 
+  const handleShippingLabelUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Le fichier doit être une image');
+      return;
+    }
+
+    setUploadingLabel(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await api.post('/upload/image?no_restrictions=true', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (response.data.url) {
+        setShippingLabel(response.data.url);
+        toast.success('Bordereau uploadé avec succès');
+      } else {
+        toast.error('Erreur lors de l\'upload');
+      }
+    } catch (error) {
+      const errorDetail = error.response?.data?.detail;
+      const errorMessage = typeof errorDetail === 'object' && errorDetail?.detail 
+        ? errorDetail.detail 
+        : (typeof errorDetail === 'string' ? errorDetail : error.message || 'Erreur lors de l\'upload');
+      toast.error(errorMessage);
+    }
+    setUploadingLabel(false);
+    e.target.value = '';
+  };
+
   const handleDeclareVente = async () => {
     if (!salePrice || parseFloat(salePrice) <= 0) {
       toast.error('Prix de vente invalide');
       return;
     }
 
+    if (!shippingLabel || !shippingLabel.trim()) {
+      toast.error('Le bordereau d\'expédition est obligatoire');
+      return;
+    }
+
     try {
       const response = await api.post('/seller/sales', {
         article_id: article.id,
-        sale_price: parseFloat(salePrice)
+        sale_price: parseFloat(salePrice),
+        shipping_label: shippingLabel
       });
 
       toast.success('Vente enregistrée. Elle est en attente de validation par DownPricer.');
       setShowSaleDialog(false);
       setSalePrice('');
+      setShippingLabel('');
       
       // Rediriger vers les ventes
       setTimeout(() => navigate('/seller/ventes'), 1500);
@@ -286,11 +330,55 @@ export const SellerArticleDetail = () => {
                     </Card>
                   )}
 
+                  <div className="space-y-2">
+                    <Label className="text-white">Bordereau d'expédition * (obligatoire)</Label>
+                    <div className="border-2 border-dashed border-zinc-600 rounded-lg p-4 text-center hover:border-orange-500/50 transition-colors bg-zinc-800/30">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleShippingLabelUpload}
+                        disabled={uploadingLabel}
+                        className="hidden"
+                        id="shipping-label-upload"
+                      />
+                      <label 
+                        htmlFor="shipping-label-upload" 
+                        className={`cursor-pointer ${uploadingLabel ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {uploadingLabel ? (
+                          <p className="text-sm text-zinc-300">Upload en cours...</p>
+                        ) : shippingLabel ? (
+                          <div className="space-y-2">
+                            <img src={resolveImageUrl(shippingLabel)} alt="Bordereau" className="max-h-32 mx-auto rounded" />
+                            <p className="text-xs text-green-400">Bordereau uploadé ✓</p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setShippingLabel('');
+                              }}
+                              className="text-xs"
+                            >
+                              Changer
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-sm text-zinc-300 font-medium">Cliquez pour uploader le bordereau</p>
+                            <p className="text-xs text-zinc-500 mt-1">Tous formats image acceptés</p>
+                          </>
+                        )}
+                      </label>
+                    </div>
+                  </div>
+
                   <div className="pt-4 space-y-2">
                     <Button
                       onClick={handleDeclareVente}
                       className="w-full bg-green-600 hover:bg-green-700"
-                      disabled={!salePrice || parseFloat(salePrice) <= 0}
+                      disabled={!salePrice || parseFloat(salePrice) <= 0 || !shippingLabel}
                     >
                       Confirmer la vente
                     </Button>

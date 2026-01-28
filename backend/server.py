@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Body, BackgroundTasks, Request
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Body, BackgroundTasks, Request, Query
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
@@ -178,7 +178,16 @@ async def get_me(current_user = Depends(get_current_user)):
     return User(**user_doc)
 
 @api_router.post("/upload/image")
-async def upload_image(file: UploadFile = File(...), current_user = Depends(get_current_user)):
+async def upload_image(
+    file: UploadFile = File(...), 
+    current_user = Depends(get_current_user), 
+    no_restrictions: bool = Query(False, description="Si True, accepte tous les formats image sans limite de taille")
+):
+    """
+    Upload d'image avec ou sans restrictions selon le paramètre no_restrictions.
+    Si no_restrictions=True : accepte tous les formats image, n'importe quelle taille.
+    Sinon : restrictions par défaut (12MB max, formats jpg/jpeg/png/webp/gif).
+    """
     MAX_FILE_SIZE = 12 * 1024 * 1024  # 12MB max (augmenté pour correspondre à nginx)
     COMPRESSION_THRESHOLD = 1 * 1024 * 1024  # 1MB - déclenche compression
     TARGET_SIZE = 400 * 1024  # 400KB cible après compression
@@ -197,19 +206,21 @@ async def upload_image(file: UploadFile = File(...), current_user = Depends(get_
                 detail={"error": "invalid_type", "detail": "Le fichier doit être une image. Type reçu: " + (file.content_type or "inconnu")}
             )
         
-        file_ext = file.filename.split(".")[-1].lower()
-        if file_ext not in ["jpg", "jpeg", "png", "webp", "gif"]:
-            raise HTTPException(
-                status_code=400, 
-                detail={"error": "unsupported_format", "detail": f"Format d'image non supporté: .{file_ext}. Formats acceptés: jpg, jpeg, png, webp, gif"}
-            )
+        # Si no_restrictions=True, on accepte tous les formats image sans vérification
+        if not no_restrictions:
+            file_ext = file.filename.split(".")[-1].lower()
+            if file_ext not in ["jpg", "jpeg", "png", "webp", "gif"]:
+                raise HTTPException(
+                    status_code=400, 
+                    detail={"error": "unsupported_format", "detail": f"Format d'image non supporté: .{file_ext}. Formats acceptés: jpg, jpeg, png, webp, gif"}
+                )
         
         # Lire le contenu du fichier
         contents = await file.read()
         file_size = len(contents)
         
-        # Vérifier la taille maximale
-        if file_size > MAX_FILE_SIZE:
+        # Vérifier la taille maximale seulement si restrictions activées
+        if not no_restrictions and file_size > MAX_FILE_SIZE:
             raise HTTPException(
                 status_code=413, 
                 detail={
@@ -218,6 +229,23 @@ async def upload_image(file: UploadFile = File(...), current_user = Depends(get_
                 }
             )
         
+        # Si no_restrictions=True, on sauvegarde le fichier tel quel sans compression
+        if no_restrictions:
+            file_ext = file.filename.split(".")[-1].lower() if "." in file.filename else "jpg"
+            unique_filename = f"{uuid.uuid4()}.{file_ext}"
+            file_path = UPLOAD_DIR / unique_filename
+            
+            # Sauvegarder directement sans traitement
+            with open(file_path, "wb") as f:
+                f.write(contents)
+            
+            # Construire l'URL - utiliser get_base_url pour cohérence
+            base_url = await get_base_url(db)
+            file_url = f"{base_url}/api/uploads/{unique_filename}"
+            
+            return {"success": True, "url": file_url, "filename": unique_filename}
+        
+        # Sinon, traitement normal avec compression
         # Toujours convertir en WebP pour de meilleures performances
         unique_filename = f"{uuid.uuid4()}.webp"
         file_path = UPLOAD_DIR / unique_filename
@@ -393,15 +421,46 @@ async def get_articles(
 
 @api_router.get("/articles/{article_id}")
 async def get_article(article_id: str):
+    """
+    Récupère un article par son ID.
+    Cherche d'abord dans le catalogue général, puis dans les articles mini-site.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"GET /articles/{article_id} - Recherche article avec ID: {article_id}")
+    
+    # 1. Chercher dans le catalogue général
     article = await db.articles.find_one({"id": article_id}, {"_id": 0})
     
-    if not article:
-        raise HTTPException(status_code=404, detail="Article non trouvé")
+    if article:
+        logger.info(f"Article trouvé dans catalogue général: {article_id}")
+        await db.articles.update_one({"id": article_id}, {"$inc": {"views": 1}})
+        article["views"] = article.get("views", 0) + 1
+        article["source"] = "general"
+        return article
     
-    await db.articles.update_one({"id": article_id}, {"$inc": {"views": 1}})
-    article["views"] = article.get("views", 0) + 1
+    # 2. Si pas trouvé, chercher dans les articles mini-site
+    logger.info(f"Article non trouvé dans catalogue général, recherche dans minisite_articles: {article_id}")
+    minisite_article = await db.minisite_articles.find_one({"id": article_id}, {"_id": 0})
     
-    return article
+    if minisite_article:
+        # Vérifier que le mini-site est actif
+        minisite = await db.minisites.find_one({"id": minisite_article.get("minisite_id")}, {"_id": 0, "status": 1, "plan_id": 1})
+        
+        if not minisite or minisite.get("status") != "active":
+            logger.warning(f"Mini-site inactif ou non trouvé pour article {article_id}")
+            raise HTTPException(status_code=404, detail="Article non trouvé")
+        
+        logger.info(f"Article trouvé dans minisite_articles: {article_id}, minisite: {minisite.get('plan_id')}")
+        minisite_article["source"] = "minisite"
+        minisite_article["minisite_id"] = minisite_article.get("minisite_id")
+        # Les articles mini-site n'ont pas de champ views, on peut l'ajouter à 0
+        minisite_article["views"] = minisite_article.get("views", 0)
+        return minisite_article
+    
+    logger.warning(f"Article non trouvé nulle part: {article_id}")
+    raise HTTPException(status_code=404, detail="Article non trouvé")
 
 @api_router.post("/demandes", dependencies=[Depends(require_roles([UserRole.CLIENT, UserRole.ADMIN]))])
 async def create_demande(
@@ -820,6 +879,13 @@ async def create_seller_sale(
     sale_data: SellerSaleCreate,
     current_user = Depends(get_current_user)
 ):
+    # Validation : bordereau obligatoire
+    if not sale_data.shipping_label or not sale_data.shipping_label.strip():
+        raise HTTPException(
+            status_code=400, 
+            detail="Le bordereau d'expédition est obligatoire. Veuillez uploader une image du bordereau."
+        )
+    
     user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0})
     article = await db.articles.find_one({"id": sale_data.article_id}, {"_id": 0})
     
@@ -845,6 +911,7 @@ async def create_seller_sale(
         "payment_proof": None,
         "payment_method": None,
         "tracking_number": None,
+        "shipping_label": sale_data.shipping_label,  # Bordereau obligatoire
         "rejection_reason": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": None
