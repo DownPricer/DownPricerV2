@@ -49,24 +49,23 @@ export const SafeImage = ({
   }
 
   return (
-    <>
+    <div className="relative" style={{ minHeight: '60px' }}>
       {loading && (
         <div 
-          className={`flex items-center justify-center bg-slate-100 animate-pulse ${className}`}
-          style={{ minHeight: '60px' }}
+          className={`absolute inset-0 flex items-center justify-center bg-slate-100 animate-pulse ${className}`}
           {...props}
         />
       )}
       <img
         src={resolvedUrl}
         alt={alt}
-        className={`${className} ${loading ? 'hidden' : ''}`}
+        className={`${className} ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-200`}
         onError={handleError}
         onLoad={handleLoad}
-        loading="lazy"
+        loading="eager"
         {...props}
       />
-    </>
+    </div>
   );
 };
 

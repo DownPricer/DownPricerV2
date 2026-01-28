@@ -471,7 +471,7 @@ async def get_article(article_id: str):
     
     if minisite_article:
         # Vérifier que le mini-site est actif
-        minisite = await db.minisites.find_one({"id": minisite_article.get("minisite_id")}, {"_id": 0, "status": 1, "plan_id": 1})
+        minisite = await db.minisites.find_one({"id": minisite_article.get("minisite_id")}, {"_id": 0, "status": 1, "plan_id": 1, "user_id": 1, "site_name": 1})
         
         if not minisite or minisite.get("status") != "active":
             logger.warning(f"Mini-site inactif ou non trouvé pour article {article_id}")
@@ -482,6 +482,20 @@ async def get_article(article_id: str):
         minisite_article["minisite_id"] = minisite_article.get("minisite_id")
         # Les articles mini-site n'ont pas de champ views, on peut l'ajouter à 0
         minisite_article["views"] = minisite_article.get("views", 0)
+        
+        # Enrichir avec les infos du vendeur pour les articles B2B
+        if minisite_article.get("show_in_reseller_catalog"):
+            minisite_article["is_third_party"] = True
+            user_id = minisite.get("user_id")
+            if user_id:
+                seller_user = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1, "first_name": 1, "last_name": 1})
+                if seller_user:
+                    minisite_article["posted_by_info"] = {
+                        "id": user_id,
+                        "username": seller_user.get("email", "").split("@")[0],
+                        "name": f"{seller_user.get('first_name', '')} {seller_user.get('last_name', '')}".strip() or seller_user.get("email", "").split("@")[0] or minisite.get("site_name", "Vendeur")
+                    }
+        
         return minisite_article
     
     logger.warning(f"Article non trouvé nulle part: {article_id}")
@@ -886,7 +900,7 @@ async def get_seller_articles(
     
     # Filtrer pour ne garder que ceux dont le mini-site est actif
     for article in minisite_articles_raw:
-        minisite = await db.minisites.find_one({"id": article.get("minisite_id")}, {"_id": 0, "status": 1, "plan_id": 1})
+        minisite = await db.minisites.find_one({"id": article.get("minisite_id")}, {"_id": 0, "status": 1, "plan_id": 1, "user_id": 1, "site_name": 1})
         if minisite and minisite.get("status") == "active":
             # Vérifier que le plan permet le catalogue revendeur (SITE_PLAN_2 ou SITE_PLAN_3)
             plan_id = minisite.get("plan_id")
@@ -895,8 +909,22 @@ async def get_seller_articles(
                 article["source"] = "minisite"  # Marquer la source
                 article["minisite_id"] = article.get("minisite_id")
                 
-                # Les articles mini-site n'ont pas de posted_by (créés par les propriétaires de mini-site)
-                # Pas de badge "Vendeur tiers" pour les articles mini-site
+                # Marquer comme vendeur tiers (créé par un user minisite, pas admin)
+                article["is_third_party"] = True
+                
+                # Enrichir avec les infos du vendeur (propriétaire du minisite)
+                user_id = minisite.get("user_id")
+                if user_id:
+                    seller_user = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1, "first_name": 1, "last_name": 1})
+                    if seller_user:
+                        article["posted_by_info"] = {
+                            "id": user_id,
+                            "username": seller_user.get("email", "").split("@")[0],
+                            "name": f"{seller_user.get('first_name', '')} {seller_user.get('last_name', '')}".strip() or seller_user.get("email", "").split("@")[0] or minisite.get("site_name", "Vendeur")
+                        }
+                
+                # Ajouter le discord_tag si présent dans l'article
+                # (déjà dans l'article depuis le modèle)
                 
                 if search:
                     # Filtrer par recherche si nécessaire

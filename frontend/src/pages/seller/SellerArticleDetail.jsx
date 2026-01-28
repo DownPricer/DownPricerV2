@@ -295,14 +295,86 @@ export const SellerArticleDetail = () => {
               </CardContent>
             </Card>
 
-            <Dialog open={showSaleDialog} onOpenChange={setShowSaleDialog}>
-              <Button
-                onClick={() => setShowSaleDialog(true)}
-                className="w-full bg-green-600 hover:bg-green-700 text-white text-lg py-6"
-                data-testid="declare-sale-btn"
-              >
-                ✓ J'ai vendu cet article
-              </Button>
+            {/* Bloc vendeur tiers : Discord + CTA plateformes */}
+            {article.is_third_party && (
+              <>
+                {/* Liens plateformes */}
+                {(article.platform_links?.vinted || article.platform_links?.leboncoin) && (
+                  <Card className="bg-zinc-900 border-zinc-800">
+                    <CardContent className="p-6 space-y-3">
+                      <h2 className="text-xl font-semibold text-white mb-3">Acheter l'article</h2>
+                      {article.platform_links.vinted && (
+                        <Button
+                          variant="outline"
+                          className="w-full justify-between border-cyan-500 text-cyan-500 hover:bg-cyan-500 hover:text-white"
+                          onClick={() => window.open(article.platform_links.vinted, '_blank')}
+                        >
+                          Acheter sur Vinted
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {article.platform_links.leboncoin && (
+                        <Button
+                          variant="outline"
+                          className="w-full justify-between border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white"
+                          onClick={() => window.open(article.platform_links.leboncoin, '_blank')}
+                        >
+                          Acheter sur Leboncoin
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Bloc Discord */}
+                <Card className="bg-blue-950/20 border-blue-900/30">
+                  <CardContent className="p-6 space-y-4">
+                    <div>
+                      <h2 className="text-xl font-semibold text-white mb-2">Contact vendeur</h2>
+                      {article.posted_by_info && (
+                        <p className="text-zinc-300 mb-2">
+                          Vendeur : <span className="text-white font-medium">{article.posted_by_info.name || article.posted_by_info.username}</span>
+                        </p>
+                      )}
+                      {article.discord_tag && (
+                        <p className="text-zinc-300">
+                          Discord : <span className="text-blue-400 font-medium">{article.discord_tag}</span>
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div className="bg-zinc-900/50 p-4 rounded-lg border border-zinc-800">
+                      <p className="text-sm text-zinc-300 mb-2">
+                        <strong className="text-white">Pour éviter les arnaques, achetez via Vinted.</strong> Sinon contactez via Discord DownPricer :
+                      </p>
+                      <p className="text-sm text-zinc-400 mb-3">
+                        Rejoignez le <a href="https://discord.gg/downpricer" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Discord officiel DownPricer</a> et contactez <strong className="text-white">{article.discord_tag || article.posted_by_info?.username || 'le vendeur'}</strong> dans le canal <strong className="text-white">#transactions</strong>.
+                      </p>
+                      <Button
+                        variant="outline"
+                        className="w-full border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-white"
+                        onClick={() => window.open('https://discord.gg/downpricer', '_blank')}
+                      >
+                        Rejoindre Discord DownPricer
+                        <ExternalLink className="h-4 w-4 ml-2" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+
+            {/* Bouton "J'ai vendu" uniquement pour articles admin (pas vendeur tiers) */}
+            {!article.is_third_party && (
+              <Dialog open={showSaleDialog} onOpenChange={setShowSaleDialog}>
+                <Button
+                  onClick={() => setShowSaleDialog(true)}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white text-lg py-6"
+                  data-testid="declare-sale-btn"
+                >
+                  ✓ J'ai vendu cet article
+                </Button>
 
               <DialogContent className="bg-zinc-900 border-zinc-800 text-white">
                 <DialogHeader>
