@@ -362,18 +362,29 @@ async def handle_checkout_session_completed(db, session: Dict[str, Any]) -> None
             "minisite_active": subscription.status in ["active", "trialing"]
         }
         
+        # Guard: empêcher l'assignation de rôles invalides
+        valid_plans = ["SITE_PLAN_1", "SITE_PLAN_2", "SITE_PLAN_3"]
+        if internal_plan and internal_plan not in valid_plans:
+            logger.error(f"❌ Invalid plan mapping: {plan} -> {internal_plan}. Valid plans: {valid_plans}")
+            internal_plan = None  # Ne pas assigner de rôle invalide
+        
         # Ajouter site_plan (SITE_PLAN_1/2/3) comme source de vérité unique
         if internal_plan:
             user_update["site_plan"] = internal_plan
         
-        # Ajouter le rôle si nécessaire
+        # Ajouter le rôle si nécessaire (seulement si valide)
         roles = roles_before.copy()
-        if internal_plan and internal_plan not in roles:
+        # Retirer les anciens rôles de plan (incluant les legacy SITE_PLAN_10/15)
+        old_plan_roles = ["SITE_PLAN_1", "SITE_PLAN_2", "SITE_PLAN_3", "SITE_PLAN_10", "SITE_PLAN_15"]
+        roles = [r for r in roles if r not in old_plan_roles]
+        
+        if internal_plan and internal_plan in valid_plans:
             roles.append(internal_plan)
             user_update["roles"] = roles
             logger.info(f"➕ Adding role: {internal_plan}")
         else:
-            logger.info(f"ℹ️  Role {internal_plan} already present or not needed")
+            user_update["roles"] = roles
+            logger.info(f"ℹ️  Role {internal_plan} not added (invalid or already present)")
         
         # Mettre à jour l'utilisateur
         result = await db.users.update_one(
@@ -443,13 +454,19 @@ async def handle_subscription_updated(db, subscription: Dict[str, Any]) -> None:
             logger.error(f"❌ Missing data in subscription: {subscription_id} - user_id={user_id}")
             return
         
-        # Mapper le plan
+        # Mapper le plan vers le format interne (SITE_PLAN_1/2/3 uniquement)
         plan_mapping = {
             "starter": "SITE_PLAN_1",
-            "standard": "SITE_PLAN_10",
-            "premium": "SITE_PLAN_15"
+            "standard": "SITE_PLAN_2",
+            "premium": "SITE_PLAN_3"
         }
         internal_plan = plan_mapping.get(plan)
+        
+        # Guard: empêcher l'assignation de rôles invalides
+        valid_plans = ["SITE_PLAN_1", "SITE_PLAN_2", "SITE_PLAN_3"]
+        if internal_plan and internal_plan not in valid_plans:
+            logger.error(f"❌ Invalid plan mapping: {plan} -> {internal_plan}. Valid plans: {valid_plans}")
+            internal_plan = None  # Ne pas assigner de rôle invalide
         
         # Récupérer l'utilisateur AVANT de mettre à jour
         user = await db.users.find_one({"id": user_id}, {"_id": 0})
@@ -480,12 +497,15 @@ async def handle_subscription_updated(db, subscription: Dict[str, Any]) -> None:
         
         # Gérer les rôles (upgrade/downgrade)
         roles = roles_before.copy()
-        # Retirer les anciens rôles de plan
-        roles = [r for r in roles if r not in ["SITE_PLAN_1", "SITE_PLAN_2", "SITE_PLAN_3"]]
-        # Ajouter le nouveau rôle
-        if internal_plan:
+        # Retirer les anciens rôles de plan (incluant les legacy SITE_PLAN_10/15)
+        old_plan_roles = ["SITE_PLAN_1", "SITE_PLAN_2", "SITE_PLAN_3", "SITE_PLAN_10", "SITE_PLAN_15"]
+        roles = [r for r in roles if r not in old_plan_roles]
+        # Ajouter le nouveau rôle (seulement si valide)
+        if internal_plan and internal_plan in valid_plans:
             roles.append(internal_plan)
             logger.info(f"🔄 Updating roles - Removed old plan roles, added: {internal_plan}")
+        else:
+            logger.warning(f"⚠️  Cannot add invalid plan role: {internal_plan}")
         user_update["roles"] = roles
         
         # Mettre à jour l'utilisateur
@@ -552,8 +572,8 @@ async def handle_subscription_deleted(db, subscription: Dict[str, Any]) -> None:
         roles_before = user.get("roles", [])
         logger.info(f"📊 User roles BEFORE deletion: {roles_before}")
         
-        # Retirer les rôles de plan
-        roles = [r for r in roles_before if r not in ["SITE_PLAN_1", "SITE_PLAN_10", "SITE_PLAN_15"]]
+        # Retirer les rôles de plan (incluant les legacy SITE_PLAN_10/15)
+        roles = [r for r in roles_before if r not in ["SITE_PLAN_1", "SITE_PLAN_2", "SITE_PLAN_3", "SITE_PLAN_10", "SITE_PLAN_15"]]
         
         # Mettre à jour l'utilisateur
         result = await db.users.update_one(
