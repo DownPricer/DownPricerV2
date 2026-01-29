@@ -4,12 +4,13 @@ import { Header } from '../components/Header';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Card, CardContent } from '../components/ui/card';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Star, ShieldCheck, Truck, ArrowLeft, Share2, Heart, AlertCircle, ShoppingBag, Mail } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'sonner';
 import { resolveImageUrl } from '../utils/images';
 import { RatingStars } from '../components/RatingStars';
 import { AvatarCircle } from '../components/AvatarCircle';
+import { Loader2 } from 'lucide-react';
 
 export const ArticleDetail = () => {
   const { id } = useParams();
@@ -51,278 +52,250 @@ export const ArticleDetail = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-white">
-        <div className="container mx-auto px-4 py-12 text-center">
-          <p>Chargement...</p>
-        </div>
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-orange-500 mb-4" />
+        <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Chargement du produit...</p>
       </div>
     );
   }
 
-  if (!article) {
-    return (
-      <div className="min-h-screen bg-zinc-950 text-white">
-        <div className="container mx-auto px-4 py-12 text-center">
-          <h1 className="text-2xl font-bold mb-4">Article introuvable</h1>
-          <p className="text-zinc-400 mb-6">L'article que vous recherchez n'existe pas ou a été supprimé.</p>
-          <Button onClick={() => navigate('/')} className="bg-orange-500 hover:bg-orange-600 text-white">
-            Retour à l'accueil
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  if (!article) return null;
 
-  // Extraire les infos vendor de manière sûre après les guards
   const vendor = article?.vendor;
   const vendorAvatar = vendor?.avatar_url || vendor?.logo_url;
   const vendorName = vendor?.seller_name || vendor?.minisite_name || 'Boutique';
-
   const discount = calculateDiscount();
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white" data-testid="article-detail-page">
-      <main className="container mx-auto px-4 py-8">
-        <div className="grid md:grid-cols-2 gap-8">
-          <div>
-            <div className="relative aspect-square bg-zinc-900 rounded-xl overflow-hidden mb-4">
+    <div className="min-h-screen bg-black text-white font-sans selection:bg-orange-500/30" data-testid="article-detail-page">
+      <Header />
+
+      <main className="container mx-auto px-4 py-6 md:py-10 max-w-7xl">
+        
+        {/* Navigation Breadcrumb */}
+        <button 
+          onClick={() => navigate(-1)}
+          className="group flex items-center gap-2 text-zinc-500 hover:text-white transition-colors mb-6 text-sm font-medium"
+        >
+          <div className="p-1 rounded-full bg-white/5 group-hover:bg-white/10 transition-colors">
+            <ArrowLeft className="h-4 w-4" />
+          </div>
+          Retour au catalogue
+        </button>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+          
+          {/* --- COLONNE GAUCHE : GALERIE --- */}
+          <div className="lg:col-span-7 space-y-4">
+            
+            {/* Main Image */}
+            <div className="relative aspect-[4/5] md:aspect-square lg:aspect-[4/3] bg-[#050505] rounded-3xl overflow-hidden border border-white/5 flex items-center justify-center group">
               {(() => {
                 const imageUrl = resolveImageUrl(article?.photos?.[currentPhotoIndex]);
                 if (!imageUrl) {
-                  return (
-                    <div className="w-full h-full flex items-center justify-center text-zinc-600">
-                      Pas d'image disponible
-                    </div>
-                  );
+                  return <div className="text-zinc-700 flex flex-col items-center gap-2"><ShoppingBag size={48} /><span className="text-xs font-bold uppercase tracking-widest">No Image</span></div>;
                 }
                 return (
                   <img
                     src={imageUrl}
-                    alt={article?.name || 'Article'}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      const placeholder = e.target.parentElement.querySelector('.img-placeholder');
-                      if (placeholder) placeholder.style.display = 'flex';
-                    }}
+                    alt={article?.name}
+                    className="w-full h-full object-contain md:object-cover transition-transform duration-500"
                   />
                 );
               })()}
-              <div className="w-full h-full hidden items-center justify-center text-zinc-600 img-placeholder">
-                Pas d'image disponible
+
+              {/* Badges sur l'image */}
+              <div className="absolute top-4 left-4 flex flex-col gap-2">
+                {discount > 0 && (
+                  <Badge className="bg-red-600 text-white border-none font-black text-sm px-3 py-1 shadow-lg">
+                    -{discount}%
+                  </Badge>
+                )}
+                {(article?.source === "minisite" || article?.is_third_party) && (
+                  <Badge className="bg-black/80 backdrop-blur-md text-white border border-white/10 font-bold uppercase tracking-wider text-[10px]">
+                    Vendeur tiers
+                  </Badge>
+                )}
               </div>
-              {discount > 0 && (
-                <Badge className="absolute top-4 right-4 bg-red-500 text-white text-lg font-bold px-4 py-2">
-                  -{discount}%
-                </Badge>
-              )}
             </div>
+
+            {/* Thumbnails */}
             {article?.photos && article.photos.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto">
+              <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
                 {article.photos.map((photo, index) => (
                   <button
                     key={index}
                     onClick={() => setCurrentPhotoIndex(index)}
-                    className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 ${
-                      index === currentPhotoIndex ? 'border-orange-500' : 'border-zinc-800'
+                    className={`flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 transition-all ${
+                      index === currentPhotoIndex ? 'border-orange-500 opacity-100 ring-2 ring-orange-500/20' : 'border-white/5 opacity-60 hover:opacity-100 hover:border-white/20'
                     }`}
-                    data-testid={`article-photo-thumb-${index}`}
                   >
-                    {(() => {
-                      const thumbUrl = resolveImageUrl(photo);
-                      return thumbUrl ? (
-                        <img 
-                          src={thumbUrl} 
-                          alt={`${article?.name || 'Article'} ${index + 1}`} 
-                          className="w-full h-full object-cover" 
-                          loading="lazy"
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-zinc-800 text-zinc-600 text-xs">Image</div>
-                      );
-                    })()}
+                    <img 
+                      src={resolveImageUrl(photo)} 
+                      alt={`Vue ${index + 1}`} 
+                      className="w-full h-full object-cover" 
+                    />
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          <div className="space-y-6">
-            <div>
-              {(article?.source === "minisite" || article?.is_third_party) && (
-                <Badge className="bg-blue-600/90 backdrop-blur-sm text-white border-none shadow-sm hover:bg-blue-700 mb-3">
-                  Vendeur tiers
-                </Badge>
-              )}
-              <h1 className="text-3xl md:text-4xl font-bold text-white mb-4" style={{fontFamily: 'Outfit, sans-serif'}}>
-                {article?.name || 'Article'}
-              </h1>
-              {article?.vendor && (
-                <div className="mb-4 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3">
-                  <div className="flex items-center gap-2">
-                    {article.vendor.logo_url ? (
-                      <img
-                        src={article.vendor.logo_url}
-                        alt={article.vendor.minisite_name || 'Boutique'}
-                        className="h-9 w-9 rounded-full object-cover border border-zinc-700"
-                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                      />
-                    ) : (
-                      <div className="h-9 w-9 rounded-full bg-zinc-800 flex items-center justify-center text-xs text-zinc-500">
-                        {article.vendor.minisite_name?.slice(0, 1)?.toUpperCase() || 'V'}
-                      </div>
-                    )}
-                    <div className="flex-1">
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/s/${article.vendor?.minisite_slug || ''}`)}
-                        className="text-sm text-white hover:text-orange-400"
-                      >
-                        {article.vendor.minisite_name || 'Boutique'}
-                      </button>
-                      <RatingStars rating={article.vendor?.rating_avg || 0} count={article.vendor?.rating_count || 0} />
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/boutique/${article.vendor?.minisite_slug || ''}/avis`)}
-                    className="mt-2 text-xs text-blue-400 hover:underline"
-                  >
-                    Voir les avis boutique
+          {/* --- COLONNE DROITE : INFOS & BUY BOX --- */}
+          <div className="lg:col-span-5 space-y-8">
+            
+            {/* Header Produit */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-start gap-4">
+                <h1 className="text-3xl md:text-4xl font-black text-white uppercase italic tracking-tighter leading-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  {article?.name}
+                </h1>
+                {/* Wishlist / Share actions (Visuelles) */}
+                <div className="flex gap-2">
+                  <button className="p-2 rounded-full bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-colors">
+                    <Share2 size={20} />
+                  </button>
+                  <button className="p-2 rounded-full bg-white/5 text-zinc-400 hover:text-red-500 hover:bg-red-500/10 transition-colors">
+                    <Heart size={20} />
                   </button>
                 </div>
-              )}
-              <div className="flex items-baseline gap-4 mb-4">
-                <span className="text-4xl font-bold text-orange-500 tracking-tight" style={{fontFamily: 'Outfit, sans-serif'}}>
-                  {article?.price || 0}€
-                </span>
-                {article?.reference_price && article.reference_price > (article?.price || 0) && (
-                  <span className="text-xl text-zinc-500 line-through">
-                    {article.reference_price}€
-                  </span>
-                )}
               </div>
+
+              {/* Vendor Info Inline */}
               {vendor && (
-                <div className="mb-4 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 space-y-2">
-                  <div className="flex items-center gap-3">
-                    <AvatarCircle src={vendorAvatar} name={vendorName} size={44} />
-                    <div>
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/s/${vendor?.minisite_slug || ''}`)}
-                        className="text-sm text-white hover:text-orange-400"
-                      >
+                <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate(`/s/${vendor.minisite_slug}`)}>
+                  <AvatarCircle src={vendorAvatar} name={vendorName} size={40} className="border border-white/10" />
+                  <div>
+                    <p className="text-xs text-zinc-400 font-medium">Vendu par</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-white group-hover:text-orange-500 transition-colors border-b border-transparent group-hover:border-orange-500/50">
                         {vendorName}
-                      </button>
-                      <RatingStars rating={vendor?.rating_avg || 0} count={vendor?.rating_count || 0} />
+                      </span>
+                      <div className="h-3 w-[1px] bg-zinc-700" />
+                      <RatingStars rating={vendor.rating_avg || 0} count={vendor.rating_count || 0} />
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/boutique/${vendor?.minisite_slug || ''}/avis`)}
-                    className="text-xs text-blue-400 hover:underline"
-                  >
-                    Voir les avis boutique
-                  </button>
                 </div>
               )}
             </div>
 
-            <Card className="bg-zinc-900 border-zinc-800">
-              <CardContent className="p-6">
-                <h2 className="text-xl font-semibold mb-3 text-white">Description</h2>
-                <p className="text-zinc-300 whitespace-pre-wrap">{article?.description || 'Aucune description disponible.'}</p>
-              </CardContent>
-            </Card>
+            {/* --- BUY BOX (Zone d'achat) --- */}
+            <div className="p-6 md:p-8 bg-[#080808] border border-white/10 rounded-[2rem] shadow-2xl relative overflow-hidden">
+              {/* Effet de fond subtil */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/5 blur-[80px] rounded-full pointer-events-none -mt-20 -mr-20" />
 
-            {(article?.platform_links?.vinted || article?.platform_links?.leboncoin) && (
-              <Card className="bg-zinc-900 border-zinc-800">
-                <CardContent className="p-6 space-y-3">
-                  <h2 className="text-xl font-semibold mb-3 text-white">Liens d'achat</h2>
+              <div className="relative z-10 space-y-6">
+                
+                {/* Prix */}
+                <div className="flex flex-col">
+                  {article?.reference_price > article?.price && (
+                    <span className="text-sm text-zinc-500 line-through font-medium">
+                      Prix conseillé : {article.reference_price}€
+                    </span>
+                  )}
+                  <div className="flex items-start gap-1 text-white">
+                    <span className="text-2xl font-bold mt-1">€</span>
+                    <span className="text-6xl font-black tracking-tighter leading-none">
+                      {Math.floor(article?.price)}
+                    </span>
+                    <div className="flex flex-col">
+                      <span className="text-xl font-bold leading-none mt-1">
+                        {Math.round((article.price % 1) * 100).toString().padEnd(2, '0')}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-zinc-500 mt-1">TVA incluse (si applicable)</p>
+                </div>
+
+                {/* Stock Status */}
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  {article?.stock > 0 ? (
+                    <>
+                      <div className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                      <span className="text-green-500">En stock, expédition rapide</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="h-2 w-2 rounded-full bg-red-500" />
+                      <span className="text-red-500">Actuellement indisponible</span>
+                    </>
+                  )}
+                </div>
+
+                {/* Boutons d'Action (Logique métier conservée) */}
+                <div className="space-y-3 pt-2">
+                  
+                  {/* Liens Vinted / Leboncoin */}
                   {article?.platform_links?.vinted && (
                     <Button
-                      variant="outline"
-                      className="w-full justify-between border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white"
+                      className="w-full h-14 rounded-xl bg-[#007782] hover:bg-[#006670] text-white font-bold text-sm tracking-wide shadow-lg shadow-[#007782]/20 transition-all active:scale-[0.98]"
                       onClick={() => window.open(article.platform_links.vinted, '_blank')}
-                      data-testid="article-vinted-link-btn"
                     >
-                      Voir l'annonce Vinted
-                      <ExternalLink className="h-4 w-4" />
+                      Acheter sur Vinted <ExternalLink className="ml-2 h-4 w-4" />
                     </Button>
                   )}
+                  
                   {article?.platform_links?.leboncoin && (
                     <Button
-                      variant="outline"
-                      className="w-full justify-between border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white"
+                      className="w-full h-14 rounded-xl bg-[#FF6E14] hover:bg-[#E5600E] text-white font-bold text-sm tracking-wide shadow-lg shadow-[#FF6E14]/20 transition-all active:scale-[0.98]"
                       onClick={() => window.open(article.platform_links.leboncoin, '_blank')}
-                      data-testid="article-leboncoin-link-btn"
                     >
-                      Voir l'annonce Leboncoin
-                      <ExternalLink className="h-4 w-4" />
+                      Acheter sur Leboncoin <ExternalLink className="ml-2 h-4 w-4" />
                     </Button>
                   )}
-                </CardContent>
-              </Card>
-            )}
 
-            {/* Contact pour articles vendeur tiers */}
-            {(article?.source === "minisite" || article?.is_third_party) && article?.contact_email && (
-              <Card className="bg-zinc-900 border-zinc-800">
-                <CardContent className="p-6 space-y-4">
-                  <h2 className="text-xl font-semibold text-white">Contact</h2>
-                  <p className="text-zinc-300 text-sm">
-                    Pour contacter le vendeur de cet article :
-                  </p>
-                  <p className="text-white">
-                    Email : <a href={`mailto:${article.contact_email}`} className="text-orange-500 hover:underline">{article.contact_email}</a>
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+                  {/* Main Propre (Si article admin) */}
+                  {article?.source !== "minisite" && !article?.is_third_party && (
+                    <Button
+                      className="w-full h-14 rounded-xl bg-white text-black hover:bg-zinc-200 font-black uppercase tracking-widest text-xs shadow-lg transition-all active:scale-[0.98]"
+                      onClick={() => {
+                        const subject = encodeURIComponent(`Hand Delivery: ${article?.name}`);
+                        const body = encodeURIComponent(`Bonjour,\n\nJe suis intéressé par l'article : ${article?.name} (ID: ${article?.id}).\nMerci de me recontacter.`);
+                        window.location.href = `mailto:${settings.contact_email || 'contact@downpricer.com'}?subject=${subject}&body=${body}`;
+                      }}
+                    >
+                      <Truck className="mr-3 h-5 w-5" /> Remise en main propre
+                    </Button>
+                  )}
 
-            {/* Remise en main propre uniquement pour articles admin */}
-            {article?.source !== "minisite" && !article?.is_third_party && (
-              <Card className="bg-zinc-900 border-zinc-800">
-                <CardContent className="p-6 space-y-4">
-                  <h2 className="text-xl font-semibold text-white">Remise en main propre</h2>
-                  <p className="text-zinc-300 text-sm">
-                    Pour une remise en main propre (souvent moins cher), contactez-nous.
-                  </p>
-                  {settings.contact_phone && (
-                    <p className="text-white">
-                      Téléphone : <span className="text-orange-500">{settings.contact_phone}</span>
-                    </p>
+                  {/* Contact Vendeur Tiers */}
+                  {(article?.source === "minisite" || article?.is_third_party) && article?.contact_email && (
+                    <Button
+                      variant="outline"
+                      className="w-full h-14 rounded-xl border-white/10 bg-white/5 hover:bg-white/10 text-white font-bold text-sm"
+                      onClick={() => window.location.href = `mailto:${article.contact_email}`}
+                    >
+                      <Mail className="mr-2 h-4 w-4" /> Contacter le vendeur
+                    </Button>
                   )}
-                  {settings.contact_email && (
-                    <p className="text-white">
-                      Email : <span className="text-orange-500">{settings.contact_email}</span>
-                    </p>
-                  )}
-                  <Button
-                    className="w-full bg-orange-500 hover:bg-orange-600 text-white rounded-full"
-                    onClick={() => {
-                      const subject = encodeURIComponent(`Demande remise en main propre - DownPricer - ${article?.name || 'Article'}`);
-                      const body = encodeURIComponent(
-                        `Bonjour,\n\nJe souhaite demander une remise en main propre pour l'article suivant :\n\n` +
-                        `- Nom : ${article?.name || 'Article'}\n` +
-                        `- Prix : ${article?.price || 0}€\n` +
-                        `- ID : ${article?.id || 'N/A'}\n` +
-                        `- Lien : ${window.location.href}\n\n` +
-                        `Merci de me contacter pour organiser la remise.\n\nCordialement`
-                      );
-                      window.location.href = `mailto:${settings.contact_email || 'contact@downpricer.com'}?subject=${subject}&body=${body}`;
-                    }}
-                    data-testid="article-request-btn"
-                  >
-                    Demander une remise en main propre
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
+                </div>
+
+                {/* Trust Elements */}
+                <div className="grid grid-cols-2 gap-4 pt-6 border-t border-white/5">
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck className="text-orange-500 h-5 w-5 shrink-0" />
+                    <span className="text-[10px] font-medium text-zinc-400 leading-tight">Paiement Sécurisé via Plateforme</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <AlertCircle className="text-orange-500 h-5 w-5 shrink-0" />
+                    <span className="text-[10px] font-medium text-zinc-400 leading-tight">Support Client 7j/7</span>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Description Block */}
+            <div className="space-y-4 pt-4">
+              <h3 className="text-lg font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <div className="h-1 w-6 bg-orange-500 rounded-full" />
+                Détails Techniques
+              </h3>
+              <div className="p-6 rounded-2xl bg-zinc-900/50 border border-white/5 text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap">
+                {article?.description || "Aucune description fournie pour cet article."}
+              </div>
+            </div>
+
           </div>
         </div>
       </main>
