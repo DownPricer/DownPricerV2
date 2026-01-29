@@ -449,6 +449,7 @@ import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { ExternalLink, Loader2, AlertCircle, ShoppingBag, Star, ChevronRight, ChevronLeft, X, ZoomIn } from 'lucide-react';
 import { SafeImage } from '../components/SafeImage';
+import { Header } from '../components/Header';
 import api from '../utils/api';
 
 // ==========================================
@@ -934,7 +935,10 @@ export const MinisitePublic = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white" style={{ fontFamily: minisite.font_family || 'system-ui' }}>
-      {/* Header */}
+      {/* Header global DownPricer - uniquement pour plan 1 */}
+      {minisite.plan_id === 'SITE_PLAN_1' && <Header />}
+      
+      {/* Header local du minisite */}
       <header className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">

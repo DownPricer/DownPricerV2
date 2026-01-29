@@ -18,7 +18,10 @@ export const AppLayout = ({ children }) => {
   // Ne pas afficher le Header pour les routes de login/signup (elles ont leur propre style)
   const isAuthRoute = location.pathname === '/login' || location.pathname === '/signup';
   
-  const showHeader = !isAdminRoute && !isProRoute && !isAuthRoute;
+  // Ne pas afficher le Header pour les routes minisite publiques (elles gèrent leur propre header selon le plan)
+  const isMinisiteRoute = location.pathname.startsWith('/s/');
+  
+  const showHeader = !isAdminRoute && !isProRoute && !isAuthRoute && !isMinisiteRoute;
   
   return (
     <div className="min-h-screen bg-gray-50">
