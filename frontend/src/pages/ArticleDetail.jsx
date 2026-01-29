@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Header } from '../components/Header';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { Card, CardContent } from '../components/ui/card';
-import { ExternalLink, Star, ShieldCheck, Truck, ArrowLeft, Share2, Heart, AlertCircle, ShoppingBag, Mail } from 'lucide-react';
+import { Card } from '../components/ui/card'; // Import nettoyé
+import { ExternalLink, Share2, Heart, AlertCircle, ShoppingBag, Mail, ArrowLeft, ShieldCheck, Truck } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'sonner';
 import { resolveImageUrl } from '../utils/images';
@@ -68,8 +67,7 @@ export const ArticleDetail = () => {
 
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-orange-500/30" data-testid="article-detail-page">
-      <Header />
-
+      
       <main className="container mx-auto px-4 py-6 md:py-10 max-w-7xl">
         
         {/* Navigation Breadcrumb */}
@@ -150,7 +148,7 @@ export const ArticleDetail = () => {
                 <h1 className="text-3xl md:text-4xl font-black text-white uppercase italic tracking-tighter leading-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>
                   {article?.name}
                 </h1>
-                {/* Wishlist / Share actions (Visuelles) */}
+                {/* Wishlist / Share actions */}
                 <div className="flex gap-2">
                   <button className="p-2 rounded-full bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-colors">
                     <Share2 size={20} />
@@ -181,7 +179,6 @@ export const ArticleDetail = () => {
 
             {/* --- BUY BOX (Zone d'achat) --- */}
             <div className="p-6 md:p-8 bg-[#080808] border border-white/10 rounded-[2rem] shadow-2xl relative overflow-hidden">
-              {/* Effet de fond subtil */}
               <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/5 blur-[80px] rounded-full pointer-events-none -mt-20 -mr-20" />
 
               <div className="relative z-10 space-y-6">
@@ -222,9 +219,8 @@ export const ArticleDetail = () => {
                   )}
                 </div>
 
-                {/* Boutons d'Action (Logique métier conservée) */}
+                {/* Boutons d'Action */}
                 <div className="space-y-3 pt-2">
-                  
                   {/* Liens Vinted / Leboncoin */}
                   {article?.platform_links?.vinted && (
                     <Button
@@ -244,7 +240,7 @@ export const ArticleDetail = () => {
                     </Button>
                   )}
 
-                  {/* Main Propre (Si article admin) */}
+                  {/* Main Propre */}
                   {article?.source !== "minisite" && !article?.is_third_party && (
                     <Button
                       className="w-full h-14 rounded-xl bg-white text-black hover:bg-zinc-200 font-black uppercase tracking-widest text-xs shadow-lg transition-all active:scale-[0.98]"
