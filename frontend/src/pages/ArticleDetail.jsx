@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { ExternalLink, Share2, AlertCircle, ShoppingBag, Mail, ArrowLeft, ShieldCheck, Truck } from 'lucide-react'; // Heart retiré
+import { Card } from '../components/ui/card';
+import { ExternalLink, Share2, AlertCircle, ShoppingBag, Mail, ArrowLeft, ShieldCheck, Truck } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'sonner';
 import { resolveImageUrl } from '../utils/images';
@@ -43,7 +44,6 @@ export const ArticleDetail = () => {
     }
   };
 
-  // --- FONCTION DE PARTAGE ---
   const handleShare = async () => {
     const shareData = {
       title: article?.name || 'DownPricer',
@@ -53,10 +53,8 @@ export const ArticleDetail = () => {
 
     try {
       if (navigator.share) {
-        // Partage natif (Mobile / Navigateurs modernes)
         await navigator.share(shareData);
       } else {
-        // Fallback : Copie dans le presse-papier
         await navigator.clipboard.writeText(window.location.href);
         toast.success('Lien copié dans le presse-papier !');
       }
@@ -85,6 +83,9 @@ export const ArticleDetail = () => {
   const vendorAvatar = vendor?.avatar_url || vendor?.logo_url;
   const vendorName = vendor?.seller_name || vendor?.minisite_name || 'Boutique';
   const discount = calculateDiscount();
+
+  // CORRECTION ICI : On considère disponible si stock n'est pas strictement 0
+  const isAvailable = article.stock !== 0; 
 
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-orange-500/30" data-testid="article-detail-page">
@@ -170,7 +171,7 @@ export const ArticleDetail = () => {
                   {article?.name}
                 </h1>
                 
-                {/* Share action ONLY */}
+                {/* Share action */}
                 <div className="flex gap-2">
                   <button 
                     onClick={handleShare}
@@ -202,7 +203,6 @@ export const ArticleDetail = () => {
 
             {/* --- BUY BOX (Zone d'achat) --- */}
             <div className="p-6 md:p-8 bg-[#080808] border border-white/10 rounded-[2rem] shadow-2xl relative overflow-hidden">
-              {/* Effet de fond subtil */}
               <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/5 blur-[80px] rounded-full pointer-events-none -mt-20 -mr-20" />
 
               <div className="relative z-10 space-y-6">
@@ -228,9 +228,9 @@ export const ArticleDetail = () => {
                   <p className="text-xs text-zinc-500 mt-1">TVA incluse (si applicable)</p>
                 </div>
 
-                {/* Stock Status */}
+                {/* Stock Status - CORRIGÉ */}
                 <div className="flex items-center gap-2 text-sm font-medium">
-                  {article?.stock > 0 ? (
+                  {isAvailable ? (
                     <>
                       <div className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
                       <span className="text-green-500">En stock, expédition rapide</span>
