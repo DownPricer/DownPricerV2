@@ -14,14 +14,13 @@ export const RatingStars = ({ rating = 0, count = 0, showCount = true, size = 14
           const isFull = index < fullStars;
           const isHalf = index === fullStars && hasHalf;
           return (
-            <span key={index} className="relative inline-flex">
-              <Star className={`text-zinc-600`} size={size} />
-              {(isFull || isHalf) && (
-                <span className={`absolute inset-0 overflow-hidden ${isHalf ? 'w-1/2' : 'w-full'}`}>
-                  <Star className="text-yellow-400" size={size} />
-                </span>
-              )}
-            </span>
+            <Star
+              key={index}
+              size={size}
+              fill={(isFull || isHalf) ? 'currentColor' : 'none'}
+              className={(isFull || isHalf) ? 'text-yellow-400' : 'text-zinc-600'}
+              style={isHalf ? { clipPath: 'inset(0 50% 0 0)' } : {}}
+            />
           );
         })}
       </div>
