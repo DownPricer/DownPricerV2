@@ -13,7 +13,6 @@ import { toast } from 'sonner';
 import { resolveImageUrl } from '../../utils/images';
 import { AvatarCircle } from '../../components/AvatarCircle';
 import { RatingStars } from '../../components/RatingStars';
-import { RatingStars } from '../../components/RatingStars';
 
 export const SellerArticleDetail = () => {
   const { id } = useParams();
