@@ -367,19 +367,12 @@ export const SellerArticleDetail = () => {
 
             {/* Bouton "J'ai vendu" uniquement pour articles admin (pas vendeur tiers) */}
             {!article.is_third_party && (
-              <Dialog open={showSaleDialog} onOpenChange={setShowSaleDialog}>
-                <Button
-                  onClick={() => setShowSaleDialog(true)}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white text-lg py-6"
-                  data-testid="declare-sale-btn"
-                >
-                  ✓ J'ai vendu cet article
-                </Button>
-
-              <DialogContent className="bg-zinc-900 border-zinc-800 text-white">
-                <DialogHeader>
-                  <DialogTitle className="text-white">Déclarer une vente</DialogTitle>
-                </DialogHeader>
+              <>
+                <Dialog open={showSaleDialog} onOpenChange={setShowSaleDialog}>
+                  <DialogContent className="bg-zinc-900 border-zinc-800 text-white">
+                    <DialogHeader>
+                      <DialogTitle className="text-white">Déclarer une vente</DialogTitle>
+                    </DialogHeader>
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm text-zinc-400 mb-2">Article : <strong className="text-white">{article.name}</strong></p>
@@ -478,7 +471,16 @@ export const SellerArticleDetail = () => {
                   </p>
                 </div>
               </DialogContent>
-            </Dialog>
+                </Dialog>
+                <Button
+                  onClick={() => setShowSaleDialog(true)}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white text-lg py-6"
+                  data-testid="declare-sale-btn"
+                >
+                  ✓ J'ai vendu cet article
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </main>
