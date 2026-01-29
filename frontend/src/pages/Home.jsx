@@ -59,7 +59,7 @@ export const Home = () => {
       if (searchQuery) params.append('search', searchQuery);
       if (selectedCategory && selectedCategory !== 'all') params.append('category_id', selectedCategory);
       params.append('sort', sortBy);
-      params.append('limit', '60'); // On charge beaucoup d'articles pour remplir la grille
+      params.append('limit', '60'); 
 
       const response = await api.get(`/articles?${params}`);
       setArticles(response.data.articles);
@@ -74,30 +74,40 @@ export const Home = () => {
     return Math.round(((referencePrice - price) / referencePrice) * 100);
   };
 
+  // Helper pour afficher les étoiles compactes
+  const renderStars = (rating) => {
+    return (
+      <div className="flex items-center gap-0.5">
+        {[...Array(5)].map((_, i) => (
+          <Star 
+            key={i} 
+            size={8} 
+            className={`${i < Math.round(rating) ? 'fill-orange-500 text-orange-500' : 'text-zinc-700'}`} 
+          />
+        ))}
+        <span className="text-[8px] text-zinc-400 ml-1 font-medium">({rating})</span>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-orange-500/30">
       
       {/* --- HERO SECTION: COMPACTE & SOBRE --- */}
-      {/* Fond noir pur, pas de flou de couleur derrière */}
       <div className={`overflow-hidden transition-all duration-500 ease-in-out border-b border-white/5 bg-black ${
         heroCollapsed ? 'max-h-0 opacity-0 border-none' : 'max-h-[250px] opacity-100'
       }`}>
         <div className="container mx-auto px-4 py-6 relative">
           <div className="flex flex-col items-center text-center">
-            {/* Tag discret */}
             <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.2em] text-orange-500 mb-2">
               <Zap size={10} className="fill-orange-500" /> Offres du jour
             </div>
-            
-            {/* Titre Blanc + Orange */}
             <h1 className="text-2xl md:text-3xl font-black tracking-tighter text-white uppercase italic mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
               Les Bons Plans <span className="text-orange-500">DownPricer</span>
             </h1>
-            
             <p className="text-zinc-500 text-xs max-w-lg mx-auto font-medium">
               Achetez malin, négociez directement. Le marketplace S-Tier.
             </p>
-            
             <button 
               onClick={() => setHeroCollapsed(true)}
               className="absolute top-4 right-4 p-1 text-zinc-700 hover:text-white transition-colors"
@@ -110,7 +120,7 @@ export const Home = () => {
 
       <main className="container mx-auto px-2 md:px-4 py-4 pb-24">
         
-        {/* --- FILTRES: SOBRE & TECHNIQUE --- */}
+        {/* --- FILTRES --- */}
         <div className="sticky top-2 z-30 mb-4 flex flex-col md:flex-row gap-2 items-center justify-between bg-black/90 backdrop-blur-md p-2 border border-white/10 rounded-lg shadow-xl">
           <div className="relative w-full md:w-80 group">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-600 group-focus-within:text-orange-500 transition-colors" />
@@ -154,8 +164,7 @@ export const Home = () => {
           </div>
         </div>
 
-        {/* --- GRID AMAZON STYLE (HAUTE DENSITÉ) --- */}
-        {/* Mobile: 2 colonnes | Tablet: 4 colonnes | Desktop: 6 colonnes */}
+        {/* --- GRID COMPACTE --- */}
         {loading ? (
           <ArticlesSkeleton />
         ) : articles.length === 0 ? (
@@ -166,7 +175,6 @@ export const Home = () => {
               const discount = calculateDiscount(article.price, article.reference_price);
               const imageUrl = resolveImageUrl(article.photos?.[0]);
               const vendor = article.vendor;
-              // Nom vendeur court pour l'affichage compact
               const vendorName = vendor?.seller_name || vendor?.minisite_name || 'Boutique';
 
               return (
@@ -175,7 +183,7 @@ export const Home = () => {
                   className="group bg-[#050505] border border-white/5 rounded-lg overflow-hidden hover:border-orange-500/40 transition-all duration-200 cursor-pointer flex flex-col h-full"
                   onClick={() => navigate(`/article/${article.id}`)}
                 >
-                  {/* Zone Image - Carrée pour uniformité */}
+                  {/* Image Zone */}
                   <div className="relative aspect-square bg-[#0a0a0a] overflow-hidden">
                     {imageUrl ? (
                       <img
@@ -190,17 +198,17 @@ export const Home = () => {
                       </div>
                     )}
                     
-                    {/* Badge Vendeur Tiers (Discret en haut à gauche) */}
+                    {/* Badge Vendeur Tiers (Modifié) */}
                     {(article.is_third_party || article.source === 'minisite') && (
-                      <div className="absolute top-0 left-0 bg-black/80 backdrop-blur-sm px-1.5 py-0.5 rounded-br-lg border-r border-b border-white/10">
+                      <div className="absolute top-0 left-0 bg-black/90 backdrop-blur-sm px-1.5 py-0.5 rounded-br-lg border-r border-b border-white/10">
                         <div className="flex items-center gap-1">
                           <Store size={8} className="text-orange-500" />
-                          <span className="text-[8px] font-black uppercase text-white tracking-wider">Partner</span>
+                          <span className="text-[7px] font-black uppercase text-white tracking-wider">Vendeur tiers</span>
                         </div>
                       </div>
                     )}
 
-                    {/* Badge Réduction (En haut à droite) */}
+                    {/* Badge Réduction */}
                     {discount > 0 && (
                       <div className="absolute top-0 right-0 bg-red-600 px-1.5 py-0.5 rounded-bl-lg">
                         <span className="text-[9px] font-black text-white">-{discount}%</span>
@@ -211,24 +219,30 @@ export const Home = () => {
                   {/* Contenu Compact */}
                   <CardContent className="p-2.5 flex-grow flex flex-col justify-between">
                     <div>
-                      {/* Titre (2 lignes max) */}
+                      {/* Titre */}
                       <h3 className="text-[11px] md:text-xs font-bold text-zinc-200 leading-tight mb-1 line-clamp-2 h-8 group-hover:text-orange-500 transition-colors">
                         {article.name}
                       </h3>
                       
-                      {/* Ligne Vendeur (Très petite) */}
+                      {/* Ligne Vendeur + Notation (Restaurée) */}
                       {article.is_third_party && vendor ? (
-                        <div className="flex items-center gap-1 mb-2 opacity-60">
-                          <span className="text-[9px] text-zinc-400 truncate">Vendu par {vendorName}</span>
+                        <div className="flex flex-col gap-0.5 mb-2" onClick={(e) => e.stopPropagation()}>
+                          <button 
+                            className="text-[9px] text-zinc-400 hover:text-white transition-colors flex items-center gap-1 w-fit"
+                            onClick={() => navigate(`/s/${vendor.minisite_slug}`)}
+                          >
+                            <span className="truncate max-w-[80px]">Par {vendorName}</span>
+                          </button>
+                          {/* Affichage des étoiles */}
+                          {vendor.rating_avg > 0 && renderStars(vendor.rating_avg)}
                         </div>
                       ) : (
-                        <div className="h-4 mb-1" /> // Spacer
+                        <div className="h-6 mb-1" /> // Spacer
                       )}
                     </div>
 
-                    {/* Prix Amazon Style */}
-                    <div className="flex items-end gap-1">
-                      {/* Prix Promo */}
+                    {/* Prix */}
+                    <div className="flex items-end gap-1 mt-1 pt-1 border-t border-white/5">
                       <div className="flex items-start text-white">
                         <span className="text-[10px] font-bold mt-[2px]">€</span>
                         <span className="text-lg md:text-xl font-black tracking-tighter leading-none">
@@ -239,7 +253,6 @@ export const Home = () => {
                         </span>
                       </div>
 
-                      {/* Prix Barré (si réduction) */}
                       {discount > 0 && (
                         <span className="text-[9px] text-zinc-600 line-through mb-[2px] ml-1">
                           {article.reference_price}€
@@ -257,8 +270,6 @@ export const Home = () => {
   );
 };
 
-// --- SKELETON & EMPTY STATE ---
-
 const EmptyState = () => (
   <div className="flex flex-col items-center justify-center py-20 text-center">
     <Search className="h-8 w-8 text-zinc-800 mb-2" />
@@ -273,7 +284,7 @@ const ArticlesSkeleton = () => (
         <div className="aspect-square bg-white/5 animate-pulse" />
         <div className="p-2 space-y-2 flex-1">
           <div className="h-3 bg-white/5 rounded w-3/4 animate-pulse" />
-          <div className="h-3 bg-white/5 rounded w-1/2 animate-pulse" />
+          <div className="h-2 bg-white/5 rounded w-1/2 animate-pulse" />
           <div className="mt-auto h-5 bg-white/5 rounded w-12 animate-pulse" />
         </div>
       </div>
