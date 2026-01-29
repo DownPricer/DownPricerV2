@@ -54,6 +54,8 @@ class User(BaseModel):
     phone: Optional[str] = None
     roles: List[UserRole] = [UserRole.VISITOR]
     site_plan: Optional[str] = None  # SITE_PLAN_1, SITE_PLAN_2, SITE_PLAN_3
+    rating_avg: Optional[float] = 0.0
+    rating_count: Optional[int] = 0
     created_at: str
 
 class UserCreate(BaseModel):
@@ -184,6 +186,10 @@ class MiniSite(BaseModel):
     articles: List[str] = []
     views: int = 0
     status: str = "active"
+    rating_avg: Optional[float] = 0.0
+    rating_count: Optional[int] = 0
+    sales_count: Optional[int] = 0
+    show_reviews: Optional[bool] = True
     logo_changes_count: int = 0
     name_changes_count: int = 0
     last_logo_change: Optional[str] = None
@@ -199,6 +205,7 @@ class MiniSiteCreate(BaseModel):
     template: Optional[str] = "template1"
     primary_color: Optional[str] = "#FF5722"
     font_family: Optional[str] = "Arial"
+    show_reviews: Optional[bool] = True
 
 class MiniSiteArticle(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -211,6 +218,8 @@ class MiniSiteArticle(BaseModel):
     reference_price: float
     platform_links: Dict[str, str] = {}
     created_at: str
+    status: Optional[str] = "active"
+    reserved: Optional[bool] = False
     # Option pour afficher dans le catalogue revendeur (plan >= 10€)
     show_in_reseller_catalog: bool = False
     # État de l'article (condition)
@@ -234,6 +243,48 @@ class MiniSiteArticleCreate(BaseModel):
     show_in_public_catalog: bool = False
     contact_email: Optional[str] = None  # Email de contact pour catalogue public
     discord_tag: Optional[str] = None  # Pseudo Discord pour B2B
+
+class MarketplaceTransactionStatus(str, Enum):
+    REQUESTED = "requested"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
+    COMPLETED = "completed"
+
+class MarketplaceTransaction(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    article_id: str
+    seller_user_id: str
+    seller_minisite_id: Optional[str] = None
+    buyer_user_id: str
+    status: MarketplaceTransactionStatus
+    buyer_confirmed: bool = False
+    seller_confirmed: bool = False
+    accepted_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    created_at: str
+    reserved: bool = False
+
+class MarketplaceTransactionCreate(BaseModel):
+    article_id: str
+
+class Review(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    transaction_id: str
+    from_user_id: str
+    to_user_id: Optional[str] = None
+    to_minisite_id: Optional[str] = None
+    rating: int = Field(..., ge=1, le=5)
+    comment: Optional[str] = None
+    created_at: str
+    visibility: str = "public"
+
+class ReviewCreate(BaseModel):
+    transaction_id: str
+    rating: int = Field(..., ge=1, le=5)
+    comment: Optional[str] = None
+    target: str  # "user" | "minisite"
 
 class Setting(BaseModel):
     model_config = ConfigDict(extra="ignore")

@@ -18,7 +18,8 @@ from models import (
     User, UserCreate, UserLogin, Article, ArticleCreate, Category, CategoryCreate,
     Demande, DemandeCreate, SellerSale, SellerSaleCreate, MiniSite, MiniSiteCreate,
     MiniSiteArticle, MiniSiteArticleCreate, Setting,
-    UserRole, DemandeStatus, SaleStatus, BillingMode
+    UserRole, DemandeStatus, SaleStatus, BillingMode,
+    MarketplaceTransactionCreate, ReviewCreate
 )
 from auth import verify_password, get_password_hash, create_access_token
 from dependencies import get_current_user, require_roles
@@ -106,6 +107,25 @@ async def get_deposit_percentage() -> float:
         return float(setting.get("value", 40))
     return 40.0
 
+def _compute_new_avg(current_avg: float, current_count: int, new_rating: int) -> float:
+    if current_count <= 0:
+        return float(new_rating)
+    return ((current_avg * current_count) + new_rating) / (current_count + 1)
+
+async def _build_vendor_info(minisite: dict) -> dict:
+    if not minisite:
+        return {}
+    return {
+        "user_id": minisite.get("user_id"),
+        "minisite_id": minisite.get("id"),
+        "minisite_slug": minisite.get("slug"),
+        "minisite_name": minisite.get("site_name"),
+        "logo_url": minisite.get("logo_url"),
+        "rating_avg": minisite.get("rating_avg", 0),
+        "rating_count": minisite.get("rating_count", 0),
+        "sales_count": minisite.get("sales_count", 0)
+    }
+
 @api_router.post("/auth/signup")
 async def signup(
     background_tasks: BackgroundTasks,
@@ -124,6 +144,8 @@ async def signup(
         "last_name": user_data.last_name,
         "phone": user_data.phone,
         "roles": [UserRole.CLIENT],
+        "rating_avg": 0.0,
+        "rating_count": 0,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
@@ -396,7 +418,7 @@ async def get_articles(
     all_articles.extend(general_articles)
     
     # 2. Articles de mini-site avec show_in_public_catalog=True (plan Premium uniquement)
-    query_minisite = {"show_in_public_catalog": True}
+    query_minisite = {"show_in_public_catalog": True, "status": {"$nin": ["sold", "suspended"]}}
     
     if search:
         # Ajouter le filtre de recherche pour les articles mini-site
@@ -409,13 +431,17 @@ async def get_articles(
     
     # Filtrer pour ne garder que ceux dont le mini-site est actif et Premium
     for article in minisite_articles_raw:
-        minisite = await db.minisites.find_one({"id": article.get("minisite_id")}, {"_id": 0, "status": 1, "plan_id": 1, "user_id": 1})
+        minisite = await db.minisites.find_one(
+            {"id": article.get("minisite_id")},
+            {"_id": 0, "status": 1, "plan_id": 1, "user_id": 1, "site_name": 1, "slug": 1, "logo_url": 1, "rating_avg": 1, "rating_count": 1, "sales_count": 1}
+        )
         if minisite and minisite.get("status") == "active" and minisite.get("plan_id") == "SITE_PLAN_3":
             # Ajouter la source pour distinguer
             article["source"] = "minisite"
             article["minisite_id"] = article.get("minisite_id")
             # Marquer comme vendeur tiers (créé par un user minisite, pas admin)
             article["is_third_party"] = True
+            article["vendor"] = await _build_vendor_info(minisite)
             # Filtrer par recherche si nécessaire (déjà fait dans la query MongoDB)
             if not search or search.lower() in article.get("name", "").lower() or search.lower() in article.get("description", "").lower():
                 all_articles.append(article)
@@ -470,8 +496,13 @@ async def get_article(article_id: str):
     minisite_article = await db.minisite_articles.find_one({"id": article_id}, {"_id": 0})
     
     if minisite_article:
+        if minisite_article.get("status") == "sold":
+            raise HTTPException(status_code=404, detail="Article non trouvé")
         # Vérifier que le mini-site est actif
-        minisite = await db.minisites.find_one({"id": minisite_article.get("minisite_id")}, {"_id": 0, "status": 1, "plan_id": 1, "user_id": 1, "site_name": 1})
+        minisite = await db.minisites.find_one(
+            {"id": minisite_article.get("minisite_id")},
+            {"_id": 0, "status": 1, "plan_id": 1, "user_id": 1, "site_name": 1, "slug": 1, "logo_url": 1, "rating_avg": 1, "rating_count": 1, "sales_count": 1}
+        )
         
         if not minisite or minisite.get("status") != "active":
             logger.warning(f"Mini-site inactif ou non trouvé pour article {article_id}")
@@ -486,6 +517,7 @@ async def get_article(article_id: str):
         # Enrichir avec les infos du vendeur pour les articles B2B
         if minisite_article.get("show_in_reseller_catalog"):
             minisite_article["is_third_party"] = True
+            minisite_article["vendor"] = await _build_vendor_info(minisite)
             user_id = minisite.get("user_id")
             if user_id:
                 seller_user = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1, "first_name": 1, "last_name": 1})
@@ -495,6 +527,11 @@ async def get_article(article_id: str):
                         "username": seller_user.get("email", "").split("@")[0],
                         "name": f"{seller_user.get('first_name', '')} {seller_user.get('last_name', '')}".strip() or seller_user.get("email", "").split("@")[0] or minisite.get("site_name", "Vendeur")
                     }
+            reserved_tx = await db.marketplace_transactions.find_one(
+                {"article_id": minisite_article.get("id"), "status": "accepted"},
+                {"_id": 0, "id": 1}
+            )
+            minisite_article["reserved"] = reserved_tx is not None
         
         return minisite_article
     
@@ -893,24 +930,34 @@ async def get_seller_articles(
         all_articles.append(article)
     
     # 2. Articles de mini-site avec show_in_reseller_catalog=True
-    query_minisite = {"show_in_reseller_catalog": True}
+    query_minisite = {"show_in_reseller_catalog": True, "status": {"$nin": ["sold", "suspended"]}}
     
     # Vérifier que le mini-site est actif
     minisite_articles_raw = await db.minisite_articles.find(query_minisite, {"_id": 0}).to_list(1000)
     
     # Filtrer pour ne garder que ceux dont le mini-site est actif
     for article in minisite_articles_raw:
-        minisite = await db.minisites.find_one({"id": article.get("minisite_id")}, {"_id": 0, "status": 1, "plan_id": 1, "user_id": 1, "site_name": 1})
+        minisite = await db.minisites.find_one(
+            {"id": article.get("minisite_id")},
+            {"_id": 0, "status": 1, "plan_id": 1, "user_id": 1, "site_name": 1, "slug": 1, "logo_url": 1, "rating_avg": 1, "rating_count": 1, "sales_count": 1}
+        )
         if minisite and minisite.get("status") == "active":
             # Vérifier que le plan permet le catalogue revendeur (SITE_PLAN_2 ou SITE_PLAN_3)
             plan_id = minisite.get("plan_id")
             if plan_id in ["SITE_PLAN_2", "SITE_PLAN_3"]:
+                reserved_tx = await db.marketplace_transactions.find_one(
+                    {"article_id": article.get("id"), "status": "accepted"},
+                    {"_id": 0, "id": 1}
+                )
+                if reserved_tx:
+                    continue
                 article["potential_profit"] = article["reference_price"] - article["price"]
                 article["source"] = "minisite"  # Marquer la source
                 article["minisite_id"] = article.get("minisite_id")
                 
                 # Marquer comme vendeur tiers (créé par un user minisite, pas admin)
                 article["is_third_party"] = True
+                article["vendor"] = await _build_vendor_info(minisite)
                 
                 # Enrichir avec les infos du vendeur (propriétaire du minisite)
                 user_id = minisite.get("user_id")
@@ -1649,6 +1696,419 @@ async def admin_mark_shipped(sale_id: str, data: dict):
     
     return {"success": True, "message": "Vente marquée comme expédiée"}
 
+# =============================
+# MARKETPLACE TRANSACTIONS
+# =============================
+
+@api_router.post("/marketplace/transactions", dependencies=[Depends(require_roles([UserRole.SELLER, UserRole.ADMIN]))])
+async def create_marketplace_transaction(
+    payload: MarketplaceTransactionCreate,
+    current_user = Depends(get_current_user)
+):
+    user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    
+    article = await db.minisite_articles.find_one({"id": payload.article_id}, {"_id": 0})
+    if not article or not article.get("show_in_reseller_catalog"):
+        raise HTTPException(status_code=404, detail="Article non disponible pour le catalogue revendeur")
+    if article.get("status") == "sold":
+        raise HTTPException(status_code=400, detail="Article déjà vendu")
+    
+    minisite = await db.minisites.find_one({"id": article.get("minisite_id")}, {"_id": 0})
+    if not minisite or minisite.get("status") != "active" or minisite.get("plan_id") != "SITE_PLAN_3":
+        raise HTTPException(status_code=400, detail="Vendeur tiers non éligible")
+    
+    if minisite.get("user_id") == user_doc.get("id"):
+        raise HTTPException(status_code=400, detail="Vous ne pouvez pas demander votre propre article")
+    
+    existing_active = await db.marketplace_transactions.find_one(
+        {"article_id": payload.article_id, "status": {"$in": ["requested", "accepted"]}},
+        {"_id": 0, "id": 1, "buyer_user_id": 1}
+    )
+    if existing_active:
+        if existing_active.get("buyer_user_id") == user_doc.get("id"):
+            raise HTTPException(status_code=400, detail="Une demande est déjà en cours pour cet article")
+        raise HTTPException(status_code=409, detail="Article déjà réservé par un autre revendeur")
+    
+    existing_for_user = await db.marketplace_transactions.find_one(
+        {"article_id": payload.article_id, "buyer_user_id": user_doc.get("id"), "status": {"$in": ["requested", "accepted", "completed"]}},
+        {"_id": 0, "id": 1}
+    )
+    if existing_for_user:
+        raise HTTPException(status_code=400, detail="Vous avez déjà une transaction pour cet article")
+    
+    transaction_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    transaction_doc = {
+        "id": transaction_id,
+        "article_id": payload.article_id,
+        "seller_user_id": minisite.get("user_id"),
+        "seller_minisite_id": minisite.get("id"),
+        "buyer_user_id": user_doc.get("id"),
+        "status": "requested",
+        "buyer_confirmed": False,
+        "seller_confirmed": False,
+        "accepted_at": None,
+        "completed_at": None,
+        "created_at": now,
+        "reserved": False
+    }
+    
+    await db.marketplace_transactions.insert_one(transaction_doc)
+    
+    return transaction_doc
+
+@api_router.get("/marketplace/transactions/my", dependencies=[Depends(get_current_user)])
+async def get_my_marketplace_transactions(
+    role: str = Query("buyer"),
+    article_id: Optional[str] = None,
+    current_user = Depends(get_current_user)
+):
+    user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    
+    if role not in ["buyer", "seller"]:
+        raise HTTPException(status_code=400, detail="Rôle invalide")
+    
+    query = {"buyer_user_id": user_doc.get("id")} if role == "buyer" else {"seller_user_id": user_doc.get("id")}
+    if article_id:
+        query["article_id"] = article_id
+    
+    transactions = await db.marketplace_transactions.find(query, {"_id": 0}).sort("created_at", -1).to_list(200)
+    
+    enriched = []
+    for tx in transactions:
+        article = await db.minisite_articles.find_one(
+            {"id": tx.get("article_id")},
+            {"_id": 0, "id": 1, "name": 1, "price": 1, "reference_price": 1, "photos": 1, "platform_links": 1, "minisite_id": 1, "discord_tag": 1, "status": 1}
+        )
+        minisite = await db.minisites.find_one(
+            {"id": tx.get("seller_minisite_id") or (article.get("minisite_id") if article else None)},
+            {"_id": 0, "id": 1, "site_name": 1, "slug": 1, "logo_url": 1, "rating_avg": 1, "rating_count": 1, "sales_count": 1, "show_reviews": 1}
+        )
+        buyer_user = await db.users.find_one(
+            {"id": tx.get("buyer_user_id")},
+            {"_id": 0, "id": 1, "email": 1, "first_name": 1, "last_name": 1, "rating_avg": 1, "rating_count": 1}
+        )
+        seller_user = await db.users.find_one(
+            {"id": tx.get("seller_user_id")},
+            {"_id": 0, "id": 1, "email": 1, "first_name": 1, "last_name": 1, "rating_avg": 1, "rating_count": 1}
+        )
+        
+        buyer_completed_count = await db.marketplace_transactions.count_documents(
+            {"buyer_user_id": tx.get("buyer_user_id"), "status": "completed"}
+        )
+        
+        buyer_review = await db.reviews.find_one(
+            {"transaction_id": tx.get("id"), "from_user_id": tx.get("buyer_user_id")},
+            {"_id": 0, "id": 1}
+        )
+        seller_review = await db.reviews.find_one(
+            {"transaction_id": tx.get("id"), "from_user_id": tx.get("seller_user_id")},
+            {"_id": 0, "id": 1}
+        )
+        
+        tx["article"] = article
+        tx["minisite"] = minisite
+        tx["buyer"] = {
+            "id": buyer_user.get("id") if buyer_user else None,
+            "name": f"{buyer_user.get('first_name', '')} {buyer_user.get('last_name', '')}".strip() if buyer_user else "Revendeur",
+            "rating_avg": buyer_user.get("rating_avg", 0) if buyer_user else 0,
+            "rating_count": buyer_user.get("rating_count", 0) if buyer_user else 0,
+            "completed_transactions": buyer_completed_count
+        }
+        tx["seller"] = {
+            "id": seller_user.get("id") if seller_user else None,
+            "name": f"{seller_user.get('first_name', '')} {seller_user.get('last_name', '')}".strip() if seller_user else "Vendeur",
+            "rating_avg": seller_user.get("rating_avg", 0) if seller_user else 0,
+            "rating_count": seller_user.get("rating_count", 0) if seller_user else 0
+        }
+        tx["buyer_reviewed"] = buyer_review is not None
+        tx["seller_reviewed"] = seller_review is not None
+        enriched.append(tx)
+    
+    return enriched
+
+@api_router.patch("/marketplace/transactions/{transaction_id}/accept", dependencies=[Depends(get_current_user)])
+async def accept_marketplace_transaction(
+    transaction_id: str,
+    background_tasks: BackgroundTasks,
+    payload: dict = Body(...),
+    current_user = Depends(get_current_user)
+):
+    user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    
+    tx = await db.marketplace_transactions.find_one({"id": transaction_id}, {"_id": 0})
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction non trouvée")
+    
+    if tx.get("seller_user_id") != user_doc.get("id") and UserRole.ADMIN not in current_user.roles:
+        raise HTTPException(status_code=403, detail="Non autorisé")
+    
+    if tx.get("status") != "requested":
+        raise HTTPException(status_code=400, detail="Transaction non modifiable")
+    
+    accept = bool(payload.get("accept"))
+    now = datetime.now(timezone.utc).isoformat()
+    
+    if accept:
+        existing_reserved = await db.marketplace_transactions.find_one(
+            {"article_id": tx.get("article_id"), "status": "accepted"},
+            {"_id": 0, "id": 1}
+        )
+        if existing_reserved:
+            raise HTTPException(status_code=409, detail="Article déjà réservé")
+        
+        await db.marketplace_transactions.update_one(
+            {"id": transaction_id},
+            {"$set": {"status": "accepted", "reserved": True, "accepted_at": now}}
+        )
+        await db.minisite_articles.update_one(
+            {"id": tx.get("article_id")},
+            {"$set": {"reserved": True}}
+        )
+        
+        buyer_user = await db.users.find_one({"id": tx.get("buyer_user_id")}, {"_id": 0, "email": 1, "first_name": 1, "last_name": 1})
+        if buyer_user and background_tasks is not None:
+            try:
+                await notify_user(
+                    db,
+                    EventType.USER_SELLER_APPLICATION_STATUS_CHANGED,
+                    {
+                        "title": "Demande acceptée",
+                        "message": "Votre demande d'accès a été acceptée. Vous pouvez poursuivre la transaction via Discord.",
+                        "user_name": f"{buyer_user.get('first_name', '')} {buyer_user.get('last_name', '')}".strip(),
+                        "user_email": buyer_user.get("email")
+                    },
+                    background_tasks
+                )
+            except Exception as e:
+                logger.error(f"Erreur notification accept transaction: {str(e)}")
+        
+        updated = await db.marketplace_transactions.find_one({"id": transaction_id}, {"_id": 0})
+        return updated
+    
+    await db.marketplace_transactions.update_one(
+        {"id": transaction_id},
+        {"$set": {"status": "declined", "reserved": False}}
+    )
+    await db.minisite_articles.update_one(
+        {"id": tx.get("article_id")},
+        {"$set": {"reserved": False}}
+    )
+    updated = await db.marketplace_transactions.find_one({"id": transaction_id}, {"_id": 0})
+    return updated
+
+@api_router.patch("/marketplace/transactions/{transaction_id}/confirm", dependencies=[Depends(get_current_user)])
+async def confirm_marketplace_transaction(
+    transaction_id: str,
+    payload: dict = Body(...),
+    current_user = Depends(get_current_user)
+):
+    user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    
+    tx = await db.marketplace_transactions.find_one({"id": transaction_id}, {"_id": 0})
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction non trouvée")
+    
+    side = payload.get("side")
+    if side not in ["buyer", "seller"]:
+        raise HTTPException(status_code=400, detail="Paramètre side invalide")
+    
+    if side == "buyer" and tx.get("buyer_user_id") != user_doc.get("id"):
+        raise HTTPException(status_code=403, detail="Non autorisé")
+    if side == "seller" and tx.get("seller_user_id") != user_doc.get("id"):
+        raise HTTPException(status_code=403, detail="Non autorisé")
+    
+    update_fields = {}
+    if side == "buyer" and not tx.get("buyer_confirmed"):
+        update_fields["buyer_confirmed"] = True
+    if side == "seller" and not tx.get("seller_confirmed"):
+        update_fields["seller_confirmed"] = True
+    
+    if update_fields:
+        await db.marketplace_transactions.update_one({"id": transaction_id}, {"$set": update_fields})
+    
+    updated_tx = await db.marketplace_transactions.find_one({"id": transaction_id}, {"_id": 0})
+    
+    if updated_tx.get("buyer_confirmed") and updated_tx.get("seller_confirmed") and updated_tx.get("status") != "completed":
+        now = datetime.now(timezone.utc).isoformat()
+        await db.marketplace_transactions.update_one(
+            {"id": transaction_id},
+            {"$set": {"status": "completed", "completed_at": now, "reserved": False}}
+        )
+        await db.minisite_articles.update_one(
+            {"id": updated_tx.get("article_id")},
+            {"$set": {"status": "sold", "show_in_reseller_catalog": False, "show_in_public_catalog": False, "reserved": False}}
+        )
+        if updated_tx.get("seller_minisite_id"):
+            await db.minisites.update_one(
+                {"id": updated_tx.get("seller_minisite_id")},
+                {"$inc": {"sales_count": 1}}
+            )
+        updated_tx = await db.marketplace_transactions.find_one({"id": transaction_id}, {"_id": 0})
+    
+    return updated_tx
+
+# =============================
+# REVIEWS & RATINGS
+# =============================
+
+@api_router.post("/reviews", dependencies=[Depends(get_current_user)])
+async def create_review(
+    review_data: ReviewCreate,
+    current_user = Depends(get_current_user)
+):
+    user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    
+    tx = await db.marketplace_transactions.find_one({"id": review_data.transaction_id}, {"_id": 0})
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction non trouvée")
+    if tx.get("status") != "completed":
+        raise HTTPException(status_code=400, detail="La transaction n'est pas terminée")
+    if user_doc.get("id") not in [tx.get("buyer_user_id"), tx.get("seller_user_id")]:
+        raise HTTPException(status_code=403, detail="Non autorisé")
+    
+    existing = await db.reviews.find_one(
+        {"transaction_id": review_data.transaction_id, "from_user_id": user_doc.get("id")},
+        {"_id": 0, "id": 1}
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="Avis déjà envoyé")
+    
+    to_user_id = None
+    to_minisite_id = None
+    if review_data.target == "minisite":
+        if user_doc.get("id") != tx.get("buyer_user_id"):
+            raise HTTPException(status_code=403, detail="Seul l'acheteur peut noter la boutique")
+        to_minisite_id = tx.get("seller_minisite_id")
+        if not to_minisite_id:
+            raise HTTPException(status_code=400, detail="Boutique introuvable")
+    elif review_data.target == "user":
+        if user_doc.get("id") != tx.get("seller_user_id"):
+            raise HTTPException(status_code=403, detail="Seul le vendeur peut noter le revendeur")
+        to_user_id = tx.get("buyer_user_id")
+    else:
+        raise HTTPException(status_code=400, detail="Cible invalide")
+    
+    review_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    review_doc = {
+        "id": review_id,
+        "transaction_id": review_data.transaction_id,
+        "from_user_id": user_doc.get("id"),
+        "to_user_id": to_user_id,
+        "to_minisite_id": to_minisite_id,
+        "rating": int(review_data.rating),
+        "comment": review_data.comment or "",
+        "created_at": now,
+        "visibility": "public"
+    }
+    
+    await db.reviews.insert_one(review_doc)
+    
+    if to_user_id:
+        target_user = await db.users.find_one({"id": to_user_id}, {"_id": 0, "rating_avg": 1, "rating_count": 1})
+        current_avg = float(target_user.get("rating_avg", 0)) if target_user else 0.0
+        current_count = int(target_user.get("rating_count", 0)) if target_user else 0
+        new_avg = _compute_new_avg(current_avg, current_count, review_doc["rating"])
+        await db.users.update_one(
+            {"id": to_user_id},
+            {"$set": {"rating_avg": new_avg}, "$inc": {"rating_count": 1}}
+        )
+    
+    if to_minisite_id:
+        target_site = await db.minisites.find_one({"id": to_minisite_id}, {"_id": 0, "rating_avg": 1, "rating_count": 1})
+        current_avg = float(target_site.get("rating_avg", 0)) if target_site else 0.0
+        current_count = int(target_site.get("rating_count", 0)) if target_site else 0
+        new_avg = _compute_new_avg(current_avg, current_count, review_doc["rating"])
+        await db.minisites.update_one(
+            {"id": to_minisite_id},
+            {"$set": {"rating_avg": new_avg}, "$inc": {"rating_count": 1}}
+        )
+    
+    return review_doc
+
+@api_router.get("/reviews/minisite/{minisite_id}")
+async def get_minisite_reviews(
+    minisite_id: str,
+    skip: int = 0,
+    limit: int = 10
+):
+    minisite = await db.minisites.find_one({"id": minisite_id}, {"_id": 0, "show_reviews": 1})
+    if not minisite:
+        raise HTTPException(status_code=404, detail="Mini-site non trouvé")
+    if not minisite.get("show_reviews", True):
+        return {"items": [], "total": 0, "hidden": True}
+    
+    reviews = await db.reviews.find(
+        {"to_minisite_id": minisite_id, "visibility": "public"},
+        {"_id": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    total = await db.reviews.count_documents({"to_minisite_id": minisite_id, "visibility": "public"})
+    
+    for review in reviews:
+        author = await db.users.find_one({"id": review.get("from_user_id")}, {"_id": 0, "first_name": 1, "last_name": 1, "email": 1})
+        review["from_user"] = {
+            "id": author.get("id") if author else None,
+            "name": f"{author.get('first_name', '')} {author.get('last_name', '')}".strip() if author else "Utilisateur"
+        }
+    
+    return {"items": reviews, "total": total, "hidden": False}
+
+@api_router.get("/reviews/user/{user_id}")
+async def get_user_reviews(
+    user_id: str,
+    skip: int = 0,
+    limit: int = 10
+):
+    reviews = await db.reviews.find(
+        {"to_user_id": user_id, "visibility": "public"},
+        {"_id": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    
+    total = await db.reviews.count_documents({"to_user_id": user_id, "visibility": "public"})
+    
+    for review in reviews:
+        author = await db.users.find_one({"id": review.get("from_user_id")}, {"_id": 0, "first_name": 1, "last_name": 1, "email": 1})
+        review["from_user"] = {
+            "id": author.get("id") if author else None,
+            "name": f"{author.get('first_name', '')} {author.get('last_name', '')}".strip() if author else "Utilisateur"
+        }
+    
+    return {"items": reviews, "total": total}
+
+@api_router.get("/ratings/minisite/{minisite_id}")
+async def get_minisite_ratings(minisite_id: str):
+    minisite = await db.minisites.find_one(
+        {"id": minisite_id},
+        {"_id": 0, "rating_avg": 1, "rating_count": 1, "sales_count": 1, "show_reviews": 1}
+    )
+    if not minisite:
+        raise HTTPException(status_code=404, detail="Mini-site non trouvé")
+    return {
+        "avg": minisite.get("rating_avg", 0),
+        "count": minisite.get("rating_count", 0),
+        "sales_count": minisite.get("sales_count", 0),
+        "show_reviews": minisite.get("show_reviews", True)
+    }
+
+@api_router.get("/ratings/user/{user_id}")
+async def get_user_ratings(user_id: str):
+    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "rating_avg": 1, "rating_count": 1})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    return {"avg": user_doc.get("rating_avg", 0), "count": user_doc.get("rating_count", 0)}
+
 # ===== MINI-SITES ROUTES =====
 
 @api_router.post("/minisites", dependencies=[Depends(require_roles([UserRole.CLIENT, UserRole.ADMIN]))])
@@ -1696,6 +2156,10 @@ async def create_minisite(
         "articles": [],
         "views": 0,
         "status": "active",
+        "rating_avg": 0.0,
+        "rating_count": 0,
+        "sales_count": 0,
+        "show_reviews": site_data.show_reviews if site_data.show_reviews is not None else True,
         "logo_changes_count": 0,
         "name_changes_count": 0,
         "last_logo_change": None,
@@ -1774,7 +2238,7 @@ async def get_minisite_by_slug(slug: str):
     
     # Récupérer les articles du mini-site par minisite_id (pas par liste d'ids)
     articles = await db.minisite_articles.find(
-        {"minisite_id": minisite["id"], "status": {"$ne": "suspended"}}, 
+        {"minisite_id": minisite["id"], "status": {"$nin": ["suspended", "sold"]}}, 
         {"_id": 0}
     ).to_list(100)
     
@@ -1835,7 +2299,7 @@ async def update_minisite(site_id: str, updates: dict, current_user = Depends(ge
         update_data["name_changes_count"] = changes_count + 1
     
     # Autres mises à jour simples
-    allowed_fields = ["welcome_text", "template", "primary_color", "font_family"]
+    allowed_fields = ["welcome_text", "template", "primary_color", "font_family", "show_reviews"]
     for field in allowed_fields:
         if field in updates:
             update_data[field] = updates[field]
@@ -1883,6 +2347,8 @@ async def add_minisite_article(site_id: str, article_data: MiniSiteArticleCreate
         "price": article_data.price,
         "reference_price": article_data.reference_price,
         "platform_links": article_data.platform_links,
+        "status": "active",
+        "reserved": False,
         "show_in_reseller_catalog": article_data.show_in_reseller_catalog,
         "condition": article_data.condition,
         "show_in_public_catalog": article_data.show_in_public_catalog,

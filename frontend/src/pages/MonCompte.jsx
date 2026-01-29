@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -9,8 +10,10 @@ import { getUser, setUser } from '../utils/auth';
 import { toast } from 'sonner';
 
 export const MonCompte = () => {
+  const navigate = useNavigate();
   const [user, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [rating, setRating] = useState({ avg: 0, count: 0 });
 
   useEffect(() => {
     const userData = getUser();
@@ -23,6 +26,10 @@ export const MonCompte = () => {
     try {
       const response = await api.get('/auth/me');
       setUserData(response.data);
+      if (response.data?.id) {
+        const ratingRes = await api.get(`/ratings/user/${response.data.id}`);
+        setRating(ratingRes.data || { avg: 0, count: 0 });
+      }
     } catch (error) {
       toast.error('Erreur lors du chargement du profil');
     }
@@ -43,6 +50,27 @@ export const MonCompte = () => {
           </div>
         ) : (
           <div className="space-y-6">
+            <Card className="bg-zinc-900 border-zinc-800">
+              <CardHeader>
+                <CardTitle className="text-white">Note revendeur</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-3 text-zinc-300">
+                  <span className="text-2xl">⭐</span>
+                  <span className="text-lg font-semibold">{Number(rating.avg || 0).toFixed(1)}</span>
+                  <span className="text-sm text-zinc-500">({rating.count || 0} avis)</span>
+                </div>
+                {user?.id && (
+                  <Button
+                    variant="outline"
+                    className="mt-4 border-zinc-700 text-white"
+                    onClick={() => navigate(`/user/${user.id}/avis`)}
+                  >
+                    Voir mes avis
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
             <Card className="bg-zinc-900 border-zinc-800">
               <CardHeader>
                 <CardTitle className="text-white">Informations personnelles</CardTitle>

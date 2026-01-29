@@ -447,10 +447,11 @@ import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { ExternalLink, Loader2, AlertCircle, ShoppingBag, Star, ChevronRight, ChevronLeft, X, ZoomIn } from 'lucide-react';
+import { ExternalLink, Loader2, AlertCircle, ShoppingBag, ChevronRight, ChevronLeft, X, ZoomIn } from 'lucide-react';
 import { SafeImage } from '../components/SafeImage';
 import { Header } from '../components/Header';
 import api from '../utils/api';
+import { RatingStars } from '../components/RatingStars';
 
 // ==========================================
 // TEMPLATE COMPONENTS
@@ -867,6 +868,9 @@ export const MinisitePublic = () => {
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [isZoomed, setIsZoomed] = useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsHidden, setReviewsHidden] = useState(false);
 
   useEffect(() => {
     fetchMinisite();
@@ -878,11 +882,28 @@ export const MinisitePublic = () => {
       const data = response.data;
       setMinisite(data);
       setArticles(data.articles_data || []);
+      if (data.show_reviews !== false) {
+        fetchReviews(data.id);
+      } else {
+        setReviewsHidden(true);
+      }
     } catch (err) {
       setError('Mini-site introuvable ou suspendu');
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchReviews = async (minisiteId) => {
+    setReviewsLoading(true);
+    try {
+      const response = await api.get(`/reviews/minisite/${minisiteId}`);
+      setReviews(response.data?.items || []);
+      setReviewsHidden(response.data?.hidden || false);
+    } catch (error) {
+      setReviews([]);
+    }
+    setReviewsLoading(false);
   };
 
   const handleArticleClick = (article) => {
@@ -951,7 +972,13 @@ export const MinisitePublic = () => {
             )}
             <h1 className="text-xl font-bold" style={{ color: minisite.primary_color || '#FF5722' }}>{minisite.site_name}</h1>
           </div>
-          <Badge className="bg-zinc-800 text-zinc-300">{articles.length} articles</Badge>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <RatingStars rating={minisite.rating_avg || 0} count={minisite.rating_count || 0} />
+              <p className="text-xs text-zinc-500">{minisite.sales_count || 0} vente(s)</p>
+            </div>
+            <Badge className="bg-zinc-800 text-zinc-300">{articles.length} articles</Badge>
+          </div>
         </div>
       </header>
 
@@ -982,6 +1009,39 @@ export const MinisitePublic = () => {
           <TemplateComponent articles={articles} minisite={minisite} onArticleClick={handleArticleClick} />
         )}
       </section>
+
+      {!reviewsHidden && (
+        <section className="container mx-auto px-4 py-8">
+          <h2 className="text-2xl font-bold mb-6" style={{ color: minisite.primary_color || '#FF5722' }}>
+            Avis boutique
+          </h2>
+          {reviewsLoading ? (
+            <Card className="bg-zinc-900 border-zinc-800">
+              <CardContent className="p-6 text-center text-zinc-400">Chargement...</CardContent>
+            </Card>
+          ) : reviews.length === 0 ? (
+            <Card className="bg-zinc-900 border-zinc-800">
+              <CardContent className="p-6 text-center text-zinc-400">Aucun avis pour le moment</CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {reviews.map((review) => (
+                <Card key={review.id} className="bg-zinc-900 border-zinc-800">
+                  <CardContent className="p-6 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <p className="text-sm text-zinc-400">{review.from_user?.name || 'Utilisateur'}</p>
+                      <RatingStars rating={review.rating} count={0} showCount={false} />
+                    </div>
+                    {review.comment && (
+                      <p className="text-zinc-300 text-sm">{review.comment}</p>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Footer - Branding uniquement pour plan 1 */}
       {minisite.plan_id === 'SITE_PLAN_1' && (

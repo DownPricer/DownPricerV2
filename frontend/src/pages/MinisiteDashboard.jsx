@@ -648,10 +648,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { 
   Globe, Eye, Share2, Settings, Plus, Check, Trash2, Mail, 
   AlertTriangle, Zap, Crown, Grid, List, LayoutGrid, Columns, 
-  ArrowUpRight, Loader2, ExternalLink, BarChart3, Palette, Box, CheckCircle2
+  ArrowUpRight, Loader2, ExternalLink, BarChart3, Palette, Box, CheckCircle2,
+  Users, Star
 } from 'lucide-react';
 import { ImageUpload } from '../components/ImageUpload';
 import { SafeImage } from '../components/SafeImage';
+import { RatingStars } from '../components/RatingStars';
 import api from '../utils/api';
 import { toast } from 'sonner';
 
@@ -706,6 +708,12 @@ export const MinisiteDashboard = () => {
   const [copied, setCopied] = useState(false);
   const [supportEmail, setSupportEmail] = useState('support@downpricer.com');
   const [paymentsEnabled, setPaymentsEnabled] = useState(false);
+  const [resellerTransactions, setResellerTransactions] = useState([]);
+  const [resellerLoading, setResellerLoading] = useState(true);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewTx, setReviewTx] = useState(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
   
   const [articleForm, setArticleForm] = useState({
     name: '',
@@ -727,7 +735,8 @@ export const MinisiteDashboard = () => {
     welcome_text: '',
     template: 'modern-grid',
     primary_color: '#FF5722',
-    font_family: 'Arial'
+    font_family: 'Arial',
+    show_reviews: true
   });
 
   const pollTimeoutsRef = useRef([]);
@@ -742,6 +751,7 @@ export const MinisiteDashboard = () => {
     fetchMinisiteData();
     fetchSettings();
     fetchSubscription();
+    fetchResellerTransactions();
 
     // Vérifier si on revient d'un paiement Stripe réussi
     const urlParams = new URLSearchParams(window.location.search);
@@ -861,7 +871,8 @@ export const MinisiteDashboard = () => {
           welcome_text: siteRes.data.welcome_text || '',
           template: siteRes.data.template || 'modern-grid',
           primary_color: siteRes.data.primary_color || '#FF5722',
-          font_family: siteRes.data.font_family || 'Arial'
+          font_family: siteRes.data.font_family || 'Arial',
+          show_reviews: siteRes.data.show_reviews !== false
         });
         
         const articlesResponse = await api.get(`/minisites/${siteRes.data.id}/articles`);
@@ -904,6 +915,61 @@ export const MinisiteDashboard = () => {
     
     if (isMountedRef.current) {
       setLoading(false);
+    }
+  };
+
+  const fetchResellerTransactions = async () => {
+    setResellerLoading(true);
+    try {
+      const response = await api.get('/marketplace/transactions/my?role=seller');
+      setResellerTransactions(response.data || []);
+    } catch (error) {
+      toast.error('Erreur chargement demandes revendeurs');
+    }
+    setResellerLoading(false);
+  };
+
+  const handleResellerDecision = async (transactionId, accept) => {
+    try {
+      await api.patch(`/marketplace/transactions/${transactionId}/accept`, { accept });
+      toast.success(accept ? 'Demande acceptée' : 'Demande refusée');
+      fetchResellerTransactions();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erreur lors de la décision');
+    }
+  };
+
+  const handleResellerConfirm = async (transactionId) => {
+    try {
+      await api.patch(`/marketplace/transactions/${transactionId}/confirm`, { side: 'seller' });
+      toast.success('Confirmation envoyée');
+      fetchResellerTransactions();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erreur confirmation');
+    }
+  };
+
+  const openReviewModal = (tx) => {
+    setReviewTx(tx);
+    setReviewRating(5);
+    setReviewComment('');
+    setReviewOpen(true);
+  };
+
+  const submitReview = async () => {
+    if (!reviewTx?.id) return;
+    try {
+      await api.post('/reviews', {
+        transaction_id: reviewTx.id,
+        rating: reviewRating,
+        comment: reviewComment,
+        target: 'user'
+      });
+      toast.success('Avis envoyé');
+      setReviewOpen(false);
+      fetchResellerTransactions();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erreur lors de l\'avis');
     }
   };
 
@@ -1134,6 +1200,11 @@ export const MinisiteDashboard = () => {
             <TabsTrigger value="articles" className="flex-1 min-w-[100px] data-[state=active]:bg-orange-500 data-[state=active]:text-white rounded-lg transition-all">
               <Box className="h-4 w-4 mr-2" /> Articles
             </TabsTrigger>
+            {minisite.plan_id === 'SITE_PLAN_3' && (
+              <TabsTrigger value="reseller" className="flex-1 min-w-[120px] data-[state=active]:bg-orange-500 data-[state=active]:text-white rounded-lg transition-all">
+                <Users className="h-4 w-4 mr-2" /> Reseller
+              </TabsTrigger>
+            )}
             <TabsTrigger value="stats" className="flex-1 min-w-[100px] data-[state=active]:bg-orange-500 data-[state=active]:text-white rounded-lg transition-all">
               <BarChart3 className="h-4 w-4 mr-2" /> Stats
             </TabsTrigger>
@@ -1256,6 +1327,66 @@ export const MinisiteDashboard = () => {
               </div>
             )}
           </TabsContent>
+
+          {minisite.plan_id === 'SITE_PLAN_3' && (
+            <TabsContent value="reseller" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <Card className="bg-zinc-900 border-zinc-800">
+                <CardHeader>
+                  <CardTitle>Demandes revendeurs</CardTitle>
+                  <CardDescription>Gérez les demandes d'accès à vos articles B2B.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {resellerLoading ? (
+                    <p className="text-zinc-400">Chargement...</p>
+                  ) : resellerTransactions.length === 0 ? (
+                    <p className="text-zinc-400">Aucune demande pour le moment.</p>
+                  ) : (
+                    resellerTransactions.map((tx) => (
+                      <div key={tx.id} className="border border-zinc-800 rounded-xl p-4 bg-zinc-950/50 space-y-3">
+                        <div className="flex justify-between items-start gap-4">
+                          <div>
+                            <h4 className="text-white font-semibold">{tx.article?.name || 'Article'}</h4>
+                            <p className="text-sm text-zinc-500">
+                              Revendeur : {tx.buyer?.name || 'Revendeur'}
+                            </p>
+                          </div>
+                          <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                            {tx.status}
+                          </Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-4 items-center text-sm text-zinc-400">
+                          <div className="flex items-center gap-2">
+                            <RatingStars rating={tx.buyer?.rating_avg || 0} count={tx.buyer?.rating_count || 0} />
+                          </div>
+                          <span>{tx.buyer?.completed_transactions || 0} transaction(s) terminée(s)</span>
+                        </div>
+                        {tx.status === 'requested' && (
+                          <div className="flex gap-2">
+                            <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleResellerDecision(tx.id, true)}>
+                              Accepter
+                            </Button>
+                            <Button variant="outline" className="border-zinc-700 text-white" onClick={() => handleResellerDecision(tx.id, false)}>
+                              Refuser
+                            </Button>
+                          </div>
+                        )}
+                        {tx.status === 'accepted' && (
+                          <Button className="bg-orange-600 hover:bg-orange-700 text-white" onClick={() => handleResellerConfirm(tx.id)} disabled={tx.seller_confirmed}>
+                            {tx.seller_confirmed ? 'Confirmation envoyée' : 'Confirmer transaction terminée'}
+                          </Button>
+                        )}
+                        {tx.status === 'completed' && !tx.seller_reviewed && (
+                          <Button className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => openReviewModal(tx)}>
+                            Laisser un avis sur le revendeur
+                          </Button>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
 
           {/* === TAB: STATS === */}
           <TabsContent value="stats" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -1408,6 +1539,18 @@ export const MinisiteDashboard = () => {
                       <div className="space-y-2">
                          <Label>Message de bienvenue</Label>
                          <Textarea value={settingsForm.welcome_text} onChange={(e) => setSettingsForm({...settingsForm, welcome_text: e.target.value})} className="bg-zinc-950 border-zinc-700 text-white min-h-[100px]" />
+                      </div>
+                      <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-800 rounded-lg p-3">
+                        <input
+                          type="checkbox"
+                          id="show_reviews"
+                          checked={settingsForm.show_reviews}
+                          onChange={(e) => setSettingsForm({...settingsForm, show_reviews: e.target.checked})}
+                          className="rounded border-zinc-700 bg-zinc-900 text-orange-500 focus:ring-orange-500"
+                        />
+                        <label htmlFor="show_reviews" className="text-sm text-zinc-300">
+                          Afficher les avis boutique sur le mini-site
+                        </label>
                       </div>
                       <Button onClick={handleSaveSettings} className="bg-orange-600 hover:bg-orange-700">Enregistrer les infos</Button>
                    </CardContent>
@@ -1578,6 +1721,42 @@ export const MinisiteDashboard = () => {
                 {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Supprimer
              </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+        <DialogContent className="bg-zinc-900 text-white border-zinc-800">
+          <DialogHeader>
+            <DialogTitle>Laisser un avis revendeur</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              {[1, 2, 3, 4, 5].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setReviewRating(value)}
+                  className="p-1"
+                >
+                  <Star className={value <= reviewRating ? 'text-yellow-400' : 'text-zinc-600'} size={20} />
+                </button>
+              ))}
+            </div>
+            <Textarea
+              value={reviewComment}
+              onChange={(e) => setReviewComment(e.target.value)}
+              placeholder="Votre commentaire (optionnel)"
+              className="bg-zinc-800 border-zinc-700 text-white"
+            />
+            <div className="flex gap-2">
+              <Button className="bg-purple-600 hover:bg-purple-700 text-white" onClick={submitReview}>
+                Envoyer l’avis
+              </Button>
+              <Button variant="outline" className="border-zinc-700 text-white" onClick={() => setReviewOpen(false)}>
+                Annuler
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

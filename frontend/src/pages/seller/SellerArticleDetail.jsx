@@ -11,6 +11,7 @@ import { Download, AlertTriangle, ExternalLink } from 'lucide-react';
 import api from '../../utils/api';
 import { toast } from 'sonner';
 import { resolveImageUrl } from '../../utils/images';
+import { RatingStars } from '../../components/RatingStars';
 
 export const SellerArticleDetail = () => {
   const { id } = useParams();
@@ -22,9 +23,13 @@ export const SellerArticleDetail = () => {
   const [shippingLabel, setShippingLabel] = useState('');
   const [uploadingLabel, setUploadingLabel] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [transaction, setTransaction] = useState(null);
+  const [transactionLoading, setTransactionLoading] = useState(false);
+  const [requestLoading, setRequestLoading] = useState(false);
 
   useEffect(() => {
     fetchArticle();
+    fetchTransaction();
   }, [id]);
 
   const fetchArticle = async () => {
@@ -36,6 +41,40 @@ export const SellerArticleDetail = () => {
       navigate('/seller/articles');
     }
     setLoading(false);
+  };
+
+  const fetchTransaction = async () => {
+    setTransactionLoading(true);
+    try {
+      const response = await api.get(`/marketplace/transactions/my?role=buyer&article_id=${id}`);
+      setTransaction(response.data?.[0] || null);
+    } catch (error) {
+      setTransaction(null);
+    }
+    setTransactionLoading(false);
+  };
+
+  const handleRequestAccess = async () => {
+    setRequestLoading(true);
+    try {
+      const response = await api.post('/marketplace/transactions', { article_id: id });
+      setTransaction(response.data);
+      toast.success('Demande envoyée au vendeur tiers');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erreur lors de la demande');
+    }
+    setRequestLoading(false);
+  };
+
+  const handleConfirmCompletion = async () => {
+    if (!transaction?.id) return;
+    try {
+      const response = await api.patch(`/marketplace/transactions/${transaction.id}/confirm`, { side: 'buyer' });
+      setTransaction(response.data);
+      toast.success('Confirmation envoyée');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erreur confirmation');
+    }
   };
 
   const handleDownloadPhotos = async () => {
@@ -144,6 +183,11 @@ export const SellerArticleDetail = () => {
   if (!article) return null;
 
   const discount = calculateDiscount();
+  const isThirdParty = article.is_third_party;
+  const isAccepted = ['accepted', 'completed'].includes(transaction?.status);
+  const isRequested = transaction?.status === 'requested';
+  const isDeclined = transaction?.status === 'declined';
+  const isReservedByOther = article.reserved && !isAccepted;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white" data-testid="seller-article-detail">
@@ -252,7 +296,7 @@ export const SellerArticleDetail = () => {
                 <h1 className="text-3xl md:text-4xl font-bold text-white flex-1" style={{fontFamily: 'Outfit, sans-serif'}}>
                   {article.name}
                 </h1>
-                {article.is_third_party && (
+                {isThirdParty && (
                   <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/50">Vendeur tiers</Badge>
                 )}
               </div>
@@ -260,6 +304,34 @@ export const SellerArticleDetail = () => {
                 <p className="text-sm text-zinc-400 mb-2">
                   Posté par <span className="text-zinc-300 font-medium">{article.posted_by_info.name || article.posted_by_info.username}</span>
                 </p>
+              )}
+              {article.vendor && (
+                <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3">
+                  <div className="flex items-center gap-2">
+                    {article.vendor.logo_url ? (
+                      <img
+                        src={article.vendor.logo_url}
+                        alt={article.vendor.minisite_name}
+                        className="h-9 w-9 rounded-full object-cover border border-zinc-700"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      />
+                    ) : (
+                      <div className="h-9 w-9 rounded-full bg-zinc-800 flex items-center justify-center text-xs text-zinc-500">
+                        {article.vendor.minisite_name?.slice(0, 1)?.toUpperCase() || 'V'}
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/s/${article.vendor.minisite_slug}`)}
+                        className="text-sm text-white hover:text-orange-400"
+                      >
+                        {article.vendor.minisite_name}
+                      </button>
+                      <RatingStars rating={article.vendor.rating_avg} count={article.vendor.rating_count} />
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
 
@@ -296,10 +368,34 @@ export const SellerArticleDetail = () => {
             </Card>
 
             {/* Bloc vendeur tiers : Discord + CTA plateformes */}
-            {article.is_third_party && (
+            {isThirdParty && (
               <>
+                {/* Demande d'accès */}
+                <Card className="bg-zinc-900 border-zinc-800">
+                  <CardContent className="p-6 space-y-3">
+                    <h2 className="text-xl font-semibold text-white">Accès à l'article</h2>
+                    {isAccepted ? (
+                      <p className="text-sm text-green-400">Accès accordé. Vous pouvez procéder à la transaction.</p>
+                    ) : isRequested ? (
+                      <p className="text-sm text-orange-400">Demande en attente d'acceptation du vendeur tiers.</p>
+                    ) : isDeclined ? (
+                      <p className="text-sm text-red-400">Demande refusée. Vous pouvez réessayer plus tard.</p>
+                    ) : (
+                      <p className="text-sm text-zinc-400">Demandez l'accès pour obtenir les liens de vente.</p>
+                    )}
+                    <Button
+                      onClick={handleRequestAccess}
+                      disabled={requestLoading || isRequested || isAccepted || isReservedByOther}
+                      className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                      {isReservedByOther ? 'Article réservé' : 'Demander l’accès à l’article'}
+                    </Button>
+                    {transactionLoading && <p className="text-xs text-zinc-500">Vérification en cours...</p>}
+                  </CardContent>
+                </Card>
+
                 {/* Liens plateformes */}
-                {(article.platform_links?.vinted || article.platform_links?.leboncoin) && (
+                {isAccepted && (article.platform_links?.vinted || article.platform_links?.leboncoin) && (
                   <Card className="bg-zinc-900 border-zinc-800">
                     <CardContent className="p-6 space-y-3">
                       <h2 className="text-xl font-semibold text-white mb-3">Acheter l'article</h2>
@@ -328,40 +424,60 @@ export const SellerArticleDetail = () => {
                 )}
 
                 {/* Bloc Discord */}
-                <Card className="bg-blue-950/20 border-blue-900/30">
-                  <CardContent className="p-6 space-y-4">
-                    <div>
-                      <h2 className="text-xl font-semibold text-white mb-2">Contact vendeur</h2>
-                      {article.posted_by_info && (
-                        <p className="text-zinc-300 mb-2">
-                          Vendeur : <span className="text-white font-medium">{article.posted_by_info.name || article.posted_by_info.username}</span>
+                {isAccepted && (
+                  <Card className="bg-blue-950/20 border-blue-900/30">
+                    <CardContent className="p-6 space-y-4">
+                      <div>
+                        <h2 className="text-xl font-semibold text-white mb-2">Contact vendeur</h2>
+                        {article.posted_by_info && (
+                          <p className="text-zinc-300 mb-2">
+                            Vendeur : <span className="text-white font-medium">{article.posted_by_info.name || article.posted_by_info.username}</span>
+                          </p>
+                        )}
+                        {article.discord_tag && (
+                          <p className="text-zinc-300">
+                            Discord : <span className="text-blue-400 font-medium">{article.discord_tag}</span>
+                          </p>
+                        )}
+                      </div>
+                      
+                      <div className="bg-zinc-900/50 p-4 rounded-lg border border-zinc-800">
+                        <p className="text-sm text-zinc-300 mb-2">
+                          <strong className="text-white">Pour éviter les arnaques, achetez via Vinted.</strong> Sinon contactez via Discord DownPricer :
                         </p>
-                      )}
-                      {article.discord_tag && (
-                        <p className="text-zinc-300">
-                          Discord : <span className="text-blue-400 font-medium">{article.discord_tag}</span>
+                        <p className="text-sm text-zinc-400 mb-3">
+                          Rejoignez le <a href="https://discord.gg/downpricer" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Discord officiel DownPricer</a> et contactez <strong className="text-white">{article.discord_tag || article.posted_by_info?.username || 'le vendeur'}</strong> dans le canal <strong className="text-white">#transactions</strong>.
                         </p>
-                      )}
-                    </div>
-                    
-                    <div className="bg-zinc-900/50 p-4 rounded-lg border border-zinc-800">
-                      <p className="text-sm text-zinc-300 mb-2">
-                        <strong className="text-white">Pour éviter les arnaques, achetez via Vinted.</strong> Sinon contactez via Discord DownPricer :
-                      </p>
-                      <p className="text-sm text-zinc-400 mb-3">
-                        Rejoignez le <a href="https://discord.gg/downpricer" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Discord officiel DownPricer</a> et contactez <strong className="text-white">{article.discord_tag || article.posted_by_info?.username || 'le vendeur'}</strong> dans le canal <strong className="text-white">#transactions</strong>.
+                        <Button
+                          variant="outline"
+                          className="w-full border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-white"
+                          onClick={() => window.open('https://discord.gg/downpricer', '_blank')}
+                        >
+                          Rejoindre Discord DownPricer
+                          <ExternalLink className="h-4 w-4 ml-2" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {isAccepted && (
+                  <Card className="bg-zinc-900 border-zinc-800">
+                    <CardContent className="p-6 space-y-3">
+                      <h2 className="text-xl font-semibold text-white">Confirmation de transaction</h2>
+                      <p className="text-sm text-zinc-400">
+                        Confirmez une fois la transaction terminée des deux côtés.
                       </p>
                       <Button
-                        variant="outline"
-                        className="w-full border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-white"
-                        onClick={() => window.open('https://discord.gg/downpricer', '_blank')}
+                        onClick={handleConfirmCompletion}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white"
+                        disabled={transaction?.buyer_confirmed}
                       >
-                        Rejoindre Discord DownPricer
-                        <ExternalLink className="h-4 w-4 ml-2" />
+                        {transaction?.buyer_confirmed ? 'Confirmation envoyée' : 'Confirmer transaction terminée'}
                       </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                )}
               </>
             )}
 

@@ -8,6 +8,7 @@ import { ExternalLink } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'sonner';
 import { resolveImageUrl } from '../utils/images';
+import { RatingStars } from '../components/RatingStars';
 
 export const ArticleDetail = () => {
   const { id } = useParams();
@@ -144,6 +145,41 @@ export const ArticleDetail = () => {
               <h1 className="text-3xl md:text-4xl font-bold text-white mb-4" style={{fontFamily: 'Outfit, sans-serif'}}>
                 {article.name}
               </h1>
+              {article.vendor && (
+                <div className="mb-4 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3">
+                  <div className="flex items-center gap-2">
+                    {article.vendor.logo_url ? (
+                      <img
+                        src={article.vendor.logo_url}
+                        alt={article.vendor.minisite_name}
+                        className="h-9 w-9 rounded-full object-cover border border-zinc-700"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      />
+                    ) : (
+                      <div className="h-9 w-9 rounded-full bg-zinc-800 flex items-center justify-center text-xs text-zinc-500">
+                        {article.vendor.minisite_name?.slice(0, 1)?.toUpperCase() || 'V'}
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/s/${article.vendor.minisite_slug}`)}
+                        className="text-sm text-white hover:text-orange-400"
+                      >
+                        {article.vendor.minisite_name}
+                      </button>
+                      <RatingStars rating={article.vendor.rating_avg} count={article.vendor.rating_count} />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/boutique/${article.vendor.minisite_slug}/avis`)}
+                    className="mt-2 text-xs text-blue-400 hover:underline"
+                  >
+                    Voir les avis boutique
+                  </button>
+                </div>
+              )}
               <div className="flex items-baseline gap-4 mb-4">
                 <span className="text-4xl font-bold text-orange-500 tracking-tight" style={{fontFamily: 'Outfit, sans-serif'}}>
                   {article.price}€

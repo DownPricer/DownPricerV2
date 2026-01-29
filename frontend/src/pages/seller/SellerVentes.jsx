@@ -3,7 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Header } from '../../components/Header';
 import { Card, CardContent } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
+import { Button } from '../../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import { Textarea } from '../../components/ui/textarea';
+import { Star } from 'lucide-react';
 import api from '../../utils/api';
 import { toast } from 'sonner';
 
@@ -11,9 +15,16 @@ export const SellerVentes = () => {
   const navigate = useNavigate();
   const [ventes, setVentes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [marketplaceTxs, setMarketplaceTxs] = useState([]);
+  const [marketplaceLoading, setMarketplaceLoading] = useState(true);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewTx, setReviewTx] = useState(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
 
   useEffect(() => {
     fetchVentes();
+    fetchMarketplaceTransactions();
   }, []);
 
   const fetchVentes = async () => {
@@ -24,6 +35,60 @@ export const SellerVentes = () => {
       toast.error('Erreur chargement ventes');
     }
     setLoading(false);
+  };
+
+  const fetchMarketplaceTransactions = async () => {
+    try {
+      const response = await api.get('/marketplace/transactions/my?role=buyer');
+      setMarketplaceTxs(response.data || []);
+    } catch (error) {
+      toast.error('Erreur chargement transactions B2B');
+    }
+    setMarketplaceLoading(false);
+  };
+
+  const handleConfirmBuyer = async (transactionId) => {
+    try {
+      await api.patch(`/marketplace/transactions/${transactionId}/confirm`, { side: 'buyer' });
+      toast.success('Confirmation envoyée');
+      fetchMarketplaceTransactions();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erreur confirmation');
+    }
+  };
+
+  const openReviewModal = (tx) => {
+    setReviewTx(tx);
+    setReviewRating(5);
+    setReviewComment('');
+    setReviewOpen(true);
+  };
+
+  const submitReview = async () => {
+    if (!reviewTx?.id) return;
+    try {
+      await api.post('/reviews', {
+        transaction_id: reviewTx.id,
+        rating: reviewRating,
+        comment: reviewComment,
+        target: 'minisite'
+      });
+      toast.success('Avis envoyé');
+      setReviewOpen(false);
+      fetchMarketplaceTransactions();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erreur lors de l\'avis');
+    }
+  };
+
+  const getTransactionStatusLabel = (status) => {
+    const map = {
+      requested: 'En attente d’acceptation',
+      accepted: 'Accès accordé',
+      declined: 'Refusée',
+      completed: 'Terminée'
+    };
+    return map[status] || status;
   };
 
   const getStatusBadge = (status) => {
@@ -49,6 +114,64 @@ export const SellerVentes = () => {
         <h1 className="text-3xl font-bold text-orange-500 mb-6" style={{fontFamily: 'Outfit, sans-serif'}}>
           Mes Ventes
         </h1>
+
+        <div className="mb-10">
+          <h2 className="text-xl font-semibold text-white mb-4">Transactions B2B</h2>
+          {marketplaceLoading ? (
+            <Card className="bg-zinc-900 border-zinc-800"><CardContent className="p-6 text-center text-zinc-400">Chargement...</CardContent></Card>
+          ) : marketplaceTxs.length === 0 ? (
+            <Card className="bg-zinc-900 border-zinc-800"><CardContent className="p-6 text-center text-zinc-400">Aucune transaction B2B</CardContent></Card>
+          ) : (
+            <div className="space-y-4">
+              {marketplaceTxs.map((tx) => (
+                <Card key={tx.id} className="bg-zinc-900 border-zinc-800">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-semibold text-white">{tx.article?.name || 'Article'}</h3>
+                        <p className="text-sm text-zinc-500">
+                          Boutique : {tx.minisite?.site_name || 'Vendeur tiers'}
+                        </p>
+                      </div>
+                      <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                        {getTransactionStatusLabel(tx.status)}
+                      </Badge>
+                    </div>
+                    {tx.status === 'accepted' && (
+                      <div className="space-y-2">
+                        {(tx.article?.platform_links?.vinted || tx.article?.platform_links?.leboncoin) && (
+                          <div className="flex flex-col gap-2">
+                            {tx.article?.platform_links?.vinted && (
+                              <Button variant="outline" className="justify-between border-cyan-500 text-cyan-500 hover:bg-cyan-500 hover:text-white" onClick={() => window.open(tx.article.platform_links.vinted, '_blank')}>
+                                Ouvrir Vinted
+                              </Button>
+                            )}
+                            {tx.article?.platform_links?.leboncoin && (
+                              <Button variant="outline" className="justify-between border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white" onClick={() => window.open(tx.article.platform_links.leboncoin, '_blank')}>
+                                Ouvrir Leboncoin
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                        <p className="text-xs text-zinc-400">
+                          Échangez via le Discord officiel DownPricer pour sécuriser la transaction.
+                        </p>
+                        <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleConfirmBuyer(tx.id)} disabled={tx.buyer_confirmed}>
+                          {tx.buyer_confirmed ? 'Confirmation envoyée' : 'Confirmer transaction terminée'}
+                        </Button>
+                      </div>
+                    )}
+                    {tx.status === 'completed' && !tx.buyer_reviewed && (
+                      <Button className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => openReviewModal(tx)}>
+                        Laisser un avis
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
 
         {loading ? (
           <div className="text-center py-12"><p className="text-zinc-400">Chargement...</p></div>
@@ -119,6 +242,41 @@ export const SellerVentes = () => {
             </TabsContent>
           </Tabs>
         )}
+        <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+          <DialogContent className="bg-zinc-900 border-zinc-800 text-white">
+            <DialogHeader>
+              <DialogTitle>Laisser un avis boutique</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setReviewRating(value)}
+                    className="p-1"
+                  >
+                    <Star className={value <= reviewRating ? 'text-yellow-400' : 'text-zinc-600'} size={20} />
+                  </button>
+                ))}
+              </div>
+              <Textarea
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                placeholder="Votre commentaire (optionnel)"
+                className="bg-zinc-800 border-zinc-700 text-white"
+              />
+              <div className="flex gap-2">
+                <Button className="bg-purple-600 hover:bg-purple-700 text-white" onClick={submitReview}>
+                  Envoyer l’avis
+                </Button>
+                <Button variant="outline" className="border-zinc-700 text-white" onClick={() => setReviewOpen(false)}>
+                  Annuler
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

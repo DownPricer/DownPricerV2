@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Search, Filter, ArrowUpDown, ShoppingBag } from 'lucide-react';
 import api from '../utils/api';
 import { resolveImageUrl } from '../utils/images';
+import { RatingStars } from '../components/RatingStars';
 
 export const Home = () => {
   const navigate = useNavigate();
@@ -207,6 +208,51 @@ export const Home = () => {
                     <p className="text-sm text-zinc-400 line-clamp-2 h-10 leading-snug">
                       {article.description || "Aucune description disponible."}
                     </p>
+                    {article.is_third_party && article.vendor && (
+                      <div className="mt-3 p-3 rounded-lg border border-zinc-800 bg-zinc-900/60">
+                        <div className="flex items-center gap-2 text-xs text-zinc-400">
+                          <Badge className="bg-blue-600/90 text-white border-none">Vendeur tiers</Badge>
+                          <span className="text-zinc-500">Boutique</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          {article.vendor.logo_url ? (
+                            <img
+                              src={article.vendor.logo_url}
+                              alt={article.vendor.minisite_name}
+                              className="h-8 w-8 rounded-full object-cover border border-zinc-700"
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="h-8 w-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs text-zinc-500">
+                              {article.vendor.minisite_name?.slice(0, 1)?.toUpperCase() || 'V'}
+                            </div>
+                          )}
+                          <div className="flex flex-col">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/s/${article.vendor.minisite_slug}`);
+                              }}
+                              className="text-left text-sm text-white hover:text-orange-400"
+                            >
+                              {article.vendor.minisite_name}
+                            </button>
+                            <RatingStars rating={article.vendor.rating_avg} count={article.vendor.rating_count} />
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/boutique/${article.vendor.minisite_slug}/avis`);
+                          }}
+                          className="mt-2 text-xs text-blue-400 hover:underline"
+                        >
+                          Voir les avis boutique
+                        </button>
+                      </div>
+                    )}
                   </CardContent>
 
                   {/* Footer Prix */}
