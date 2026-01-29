@@ -243,9 +243,10 @@ export const ArticleDetail = () => {
                   )}
                 </div>
 
-                {/* Boutons d'Action */}
-                <div className="space-y-3 pt-2">
-                  {/* Liens Vinted / Leboncoin */}
+                 {/* Boutons d'Action */}
+                 <div className="space-y-3 pt-2">
+                   <p className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500">Achat / Expédition</p>
+                   {/* Liens Vinted / Leboncoin / Autre */}
                   {article?.platform_links?.vinted && (
                     <Button
                       className="w-full h-14 rounded-xl bg-[#007782] hover:bg-[#006670] text-white font-bold text-sm tracking-wide shadow-lg shadow-[#007782]/20 transition-all active:scale-[0.98]"
@@ -263,6 +264,14 @@ export const ArticleDetail = () => {
                       Acheter sur Leboncoin <ExternalLink className="ml-2 h-4 w-4" />
                     </Button>
                   )}
+                   {article?.platform_links?.other && (
+                     <Button
+                       className="w-full h-14 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm tracking-wide transition-all active:scale-[0.98]"
+                       onClick={() => window.open(article.platform_links.other, '_blank')}
+                     >
+                       Acheter <ExternalLink className="ml-2 h-4 w-4" />
+                     </Button>
+                   )}
 
                   {/* Main Propre */}
                   {article?.source !== "minisite" && !article?.is_third_party && (
@@ -279,7 +288,7 @@ export const ArticleDetail = () => {
                   )}
 
                   {/* Contact Vendeur Tiers */}
-                  {(article?.source === "minisite" || article?.is_third_party) && article?.contact_email && (
+                   {(article?.source === "minisite" || article?.is_third_party) && article?.contact_email && (
                     <Button
                       variant="outline"
                       className="w-full h-14 rounded-xl border-white/10 bg-white/5 hover:bg-white/10 text-white font-bold text-sm"

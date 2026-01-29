@@ -221,10 +221,10 @@ export const MinisiteArticleDetail = () => {
               </CardContent>
             </Card>
 
-            {(article.platform_links?.vinted || article.platform_links?.leboncoin) && (
+            {(article.platform_links?.vinted || article.platform_links?.leboncoin || article.platform_links?.other) && (
               <Card className="bg-zinc-900 border-zinc-800">
                 <CardContent className="p-6 space-y-3">
-                  <h2 className="text-xl font-semibold mb-3 text-white">Liens d'achat</h2>
+                  <h2 className="text-xl font-semibold mb-3 text-white">Achat / Expédition</h2>
                   {article.platform_links.vinted && (
                     <Button
                       variant="outline"
@@ -242,6 +242,16 @@ export const MinisiteArticleDetail = () => {
                       onClick={() => window.open(article.platform_links.leboncoin, '_blank')}
                     >
                       Voir l'annonce Leboncoin
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {article.platform_links.other && (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-between border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-white"
+                      onClick={() => window.open(article.platform_links.other, '_blank')}
+                    >
+                      Acheter
                       <ExternalLink className="h-4 w-4" />
                     </Button>
                   )}

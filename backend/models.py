@@ -1,7 +1,30 @@
-from pydantic import BaseModel, Field, ConfigDict, EmailStr
+from pydantic import BaseModel, Field, ConfigDict, EmailStr, field_validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
+from urllib.parse import urlparse
+
+def _normalize_platform_links(links: Dict[str, Any]) -> Dict[str, str]:
+    if not links:
+        return {}
+    if not isinstance(links, dict):
+        raise ValueError("platform_links doit être un objet")
+    normalized = dict(links)
+    for key in ["vinted", "leboncoin", "other"]:
+        value = links.get(key)
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            raise ValueError(f"Lien {key} invalide")
+        trimmed = value.strip()
+        if not trimmed:
+            normalized[key] = ""
+            continue
+        parsed = urlparse(trimmed)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            raise ValueError(f"Lien {key} invalide")
+        normalized[key] = trimmed
+    return normalized
 
 class UserRole(str, Enum):
     VISITOR = "VISITOR"
@@ -105,6 +128,11 @@ class ArticleCreate(BaseModel):
     visible_public: bool = True
     visible_seller: bool = True
     discord_contact: Optional[str] = None  # Pseudo Discord (obligatoire pour S_PLAN_3 créant un article B2B)
+
+    @field_validator("platform_links")
+    @classmethod
+    def validate_platform_links(cls, value):
+        return _normalize_platform_links(value)
 
 class Category(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -244,6 +272,11 @@ class MiniSiteArticleCreate(BaseModel):
     show_in_public_catalog: bool = False
     contact_email: Optional[str] = None  # Email de contact pour catalogue public
     discord_tag: Optional[str] = None  # Pseudo Discord pour B2B
+
+    @field_validator("platform_links")
+    @classmethod
+    def validate_platform_links(cls, value):
+        return _normalize_platform_links(value)
 
 class MarketplaceTransactionStatus(str, Enum):
     REQUESTED = "requested"

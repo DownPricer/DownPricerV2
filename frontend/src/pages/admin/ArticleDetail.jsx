@@ -13,7 +13,7 @@ import api from '../../utils/api';
 import { ImageUpload } from '../../components/ImageUpload';
 import { SafeImage } from '../../components/SafeImage';
 
-const emptyLinks = { vinted: '', leboncoin: '' };
+const emptyLinks = { vinted: '', leboncoin: '', other: '' };
 
 const toNumberOrNull = (v) => {
   if (v === '' || v === null || v === undefined) return null;
@@ -349,6 +349,17 @@ export const AdminArticleDetailPage = () => {
                       setFormData((p) => ({
                         ...p,
                         platform_links: { ...(p.platform_links || emptyLinks), leboncoin: v },
+                      }))
+                    }
+                  />
+                  <Field
+                    label="Autre lien (optionnel)"
+                    type="url"
+                    value={formData.platform_links?.other || ''}
+                    onChange={(v) =>
+                      setFormData((p) => ({
+                        ...p,
+                        platform_links: { ...(p.platform_links || emptyLinks), other: v },
                       }))
                     }
                   />

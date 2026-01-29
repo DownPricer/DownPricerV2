@@ -30,7 +30,7 @@ export const AdminArticlesPage = () => {
     reference_price: '',
     category_id: '',
     stock: 1,
-    platform_links: { vinted: '', leboncoin: '' },
+    platform_links: { vinted: '', leboncoin: '', other: '' },
     visible_public: true,
     visible_seller: true
   });
@@ -77,7 +77,7 @@ export const AdminArticlesPage = () => {
       setShowCreateDialog(false);
       setFormData({
         name: '', description: '', photos: [], price: '', reference_price: '',
-        category_id: '', stock: 1, platform_links: { vinted: '', leboncoin: '' },
+        category_id: '', stock: 1, platform_links: { vinted: '', leboncoin: '', other: '' },
         visible_public: true, visible_seller: true
       });
       fetchArticles();
@@ -176,8 +176,49 @@ export const AdminArticlesPage = () => {
                   </div>
                 </div>
 
-                <div className="p-6 bg-white/5 border border-white/5 rounded-3xl">
+                <div className="p-6 bg-white/5 border border-white/5 rounded-3xl space-y-4">
                    <ImageUpload images={formData.photos} onChange={(photos) => setFormData({...formData, photos})} maxImages={10} label="Galerie Photos" />
+                   <div className="grid md:grid-cols-3 gap-4">
+                     <div className="space-y-2">
+                       <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Lien Vinted</Label>
+                       <Input
+                         type="url"
+                         value={formData.platform_links?.vinted || ''}
+                         onChange={(e) => setFormData({
+                           ...formData,
+                           platform_links: { ...formData.platform_links, vinted: e.target.value }
+                         })}
+                         placeholder="https://www.vinted.fr/..."
+                         className="bg-black border-white/10 h-12 rounded-xl"
+                       />
+                     </div>
+                     <div className="space-y-2">
+                       <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Lien Leboncoin</Label>
+                       <Input
+                         type="url"
+                         value={formData.platform_links?.leboncoin || ''}
+                         onChange={(e) => setFormData({
+                           ...formData,
+                           platform_links: { ...formData.platform_links, leboncoin: e.target.value }
+                         })}
+                         placeholder="https://www.leboncoin.fr/..."
+                         className="bg-black border-white/10 h-12 rounded-xl"
+                       />
+                     </div>
+                     <div className="space-y-2">
+                       <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Autre lien (optionnel)</Label>
+                       <Input
+                         type="url"
+                         value={formData.platform_links?.other || ''}
+                         onChange={(e) => setFormData({
+                           ...formData,
+                           platform_links: { ...formData.platform_links, other: e.target.value }
+                         })}
+                         placeholder="https://..."
+                         className="bg-black border-white/10 h-12 rounded-xl"
+                       />
+                     </div>
+                   </div>
                 </div>
 
                 <div className="flex gap-3 pt-6 border-t border-white/[0.03]">
