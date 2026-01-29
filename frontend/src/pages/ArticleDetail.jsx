@@ -9,6 +9,7 @@ import api from '../utils/api';
 import { toast } from 'sonner';
 import { resolveImageUrl } from '../utils/images';
 import { RatingStars } from '../components/RatingStars';
+import { AvatarCircle } from '../components/AvatarCircle';
 
 export const ArticleDetail = () => {
   const { id } = useParams();
@@ -47,6 +48,9 @@ export const ArticleDetail = () => {
     if (!article || !article.reference_price || article.reference_price === 0) return 0;
     return Math.round(((article.reference_price - article.price) / article.reference_price) * 100);
   };
+  const vendor = article.vendor;
+  const vendorAvatar = vendor?.avatar_url || vendor?.logo_url;
+  const vendorName = vendor?.seller_name || vendor?.minisite_name || 'Boutique';
 
   if (loading) {
     return (
@@ -190,6 +194,30 @@ export const ArticleDetail = () => {
                   </span>
                 )}
               </div>
+              {vendor && (
+                <div className="mb-4 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <AvatarCircle src={vendorAvatar} name={vendorName} size={44} />
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/s/${vendor.minisite_slug}`)}
+                        className="text-sm text-white hover:text-orange-400"
+                      >
+                        {vendorName}
+                      </button>
+                      <RatingStars rating={vendor.rating_avg || 0} count={vendor.rating_count || 0} />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/boutique/${vendor.minisite_slug}/avis`)}
+                    className="text-xs text-blue-400 hover:underline"
+                  >
+                    Voir les avis boutique
+                  </button>
+                </div>
+              )}
             </div>
 
             <Card className="bg-zinc-900 border-zinc-800">

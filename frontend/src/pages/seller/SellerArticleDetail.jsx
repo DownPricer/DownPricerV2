@@ -11,6 +11,8 @@ import { Download, AlertTriangle, ExternalLink } from 'lucide-react';
 import api from '../../utils/api';
 import { toast } from 'sonner';
 import { resolveImageUrl } from '../../utils/images';
+import { AvatarCircle } from '../../components/AvatarCircle';
+import { RatingStars } from '../../components/RatingStars';
 import { RatingStars } from '../../components/RatingStars';
 
 export const SellerArticleDetail = () => {
@@ -182,6 +184,10 @@ export const SellerArticleDetail = () => {
 
   if (!article) return null;
 
+  const vendor = article.vendor;
+  const vendorAvatar = vendor?.avatar_url || vendor?.logo_url;
+  const vendorName = vendor?.seller_name || vendor?.minisite_name || 'Boutique tiers';
+
   const discount = calculateDiscount();
   const isThirdParty = article.is_third_party;
   const isAccepted = ['accepted', 'completed'].includes(transaction?.status);
@@ -306,31 +312,27 @@ export const SellerArticleDetail = () => {
                 </p>
               )}
               {article.vendor && (
-                <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3">
-                  <div className="flex items-center gap-2">
-                    {article.vendor.logo_url ? (
-                      <img
-                        src={article.vendor.logo_url}
-                        alt={article.vendor.minisite_name}
-                        className="h-9 w-9 rounded-full object-cover border border-zinc-700"
-                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                      />
-                    ) : (
-                      <div className="h-9 w-9 rounded-full bg-zinc-800 flex items-center justify-center text-xs text-zinc-500">
-                        {article.vendor.minisite_name?.slice(0, 1)?.toUpperCase() || 'V'}
-                      </div>
-                    )}
+                <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <AvatarCircle src={vendorAvatar} name={vendorName} size={48} />
                     <div className="flex-1">
                       <button
                         type="button"
                         onClick={() => navigate(`/s/${article.vendor.minisite_slug}`)}
                         className="text-sm text-white hover:text-orange-400"
                       >
-                        {article.vendor.minisite_name}
+                        {vendorName}
                       </button>
                       <RatingStars rating={article.vendor.rating_avg} count={article.vendor.rating_count} />
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/boutique/${article.vendor.minisite_slug}/avis`)}
+                    className="text-xs text-blue-400 hover:underline"
+                  >
+                    Voir les avis boutique
+                  </button>
                 </div>
               )}
             </div>

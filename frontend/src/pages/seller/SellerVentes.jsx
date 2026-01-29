@@ -8,6 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/ta
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Textarea } from '../../components/ui/textarea';
 import { Star } from 'lucide-react';
+import { AvatarCircle } from '../../components/AvatarCircle';
+import { RatingStars } from '../../components/RatingStars';
 import api from '../../utils/api';
 import { toast } from 'sonner';
 
@@ -136,6 +138,13 @@ export const SellerVentes = () => {
                       <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
                         {getTransactionStatusLabel(tx.status)}
                       </Badge>
+                    </div>
+                    <div className="flex items-center gap-3 mt-3">
+                      <AvatarCircle src={tx.buyer?.avatar} name={tx.buyer?.name} size={40} />
+                      <div>
+                        <p className="text-sm font-semibold text-white">{tx.buyer?.name || 'Revendeur'}</p>
+                        <RatingStars rating={tx.buyer?.rating_avg || 0} count={tx.buyer?.rating_count || 0} showCount={false} size={12} />
+                      </div>
                     </div>
                     {tx.status === 'accepted' && (
                       <div className="space-y-2">

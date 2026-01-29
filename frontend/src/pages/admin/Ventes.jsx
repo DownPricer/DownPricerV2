@@ -16,6 +16,7 @@ import {
   CheckCircle,
   Clock,
 } from 'lucide-react';
+import { AvatarCircle } from '../../components/AvatarCircle';
 import api from '../../utils/api';
 import { toast } from 'sonner';
 
@@ -210,9 +211,24 @@ export const AdminVentesPage = () => {
                               {getStatusLabel(vente.status)}
                             </Badge>
                           </div>
-                          <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-tighter mt-0.5">
-                            ID: {String(vente.id).slice(0, 8).toUpperCase()} • {new Date(vente.created_at).toLocaleDateString('fr-FR')}
-                          </p>
+                        <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-tighter mt-0.5">
+                          ID: {String(vente.id).slice(0, 8).toUpperCase()} • {new Date(vente.created_at).toLocaleDateString('fr-FR')}
+                        </p>
+                        <div className="flex items-center gap-3 mt-3">
+                          <AvatarCircle
+                            src={vente.seller_avatar_url}
+                            name={vente.seller_display_name || vente.seller_id || 'Vendeur'}
+                            size={36}
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-semibold text-white">
+                              {vente.seller_display_name || vente.seller_id || 'Vendeur'}
+                            </span>
+                            {vente.seller_email && (
+                              <span className="text-xs text-zinc-500">{vente.seller_email}</span>
+                            )}
+                          </div>
+                        </div>
                         </div>
 
                         {/* Middle */}

@@ -1,40 +1,87 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
 import api from '../utils/api';
-import { getUser, setUser } from '../utils/auth';
+import { getUser } from '../utils/auth';
 import { toast } from 'sonner';
+import { AvatarCircle } from '../components/AvatarCircle';
+import { RatingStars } from '../components/RatingStars';
 
 export const MonCompte = () => {
   const navigate = useNavigate();
+  const { userId: routeUserId } = useParams();
   const [user, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState({ avg: 0, count: 0 });
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    const userData = getUser();
-    if (userData) {
-      fetchUserDetails();
+  const fetchRating = async (targetId) => {
+    try {
+      const ratingRes = await api.get(`/ratings/user/${targetId}`);
+      setRating(ratingRes.data || { avg: 0, count: 0 });
+    } catch (error) {
+      setRating({ avg: 0, count: 0 });
     }
-  }, []);
+  };
 
   const fetchUserDetails = async () => {
     try {
       const response = await api.get('/auth/me');
       setUserData(response.data);
-      if (response.data?.id) {
-        const ratingRes = await api.get(`/ratings/user/${response.data.id}`);
-        setRating(ratingRes.data || { avg: 0, count: 0 });
+      const targetId = routeUserId || response.data?.id;
+      if (targetId) {
+        await fetchRating(targetId);
       }
     } catch (error) {
       toast.error('Erreur lors du chargement du profil');
     }
     setLoading(false);
   };
+
+  useEffect(() => {
+    const userData = getUser();
+    if (userData) {
+      fetchUserDetails();
+    } else {
+      setLoading(false);
+    }
+  }, [routeUserId]);
+
+  const handleAvatarChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setAvatarUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await api.post('/users/avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (response.data?.avatar_url) {
+        setUserData((prev) => (prev ? { ...prev, avatar_url: response.data.avatar_url } : prev));
+        toast.success('Photo de profil mise à jour');
+      } else {
+        toast.error('Impossible de sauvegarder la photo');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erreur lors de l\'upload de la photo');
+    } finally {
+      setAvatarUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const profileTargetId = routeUserId || user?.id;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white" data-testid="mon-compte-page">
@@ -52,19 +99,54 @@ export const MonCompte = () => {
           <div className="space-y-6">
             <Card className="bg-zinc-900 border-zinc-800">
               <CardHeader>
+                <CardTitle className="text-white">Photo de profil</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <AvatarCircle
+                    src={user?.avatar_url}
+                    name={`${user?.first_name || ''} ${user?.last_name || ''}`.trim() || 'Utilisateur'}
+                    size={80}
+                  />
+                  <div className="flex-1 space-y-2">
+                    <p className="text-sm text-zinc-400">
+                      Cette photo sera affichée sur les transactions, demandes et avis.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        className="border-zinc-700 text-white"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={avatarUploading}
+                      >
+                        {avatarUploading ? 'Upload en cours...' : 'Modifier la photo'}
+                      </Button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleAvatarChange}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-zinc-900 border-zinc-800">
+              <CardHeader>
                 <CardTitle className="text-white">Note revendeur</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-3 text-zinc-300">
-                  <span className="text-2xl">⭐</span>
-                  <span className="text-lg font-semibold">{Number(rating.avg || 0).toFixed(1)}</span>
-                  <span className="text-sm text-zinc-500">({rating.count || 0} avis)</span>
-                </div>
-                {user?.id && (
+              <CardContent className="space-y-3">
+                <RatingStars rating={rating.avg || 0} count={rating.count || 0} />
+                <p className="text-sm text-zinc-400">
+                  {rating.count ? `${rating.count} avis` : 'Nouveau vendeur'}
+                </p>
+                {profileTargetId && (
                   <Button
                     variant="outline"
-                    className="mt-4 border-zinc-700 text-white"
-                    onClick={() => navigate(`/user/${user.id}/avis`)}
+                    className="border-zinc-700 text-white"
+                    onClick={() => navigate(`/user/${profileTargetId}/avis`)}
                   >
                     Voir mes avis
                   </Button>

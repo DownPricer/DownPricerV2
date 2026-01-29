@@ -115,6 +115,16 @@ def _compute_new_avg(current_avg: float, current_count: int, new_rating: int) ->
 async def _build_vendor_info(minisite: dict) -> dict:
     if not minisite:
         return {}
+    seller_name = ""
+    avatar_url = None
+    if minisite.get("user_id"):
+        user_doc = await db.users.find_one(
+            {"id": minisite.get("user_id")},
+            {"_id": 0, "avatar_url": 1, "first_name": 1, "last_name": 1}
+        )
+        if user_doc:
+            avatar_url = user_doc.get("avatar_url")
+            seller_name = f"{user_doc.get('first_name', '')} {user_doc.get('last_name', '')}".strip()
     return {
         "user_id": minisite.get("user_id"),
         "minisite_id": minisite.get("id"),
@@ -123,7 +133,9 @@ async def _build_vendor_info(minisite: dict) -> dict:
         "logo_url": minisite.get("logo_url"),
         "rating_avg": minisite.get("rating_avg", 0),
         "rating_count": minisite.get("rating_count", 0),
-        "sales_count": minisite.get("sales_count", 0)
+        "sales_count": minisite.get("sales_count", 0),
+        "avatar_url": avatar_url,
+        "seller_name": seller_name
     }
 
 @api_router.post("/auth/signup")
@@ -358,6 +370,23 @@ async def upload_image(
                 "detail": f"Erreur lors de l'upload: {str(e)}"
             }
         )
+
+@api_router.post("/users/avatar", dependencies=[Depends(get_current_user)])
+async def upload_user_avatar(
+    file: UploadFile = File(...),
+    current_user = Depends(get_current_user)
+):
+    user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0, "id": 1})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+
+    upload_result = await upload_image(file=file, current_user=current_user, no_restrictions=True, payment_proof=False)
+    avatar_url = upload_result.get("url")
+    if not avatar_url:
+        raise HTTPException(status_code=500, detail="Impossible de sauvegarder l'avatar")
+
+    await db.users.update_one({"id": user_doc["id"]}, {"$set": {"avatar_url": avatar_url}})
+    return {"avatar_url": avatar_url}
 
 @api_router.get("/settings/public")
 async def get_public_settings():
@@ -1817,13 +1846,15 @@ async def get_my_marketplace_transactions(
             "name": f"{buyer_user.get('first_name', '')} {buyer_user.get('last_name', '')}".strip() if buyer_user else "Revendeur",
             "rating_avg": buyer_user.get("rating_avg", 0) if buyer_user else 0,
             "rating_count": buyer_user.get("rating_count", 0) if buyer_user else 0,
-            "completed_transactions": buyer_completed_count
+            "completed_transactions": buyer_completed_count,
+            "avatar": buyer_user.get("avatar_url") if buyer_user else None
         }
         tx["seller"] = {
             "id": seller_user.get("id") if seller_user else None,
             "name": f"{seller_user.get('first_name', '')} {seller_user.get('last_name', '')}".strip() if seller_user else "Vendeur",
             "rating_avg": seller_user.get("rating_avg", 0) if seller_user else 0,
-            "rating_count": seller_user.get("rating_count", 0) if seller_user else 0
+            "rating_count": seller_user.get("rating_count", 0) if seller_user else 0,
+            "avatar": seller_user.get("avatar_url") if seller_user else None
         }
         tx["buyer_reviewed"] = buyer_review is not None
         tx["seller_reviewed"] = seller_review is not None
@@ -2104,10 +2135,17 @@ async def get_minisite_ratings(minisite_id: str):
 
 @api_router.get("/ratings/user/{user_id}")
 async def get_user_ratings(user_id: str):
-    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "rating_avg": 1, "rating_count": 1})
+    user_doc = await db.users.find_one(
+        {"id": user_id},
+        {"_id": 0, "rating_avg": 1, "rating_count": 1}
+    )
     if not user_doc:
-        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
-    return {"avg": user_doc.get("rating_avg", 0), "count": user_doc.get("rating_count", 0)}
+        return {"avg": 0, "count": 0, "sales_count": 0}
+    return {
+        "avg": user_doc.get("rating_avg", 0),
+        "count": user_doc.get("rating_count", 0),
+        "sales_count": 0
+    }
 
 # ===== MINI-SITES ROUTES =====
 
@@ -2692,6 +2730,22 @@ async def get_all_demandes():
 @api_router.get("/admin/sales", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
 async def get_all_sales():
     sales = await db.seller_sales.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    seller_ids = list({sale.get("seller_id") for sale in sales if sale.get("seller_id")})
+    sellers_map = {}
+    if seller_ids:
+        sellers = await db.users.find(
+            {"id": {"$in": seller_ids}},
+            {"_id": 0, "id": 1, "avatar_url": 1, "first_name": 1, "last_name": 1}
+        ).to_list(len(seller_ids))
+        sellers_map = {seller["id"]: seller for seller in sellers}
+
+    for sale in sales:
+        seller = sellers_map.get(sale.get("seller_id"))
+        sale["seller_avatar_url"] = seller.get("avatar_url") if seller else None
+        if seller:
+            sale["seller_display_name"] = (
+                f"{seller.get('first_name', '').strip()} {seller.get('last_name', '').strip()}"
+            ).strip() or None
     return sales
 
 @api_router.get("/admin/sales/{sale_id}", dependencies=[Depends(require_roles([UserRole.ADMIN]))])

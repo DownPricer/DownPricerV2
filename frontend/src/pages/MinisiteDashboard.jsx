@@ -653,6 +653,7 @@ import {
 } from 'lucide-react';
 import { ImageUpload } from '../components/ImageUpload';
 import { SafeImage } from '../components/SafeImage';
+import { AvatarCircle } from '../components/AvatarCircle';
 import { RatingStars } from '../components/RatingStars';
 import api from '../utils/api';
 import { toast } from 'sonner';
@@ -1354,6 +1355,13 @@ export const MinisiteDashboard = () => {
                             {tx.status}
                           </Badge>
                         </div>
+                      <div className="flex items-center gap-3 mt-3">
+                        <AvatarCircle src={tx.buyer?.avatar} name={tx.buyer?.name} size={40} />
+                        <div>
+                          <p className="text-sm font-semibold text-white">{tx.buyer?.name || 'Revendeur'}</p>
+                          <RatingStars rating={tx.buyer?.rating_avg || 0} count={tx.buyer?.rating_count || 0} showCount={false} size={12} />
+                        </div>
+                      </div>
                         <div className="flex flex-wrap gap-4 items-center text-sm text-zinc-400">
                           <div className="flex items-center gap-2">
                             <RatingStars rating={tx.buyer?.rating_avg || 0} count={tx.buyer?.rating_count || 0} />

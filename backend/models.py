@@ -56,6 +56,7 @@ class User(BaseModel):
     site_plan: Optional[str] = None  # SITE_PLAN_1, SITE_PLAN_2, SITE_PLAN_3
     rating_avg: Optional[float] = 0.0
     rating_count: Optional[int] = 0
+    avatar_url: Optional[str] = None
     created_at: str
 
 class UserCreate(BaseModel):
