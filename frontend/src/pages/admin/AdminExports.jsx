@@ -8,65 +8,61 @@ import { toast } from 'sonner';
 
 export const AdminExportsPage = () => {
   const [exporting, setExporting] = useState(null);
+  const [startDate, setStartDate] = useState(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 30);
+    return toDateInputValue(start);
+  });
+  const [endDate, setEndDate] = useState(() => toDateInputValue(new Date()));
 
   const handleExport = async (type) => {
     setExporting(type);
     try {
-      let data = [];
-      let filename = '';
+      let url = '';
+      let fallbackName = '';
+      const params = {
+        start: startDate,
+        end: endDate,
+      };
 
       switch (type) {
-        case 'articles': {
-          const articlesRes = await api.get('/articles?limit=10000');
-          data = articlesRes.data.articles;
-          filename = 'articles.csv';
+        case 'articles_me':
+          url = '/admin/exports/articles/me';
+          fallbackName = 'articles_me.xlsx';
           break;
-        }
-        case 'users': {
-          const usersRes = await api.get('/admin/users');
-          data = usersRes.data;
-          filename = 'utilisateurs.csv';
+        case 'articles_all':
+          url = '/admin/exports/articles/all';
+          fallbackName = 'articles_all.xlsx';
           break;
-        }
-        case 'demandes': {
-          const demandesRes = await api.get('/admin/demandes');
-          data = demandesRes.data;
-          filename = 'demandes.csv';
+        case 'users':
+          url = '/admin/exports/users';
+          fallbackName = 'users.xlsx';
           break;
-        }
-        case 'ventes': {
-          const ventesRes = await api.get('/admin/sales');
-          data = ventesRes.data;
-          filename = 'ventes.csv';
+        case 'demandes':
+          url = '/admin/exports/demandes';
+          fallbackName = 'demandes.xlsx';
           break;
-        }
+        case 'sales_me':
+          url = '/admin/exports/sales/me';
+          fallbackName = 'sales_me.xlsx';
+          break;
+        case 'snapshot':
+          url = '/admin/exports/snapshot';
+          fallbackName = 'snapshot.zip';
+          break;
         default:
           throw new Error("Type d'export inconnu");
       }
 
-      if (!data || data.length === 0) {
-        toast.error('Aucune donnée à exporter');
-        setExporting(null);
-        return;
-      }
+      const response = await api.get(url, {
+        params,
+        responseType: 'blob',
+      });
 
-      const headers = Object.keys(data[0]).join(',');
-      const rows = data.map((item) =>
-        Object.values(item)
-          .map((val) =>
-            typeof val === 'string' && val.includes(',') ? `"${val}"` : val
-          )
-          .join(',')
-      );
-      const csv = [headers, ...rows].join('\n');
-
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      link.click();
-      URL.revokeObjectURL(url);
+      const contentDisposition = response.headers?.['content-disposition'];
+      const filename = getFilenameFromDisposition(contentDisposition) || fallbackName;
+      downloadBlob(response.data, filename);
 
       toast.success(`Export ${filename} réussi`);
     } catch (error) {
@@ -98,39 +94,80 @@ export const AdminExportsPage = () => {
         </div>
 
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-          {/* CSV Section */}
+          {/* XLSX Section */}
           <Card className="bg-[#0E0E0E] border-white/10 ring-1 ring-white/[0.03] rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden shadow-2xl hover:ring-white/[0.06] transition-all">
             <CardHeader className="p-6 sm:px-8 sm:pt-8 sm:pb-4">
               <CardTitle className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-zinc-500 flex items-center gap-2">
-                <Table className="h-4 w-4 text-orange-500" /> Formats Tableurs (CSV)
+                <Table className="h-4 w-4 text-orange-500" /> Formats Tableurs (XLSX)
               </CardTitle>
             </CardHeader>
 
             <CardContent className="p-6 sm:px-8 sm:pb-8 space-y-3">
-              <ExportButton
-                label="Articles"
-                icon={<Package size={16} />}
-                loading={exporting === 'articles'}
-                onClick={() => handleExport('articles')}
-              />
-              <ExportButton
-                label="Utilisateurs"
-                icon={<Users size={16} />}
-                loading={exporting === 'users'}
-                onClick={() => handleExport('users')}
-              />
-              <ExportButton
-                label="Demandes"
-                icon={<FileText size={16} />}
-                loading={exporting === 'demandes'}
-                onClick={() => handleExport('demandes')}
-              />
-              <ExportButton
-                label="Ventes"
-                icon={<Download size={16} />}
-                loading={exporting === 'ventes'}
-                onClick={() => handleExport('ventes')}
-              />
+              <div className="rounded-xl sm:rounded-2xl border border-white/[0.08] bg-[#0B0B0B] p-4 space-y-3">
+                <p className="text-[9px] sm:text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">Période globale</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                      Début
+                    </label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(event) => setStartDate(event.target.value)}
+                      className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[10px] sm:text-xs text-white focus:outline-none focus:ring-2 focus:ring-orange-500/40"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                      Fin
+                    </label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(event) => setEndDate(event.target.value)}
+                      className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-[10px] sm:text-xs text-white focus:outline-none focus:ring-2 focus:ring-orange-500/40"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <p className="text-[9px] sm:text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2">Mes données</p>
+                <ExportButton
+                  label="Articles (mes données)"
+                  icon={<Package size={16} />}
+                  loading={exporting === 'articles_me'}
+                  onClick={() => handleExport('articles_me')}
+                />
+                <ExportButton
+                  label="Ventes (mes données)"
+                  icon={<Download size={16} />}
+                  loading={exporting === 'sales_me'}
+                  onClick={() => handleExport('sales_me')}
+                />
+              </div>
+
+              <div className="pt-4">
+                <p className="text-[9px] sm:text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2">Tous les utilisateurs</p>
+                <ExportButton
+                  label="Articles (tous les utilisateurs)"
+                  icon={<Package size={16} />}
+                  loading={exporting === 'articles_all'}
+                  onClick={() => handleExport('articles_all')}
+                />
+                <ExportButton
+                  label="Utilisateurs"
+                  icon={<Users size={16} />}
+                  loading={exporting === 'users'}
+                  onClick={() => handleExport('users')}
+                />
+                <ExportButton
+                  label="Demandes"
+                  icon={<FileText size={16} />}
+                  loading={exporting === 'demandes'}
+                  onClick={() => handleExport('demandes')}
+                />
+              </div>
             </CardContent>
           </Card>
 
@@ -144,21 +181,21 @@ export const AdminExportsPage = () => {
 
             <CardContent className="p-6 sm:px-8 sm:pb-8 flex-1 flex flex-col">
               <p className="text-zinc-500 text-[10px] sm:text-xs font-medium leading-relaxed mb-6 sm:mb-8 uppercase tracking-wider">
-                Générez un snapshot complet de l&apos;infrastructure au format JSON pour une restauration d&apos;urgence.
+                Snapshot ZIP incluant les exports XLSX principaux et les métadonnées (sans images).
               </p>
 
               <div className="mt-auto space-y-4 sm:space-y-6">
-                {/* NOTE: pas de onClick dans ton code d'origine -> je garde pareil */}
                 <Button
                   className="w-full bg-white hover:bg-zinc-200 text-black font-black uppercase tracking-widest text-[10px] sm:text-[11px] h-12 sm:h-14 rounded-xl sm:rounded-2xl shadow-lg transition-all active:scale-[0.98]"
-                  disabled={exporting === 'full'}
+                  disabled={exporting === 'snapshot'}
+                  onClick={() => handleExport('snapshot')}
                 >
-                  {exporting === 'full' ? (
+                  {exporting === 'snapshot' ? (
                     <Loader2 className="animate-spin h-4 w-4 mr-2" />
                   ) : (
                     <Download className="h-4 w-4 mr-2 stroke-[3px]" />
                   )}
-                  Full System Dump (JSON)
+                  Snapshot complet (ZIP)
                 </Button>
 
                 <div className="bg-[#0B0B0B] border border-white/[0.08] rounded-xl sm:rounded-2xl p-4 flex items-center justify-between">
@@ -188,9 +225,9 @@ export const AdminExportsPage = () => {
 
             <CardContent className="px-6 pb-6 sm:px-8 sm:pb-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2 md:gap-y-4">
-                <InstructionItem text="Les exports CSV sont formatés pour Excel et Google Sheets." />
-                <InstructionItem text="Le dump JSON inclut l'intégralité des relations SQL." />
-                <InstructionItem text="Privilégiez les sauvegardes hors pic d'activité." />
+                <InstructionItem text="Les exports XLSX sont compatibles Excel et Google Sheets." />
+                <InstructionItem text="Le snapshot ZIP contient uniquement des données structurées." />
+                <InstructionItem text="Période globale appliquée à chaque export." />
                 <InstructionItem text="Toutes les extractions sont loggées à des fins d'audit." />
               </div>
             </CardContent>
@@ -230,3 +267,26 @@ const InstructionItem = ({ text }) => (
     <p className="text-[9px] sm:text-[11px] font-medium text-zinc-500 uppercase leading-relaxed">{text}</p>
   </div>
 );
+
+const toDateInputValue = (date) => {
+  const local = new Date(date);
+  local.setMinutes(local.getMinutes() - local.getTimezoneOffset());
+  return local.toISOString().split('T')[0];
+};
+
+const getFilenameFromDisposition = (contentDisposition) => {
+  if (!contentDisposition) return '';
+  const match = /filename="(.+?)"/.exec(contentDisposition);
+  return match ? match[1] : '';
+};
+
+const downloadBlob = (blob, filename) => {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};

@@ -7,10 +7,12 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 import uuid
 from datetime import datetime, timezone
 import shutil
+import json
+import zipfile
 from PIL import Image
 import io
 
@@ -36,6 +38,16 @@ from stripe_billing import (
     handle_invoice_paid
 )
 import stripe
+
+from utils.exports import (
+    build_filename,
+    create_temp_dir,
+    create_xlsx_file,
+    format_platform_links,
+    parse_date_range,
+    stream_file_response,
+    cleanup_paths,
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -2920,6 +2932,707 @@ async def get_seller_sale_detail(sale_id: str, current_user = Depends(get_curren
         "sale": sale,
         "article": article
     }
+
+# =============================
+# ADMIN EXPORTS (XLSX/ZIP)
+# =============================
+
+def _date_range_query(field: str, start_dt: datetime, end_dt: datetime) -> dict:
+    return {field: {"$gte": start_dt.isoformat(), "$lte": end_dt.isoformat()}}
+
+
+def _sale_timestamp(sale: dict) -> str:
+    return sale.get("updated_at") or sale.get("created_at") or ""
+
+
+@api_router.get("/admin/exports/articles/me", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
+async def export_admin_articles_me(
+    background_tasks: BackgroundTasks,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    current_user = Depends(get_current_user)
+):
+    # Date filter applies to created_at for all articles (sold or not).
+    start_dt, end_dt, start_str, end_str = parse_date_range(start, end)
+    user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0, "id": 1})
+
+    query = _date_range_query("created_at", start_dt, end_dt)
+    query["$or"] = [
+        {"posted_by": user_doc.get("id") if user_doc else None},
+        {"posted_by": None},
+        {"posted_by": {"$exists": False}}
+    ]
+
+    articles = await db.articles.find(query, {"_id": 0}).to_list(100000)
+    article_ids = [a.get("id") for a in articles if a.get("id")]
+
+    categories = await db.categories.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(1000)
+    category_map = {c["id"]: c["name"] for c in categories if c.get("id")}
+
+    sales = []
+    if article_ids:
+        sales = await db.seller_sales.find(
+            {"article_id": {"$in": article_ids}, "status": SaleStatus.COMPLETED},
+            {"_id": 0, "article_id": 1, "sale_price": 1, "updated_at": 1, "created_at": 1}
+        ).to_list(100000)
+
+    sales_map: Dict[str, dict] = {}
+    for sale in sales:
+        article_id = sale.get("article_id")
+        if not article_id:
+            continue
+        ts = _sale_timestamp(sale)
+        existing = sales_map.get(article_id)
+        if not existing or ts > _sale_timestamp(existing):
+            sales_map[article_id] = sale
+
+    columns = [
+        "article_id",
+        "title",
+        "category",
+        "condition/state",
+        "purchase_price",
+        "listed_price",
+        "sold_price",
+        "status",
+        "created_at",
+        "sold_at",
+        "platform_links",
+    ]
+
+    rows = []
+    for article in articles:
+        sale = sales_map.get(article.get("id"))
+        sold = article.get("status") == "sold" or article.get("stock", 1) <= 0
+        rows.append({
+            "article_id": article.get("id"),
+            "title": article.get("name"),
+            "category": category_map.get(article.get("category_id"), article.get("category_id") or ""),
+            "condition/state": article.get("condition") or "",
+            "purchase_price": article.get("price"),
+            "listed_price": article.get("reference_price"),
+            "sold_price": sale.get("sale_price") if sale else "",
+            "status": "SOLD" if sold else "AVAILABLE",
+            "created_at": article.get("created_at"),
+            "sold_at": _sale_timestamp(sale) if sale else "",
+            "platform_links": format_platform_links(article.get("platform_links")),
+        })
+
+    sheets = [
+        {"title": "Articles - Tous", "columns": columns, "rows": rows},
+        {"title": "Articles - Vendus", "columns": columns, "rows": [r for r in rows if r["status"] == "SOLD"]},
+        {"title": "Articles - Non vendus", "columns": columns, "rows": [r for r in rows if r["status"] == "AVAILABLE"]},
+    ]
+
+    xlsx_path = create_xlsx_file(sheets)
+    filename = build_filename("articles_me", start_str, end_str, "xlsx")
+    return stream_file_response(
+        xlsx_path,
+        filename,
+        background_tasks,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+
+@api_router.get("/admin/exports/articles/all", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
+async def export_admin_articles_all(
+    background_tasks: BackgroundTasks,
+    start: Optional[str] = None,
+    end: Optional[str] = None
+):
+    # Date filter applies to created_at for all articles (sold or not).
+    start_dt, end_dt, start_str, end_str = parse_date_range(start, end)
+
+    articles = await db.articles.find(
+        _date_range_query("created_at", start_dt, end_dt),
+        {"_id": 0}
+    ).to_list(100000)
+    minisite_articles = await db.minisite_articles.find(
+        _date_range_query("created_at", start_dt, end_dt),
+        {"_id": 0}
+    ).to_list(100000)
+
+    categories = await db.categories.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(1000)
+    category_map = {c["id"]: c["name"] for c in categories if c.get("id")}
+
+    posted_by_ids = {a.get("posted_by") for a in articles if a.get("posted_by")}
+    minisite_ids = {a.get("minisite_id") for a in minisite_articles if a.get("minisite_id")}
+
+    minisites = []
+    if minisite_ids:
+        minisites = await db.minisites.find(
+            {"id": {"$in": list(minisite_ids)}},
+            {"_id": 0, "id": 1, "user_id": 1, "site_name": 1, "slug": 1}
+        ).to_list(100000)
+
+    minisite_map = {m.get("id"): m for m in minisites if m.get("id")}
+    minisite_user_ids = {m.get("user_id") for m in minisites if m.get("user_id")}
+
+    user_ids = set(posted_by_ids) | set(minisite_user_ids)
+    users = []
+    if user_ids:
+        users = await db.users.find(
+            {"id": {"$in": list(user_ids)}},
+            {"_id": 0, "id": 1, "first_name": 1, "last_name": 1, "email": 1, "roles": 1}
+        ).to_list(len(user_ids))
+
+    user_map = {u.get("id"): u for u in users if u.get("id")}
+
+    article_ids = [a.get("id") for a in articles if a.get("id")]
+    sales = []
+    if article_ids:
+        sales = await db.seller_sales.find(
+            {"article_id": {"$in": article_ids}, "status": SaleStatus.COMPLETED},
+            {"_id": 0, "article_id": 1, "sale_price": 1, "updated_at": 1, "created_at": 1}
+        ).to_list(100000)
+
+    sales_map: Dict[str, dict] = {}
+    for sale in sales:
+        article_id = sale.get("article_id")
+        if not article_id:
+            continue
+        ts = _sale_timestamp(sale)
+        existing = sales_map.get(article_id)
+        if not existing or ts > _sale_timestamp(existing):
+            sales_map[article_id] = sale
+
+    minisite_article_ids = [a.get("id") for a in minisite_articles if a.get("id")]
+    transactions = []
+    if minisite_article_ids:
+        transactions = await db.marketplace_transactions.find(
+            {"article_id": {"$in": minisite_article_ids}, "status": "completed"},
+            {"_id": 0, "article_id": 1, "completed_at": 1, "created_at": 1}
+        ).to_list(100000)
+
+    transaction_map: Dict[str, dict] = {}
+    for tx in transactions:
+        article_id = tx.get("article_id")
+        if not article_id:
+            continue
+        ts = tx.get("completed_at") or tx.get("created_at") or ""
+        existing = transaction_map.get(article_id)
+        existing_ts = (existing.get("completed_at") or existing.get("created_at") or "") if existing else ""
+        if not existing or ts > existing_ts:
+            transaction_map[article_id] = tx
+
+    columns = [
+        "user_id",
+        "first_name",
+        "last_name",
+        "email",
+        "roles",
+        "minisite_id",
+        "minisite_name",
+        "minisite_slug",
+        "article_id",
+        "title",
+        "category",
+        "condition/state",
+        "purchase_price",
+        "listed_price",
+        "sold_price",
+        "status",
+        "created_at",
+        "sold_at",
+        "platform_links",
+    ]
+
+    rows = []
+    for article in articles:
+        user = user_map.get(article.get("posted_by"))
+        sale = sales_map.get(article.get("id"))
+        sold = article.get("status") == "sold" or article.get("stock", 1) <= 0
+        rows.append({
+            "user_id": user.get("id") if user else "",
+            "first_name": user.get("first_name") if user else "",
+            "last_name": user.get("last_name") if user else "",
+            "email": user.get("email") if user else "",
+            "roles": ", ".join(user.get("roles", [])) if user else "",
+            "minisite_id": "",
+            "minisite_name": "",
+            "minisite_slug": "",
+            "article_id": article.get("id"),
+            "title": article.get("name"),
+            "category": category_map.get(article.get("category_id"), article.get("category_id") or ""),
+            "condition/state": article.get("condition") or "",
+            "purchase_price": article.get("price"),
+            "listed_price": article.get("reference_price"),
+            "sold_price": sale.get("sale_price") if sale else "",
+            "status": "SOLD" if sold else "AVAILABLE",
+            "created_at": article.get("created_at"),
+            "sold_at": _sale_timestamp(sale) if sale else "",
+            "platform_links": format_platform_links(article.get("platform_links")),
+        })
+
+    for article in minisite_articles:
+        minisite = minisite_map.get(article.get("minisite_id"))
+        user = user_map.get(minisite.get("user_id")) if minisite else None
+        tx = transaction_map.get(article.get("id"))
+        sold = article.get("status") == "sold"
+        rows.append({
+            "user_id": user.get("id") if user else "",
+            "first_name": user.get("first_name") if user else "",
+            "last_name": user.get("last_name") if user else "",
+            "email": user.get("email") if user else "",
+            "roles": ", ".join(user.get("roles", [])) if user else "",
+            "minisite_id": minisite.get("id") if minisite else "",
+            "minisite_name": minisite.get("site_name") if minisite else "",
+            "minisite_slug": minisite.get("slug") if minisite else "",
+            "article_id": article.get("id"),
+            "title": article.get("name"),
+            "category": "",
+            "condition/state": article.get("condition") or "",
+            "purchase_price": article.get("price"),
+            "listed_price": article.get("reference_price"),
+            "sold_price": "",
+            "status": "SOLD" if sold else "AVAILABLE",
+            "created_at": article.get("created_at"),
+            "sold_at": (tx.get("completed_at") or tx.get("created_at")) if tx else "",
+            "platform_links": format_platform_links(article.get("platform_links")),
+        })
+
+    sheets = [
+        {"title": "Tous", "columns": columns, "rows": rows},
+        {"title": "Vendus", "columns": columns, "rows": [r for r in rows if r["status"] == "SOLD"]},
+        {"title": "Non vendus", "columns": columns, "rows": [r for r in rows if r["status"] == "AVAILABLE"]},
+    ]
+
+    xlsx_path = create_xlsx_file(sheets)
+    filename = build_filename("articles_all", start_str, end_str, "xlsx")
+    return stream_file_response(
+        xlsx_path,
+        filename,
+        background_tasks,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+
+@api_router.get("/admin/exports/users", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
+async def export_admin_users(
+    background_tasks: BackgroundTasks,
+    start: Optional[str] = None,
+    end: Optional[str] = None
+):
+    start_dt, end_dt, start_str, end_str = parse_date_range(start, end)
+    users = await db.users.find(
+        _date_range_query("created_at", start_dt, end_dt),
+        {"_id": 0, "password_hash": 0}
+    ).to_list(100000)
+
+    user_ids = [u.get("id") for u in users if u.get("id")]
+
+    minisites = []
+    if user_ids:
+        minisites = await db.minisites.find(
+            {"user_id": {"$in": user_ids}},
+            {"_id": 0, "id": 1, "user_id": 1, "slug": 1}
+        ).to_list(100000)
+
+    minisite_map: Dict[str, List[dict]] = {}
+    for site in minisites:
+        minisite_map.setdefault(site.get("user_id"), []).append(site)
+
+    sales = []
+    if user_ids:
+        sales = await db.seller_sales.find(
+            {"seller_id": {"$in": user_ids}, "status": SaleStatus.COMPLETED},
+            {"_id": 0, "seller_id": 1, "sale_price": 1}
+        ).to_list(100000)
+
+    sales_map: Dict[str, dict] = {}
+    for sale in sales:
+        seller_id = sale.get("seller_id")
+        if not seller_id:
+            continue
+        stats = sales_map.setdefault(seller_id, {"count": 0, "revenue": 0.0})
+        stats["count"] += 1
+        stats["revenue"] += float(sale.get("sale_price") or 0)
+
+    article_counts: Dict[str, int] = {}
+    if user_ids:
+        user_articles = await db.articles.find(
+            {"posted_by": {"$in": user_ids}},
+            {"_id": 0, "posted_by": 1}
+        ).to_list(100000)
+        for article in user_articles:
+            owner = article.get("posted_by")
+            if owner:
+                article_counts[owner] = article_counts.get(owner, 0) + 1
+
+        minisite_ids = [site.get("id") for site in minisites if site.get("id")]
+        if minisite_ids:
+            minisite_articles = await db.minisite_articles.find(
+                {"minisite_id": {"$in": minisite_ids}},
+                {"_id": 0, "minisite_id": 1}
+            ).to_list(100000)
+            minisite_owner_map = {site.get("id"): site.get("user_id") for site in minisites}
+            for article in minisite_articles:
+                owner = minisite_owner_map.get(article.get("minisite_id"))
+                if owner:
+                    article_counts[owner] = article_counts.get(owner, 0) + 1
+
+    columns = [
+        "user_id",
+        "first_name",
+        "last_name",
+        "email",
+        "created_at",
+        "roles",
+        "minisite_id",
+        "minisite_slug",
+        "total_sales_count",
+        "total_revenue",
+        "total_articles_count",
+    ]
+
+    rows = []
+    for user in users:
+        user_id = user.get("id")
+        sites = minisite_map.get(user_id, [])
+        site_ids = ", ".join([s.get("id") for s in sites if s.get("id")])
+        site_slugs = ", ".join([s.get("slug") for s in sites if s.get("slug")])
+        stats = sales_map.get(user_id, {"count": 0, "revenue": 0.0})
+        rows.append({
+            "user_id": user_id,
+            "first_name": user.get("first_name"),
+            "last_name": user.get("last_name"),
+            "email": user.get("email"),
+            "created_at": user.get("created_at"),
+            "roles": ", ".join(user.get("roles", [])),
+            "minisite_id": site_ids,
+            "minisite_slug": site_slugs,
+            "total_sales_count": stats.get("count", 0),
+            "total_revenue": stats.get("revenue", 0.0),
+            "total_articles_count": article_counts.get(user_id, 0),
+        })
+
+    xlsx_path = create_xlsx_file([{"title": "Utilisateurs", "columns": columns, "rows": rows}])
+    filename = build_filename("users", start_str, end_str, "xlsx")
+    return stream_file_response(
+        xlsx_path,
+        filename,
+        background_tasks,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+
+@api_router.get("/admin/exports/demandes", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
+async def export_admin_demandes(
+    background_tasks: BackgroundTasks,
+    start: Optional[str] = None,
+    end: Optional[str] = None
+):
+    start_dt, end_dt, start_str, end_str = parse_date_range(start, end)
+    demandes = await db.demandes.find(
+        _date_range_query("created_at", start_dt, end_dt),
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100000)
+
+    requester_ids = {d.get("client_id") for d in demandes if d.get("client_id")}
+    users = []
+    if requester_ids:
+        users = await db.users.find(
+            {"id": {"$in": list(requester_ids)}},
+            {"_id": 0, "id": 1, "first_name": 1, "last_name": 1, "email": 1, "phone": 1}
+        ).to_list(len(requester_ids))
+
+    user_map = {u.get("id"): u for u in users if u.get("id")}
+
+    columns = [
+        "demande_id",
+        "created_at",
+        "status",
+        "requester_first_name",
+        "requester_last_name",
+        "requester_email",
+        "requester_phone",
+        "related_article_id",
+        "message/notes",
+    ]
+
+    rows = []
+    for demande in demandes:
+        requester = user_map.get(demande.get("client_id"))
+        rows.append({
+            "demande_id": demande.get("id"),
+            "created_at": demande.get("created_at"),
+            "status": demande.get("status"),
+            "requester_first_name": requester.get("first_name") if requester else "",
+            "requester_last_name": requester.get("last_name") if requester else "",
+            "requester_email": requester.get("email") if requester else "",
+            "requester_phone": requester.get("phone") if requester else "",
+            "related_article_id": demande.get("article_id") or "",
+            "message/notes": demande.get("description") or "",
+        })
+
+    xlsx_path = create_xlsx_file([{"title": "Demandes", "columns": columns, "rows": rows}])
+    filename = build_filename("demandes", start_str, end_str, "xlsx")
+    return stream_file_response(
+        xlsx_path,
+        filename,
+        background_tasks,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+
+@api_router.get("/admin/exports/sales/me", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
+async def export_admin_sales_me(
+    background_tasks: BackgroundTasks,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    current_user = Depends(get_current_user)
+):
+    # Date filter applies to created_at for seller sales.
+    start_dt, end_dt, start_str, end_str = parse_date_range(start, end)
+    user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0, "id": 1})
+    seller_id = user_doc.get("id") if user_doc else None
+
+    if not seller_id:
+        sales = []
+    else:
+        query = _date_range_query("created_at", start_dt, end_dt)
+        query["seller_id"] = seller_id
+        sales = await db.seller_sales.find(query, {"_id": 0}).sort("created_at", -1).to_list(100000)
+
+    columns = [
+        "sale_id",
+        "created_at",
+        "completed_at",
+        "status",
+        "article_id",
+        "article_title",
+        "buyer_user_id",
+        "buyer_name",
+        "buyer_email",
+        "sold_price",
+        "payment_method",
+        "shipping_reference",
+        "notes",
+    ]
+
+    rows = []
+    for sale in sales:
+        payment_proof = sale.get("payment_proof") or {}
+        shipping_reference = sale.get("tracking_number") or sale.get("shipping_label") or ""
+        rows.append({
+            "sale_id": sale.get("id"),
+            "created_at": sale.get("created_at"),
+            "completed_at": sale.get("updated_at") if sale.get("status") == SaleStatus.COMPLETED else "",
+            "status": sale.get("status"),
+            "article_id": sale.get("article_id"),
+            "article_title": sale.get("article_name"),
+            "buyer_user_id": "",
+            "buyer_name": "",
+            "buyer_email": "",
+            "sold_price": sale.get("sale_price"),
+            "payment_method": sale.get("payment_method"),
+            "shipping_reference": shipping_reference,
+            "notes": payment_proof.get("note") or sale.get("rejection_reason") or "",
+        })
+
+    xlsx_path = create_xlsx_file([{"title": "Ventes", "columns": columns, "rows": rows}])
+    filename = build_filename("sales_me", start_str, end_str, "xlsx")
+    return stream_file_response(
+        xlsx_path,
+        filename,
+        background_tasks,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+
+@api_router.get("/admin/exports/snapshot", dependencies=[Depends(require_roles([UserRole.ADMIN]))])
+async def export_admin_snapshot(
+    background_tasks: BackgroundTasks,
+    start: Optional[str] = None,
+    end: Optional[str] = None
+):
+    start_dt, end_dt, start_str, end_str = parse_date_range(start, end)
+    tmp_dir = create_temp_dir()
+    temp_paths: List[str] = [tmp_dir]
+
+    def _write_xlsx(filename: str, sheets: List[Dict[str, Any]]) -> str:
+        output_path = os.path.join(tmp_dir, filename)
+        create_xlsx_file(sheets, output_path=output_path)
+        temp_paths.append(output_path)
+        return output_path
+
+    users = await db.users.find(
+        _date_range_query("created_at", start_dt, end_dt),
+        {"_id": 0, "password_hash": 0}
+    ).to_list(100000)
+    _write_xlsx(
+        "users.xlsx",
+        [{
+            "title": "users",
+            "columns": ["id", "email", "first_name", "last_name", "phone", "roles", "site_plan", "created_at"],
+            "rows": users,
+        }]
+    )
+
+    minisites = await db.minisites.find(
+        _date_range_query("created_at", start_dt, end_dt),
+        {"_id": 0}
+    ).to_list(100000)
+    _write_xlsx(
+        "minisites.xlsx",
+        [{
+            "title": "minisites",
+            "columns": [
+                "id", "user_id", "user_email", "plan_id", "site_name", "slug",
+                "welcome_text", "template", "primary_color", "font_family",
+                "status", "rating_avg", "rating_count", "sales_count",
+                "show_reviews", "created_at", "updated_at"
+            ],
+            "rows": minisites,
+        }]
+    )
+
+    articles = await db.articles.find(
+        _date_range_query("created_at", start_dt, end_dt),
+        {"_id": 0}
+    ).to_list(100000)
+    minisite_articles = await db.minisite_articles.find(
+        _date_range_query("created_at", start_dt, end_dt),
+        {"_id": 0}
+    ).to_list(100000)
+    _write_xlsx(
+        "articles.xlsx",
+        [
+            {
+                "title": "articles",
+                "columns": [
+                    "id", "name", "description", "price", "reference_price", "category_id",
+                    "platform_links", "status", "stock", "created_at", "visible_public",
+                    "visible_seller", "discord_contact", "posted_by", "is_third_party"
+                ],
+                "rows": articles,
+            },
+            {
+                "title": "minisite_articles",
+                "columns": [
+                    "id", "minisite_id", "name", "description", "price", "reference_price",
+                    "platform_links", "created_at", "status", "reserved", "show_in_reseller_catalog",
+                    "condition", "show_in_public_catalog", "contact_email", "discord_tag"
+                ],
+                "rows": minisite_articles,
+            }
+        ]
+    )
+
+    demandes = await db.demandes.find(
+        _date_range_query("created_at", start_dt, end_dt),
+        {"_id": 0}
+    ).to_list(100000)
+    _write_xlsx(
+        "demandes.xlsx",
+        [{
+            "title": "demandes",
+            "columns": [
+                "id", "client_id", "name", "description", "max_price", "reference_price",
+                "deposit_amount", "status", "payment_type", "deposit_requested_at",
+                "deposit_paid_at", "created_at", "can_cancel"
+            ],
+            "rows": demandes,
+        }]
+    )
+
+    seller_sales = await db.seller_sales.find(
+        _date_range_query("created_at", start_dt, end_dt),
+        {"_id": 0}
+    ).to_list(100000)
+    transactions = await db.marketplace_transactions.find(
+        _date_range_query("created_at", start_dt, end_dt),
+        {"_id": 0}
+    ).to_list(100000)
+    _write_xlsx(
+        "sales_transactions.xlsx",
+        [
+            {
+                "title": "seller_sales",
+                "columns": [
+                    "id", "seller_id", "article_id", "article_name", "sale_price", "seller_cost",
+                    "profit", "status", "payment_method", "tracking_number", "shipping_label",
+                    "rejection_reason", "created_at", "updated_at"
+                ],
+                "rows": seller_sales,
+            },
+            {
+                "title": "marketplace_transactions",
+                "columns": [
+                    "id", "article_id", "seller_user_id", "seller_minisite_id", "buyer_user_id",
+                    "status", "buyer_confirmed", "seller_confirmed", "accepted_at",
+                    "completed_at", "created_at", "reserved"
+                ],
+                "rows": transactions,
+            }
+        ]
+    )
+
+    subscriptions = await db.subscriptions.find(
+        {"product": "minisite"},
+        {"_id": 0}
+    ).to_list(100000)
+    _write_xlsx(
+        "subscriptions.xlsx",
+        [{
+            "title": "subscriptions",
+            "columns": ["id", "user_id", "user_email", "plan", "status", "created_at", "current_period_end"],
+            "rows": subscriptions,
+        }]
+    )
+
+    settings_docs = await db.settings.find({}, {"_id": 0}).to_list(1000)
+    public_settings = await db.settings.find(
+        {"key": {"$in": ["logo_url", "contact_phone", "contact_email", "discord_invite_url", "billing_mode", "payments_enabled"]}},
+        {"_id": 0}
+    ).to_list(1000)
+    _write_xlsx(
+        "settings.xlsx",
+        [
+            {"title": "settings", "columns": ["key", "value"], "rows": settings_docs},
+            {"title": "public_settings", "columns": ["key", "value"], "rows": public_settings},
+        ]
+    )
+
+    audit_logs = await db.audit_logs.find(
+        _date_range_query("created_at", start_dt, end_dt),
+        {"_id": 0}
+    ).to_list(100000)
+    if audit_logs:
+        _write_xlsx(
+            "audit_logs.xlsx",
+            [{
+                "title": "audit_logs",
+                "columns": ["user_id", "action", "created_at", "ip"],
+                "rows": audit_logs,
+            }]
+        )
+
+    export_info = {
+        "version": "1.0",
+        "period": {"start": start_str, "end": end_str},
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    export_info_path = os.path.join(tmp_dir, "export_info.json")
+    with open(export_info_path, "w", encoding="utf-8") as handle:
+        json.dump(export_info, handle, ensure_ascii=True, indent=2)
+    temp_paths.append(export_info_path)
+
+    zip_path = os.path.join(tmp_dir, "snapshot.zip")
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zip_handle:
+        for path in temp_paths:
+            if os.path.isfile(path) and path != zip_path:
+                zip_handle.write(path, arcname=os.path.basename(path))
+    temp_paths.append(zip_path)
+
+    background_tasks.add_task(cleanup_paths, temp_paths)
+    filename = build_filename("snapshot", start_str, end_str, "zip")
+    return stream_file_response(
+        zip_path,
+        filename,
+        background_tasks,
+        "application/zip"
+    )
 
 # ===== STRIPE BILLING ENDPOINTS =====
 

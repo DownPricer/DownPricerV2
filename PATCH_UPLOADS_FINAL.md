@@ -226,3 +226,4 @@ Après ce patch, `/api/uploads/<uuid>.webp` doit retourner **200 OK** et les ima
 
 
 
+
