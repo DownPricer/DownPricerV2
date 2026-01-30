@@ -6,47 +6,71 @@
 
 @layer base {
   :root {
-    /* NOIR PUR : HSL 0 0% 0% */
-    --background: 0 0% 0%; 
-    --foreground: 0 0% 98%;
-    
-    /* Cartes légèrement plus claires pour le relief (2%) */
-    --card: 0 0% 3%;
-    --card-foreground: 0 0% 98%;
-    
-    --popover: 0 0% 2%;
-    --popover-foreground: 0 0% 98%;
-    
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    
-    /* Gris très sombres pour les éléments secondaires */
-    --secondary: 0 0% 10%;
-    --secondary-foreground: 0 0% 98%;
-    
-    --muted: 0 0% 8%;
-    --muted-foreground: 0 0% 60%;
-    
-    --accent: 0 0% 12%;
-    --accent-foreground: 0 0% 98%;
-    
-    --destructive: 0 62.8% 30.6%;
+    --bg: 0 0% 98%;
+    --surface: 0 0% 100%;
+    --surface-2: 0 0% 96%;
+    --border: 220 14% 90%;
+    --text: 222 47% 11%;
+    --text-muted: 215 16% 47%;
+    --primary: 24 95% 53%;
+    --primary-contrast: 0 0% 100%;
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+    --danger: 0 72% 51%;
+    --shadow: 0 0% 0%;
+
+    --background: var(--bg);
+    --foreground: var(--text);
+    --card: var(--surface);
+    --card-foreground: var(--text);
+    --popover: var(--surface);
+    --popover-foreground: var(--text);
+    --primary-foreground: var(--primary-contrast);
+    --secondary: 210 20% 96%;
+    --secondary-foreground: var(--text);
+    --muted: 210 14% 94%;
+    --muted-foreground: var(--text-muted);
+    --accent: 210 18% 92%;
+    --accent-foreground: var(--text);
+    --destructive: var(--danger);
     --destructive-foreground: 0 0% 98%;
-    
-    /* Bordures ultra fines et sombres */
-    --border: 0 0% 12%;
-    --input: 0 0% 12%;
-    --ring: 0 0% 83.1%;
-    
+    --input: var(--border);
+    --ring: 24 95% 53%;
     --radius: 0.75rem;
   }
 
-  /* Force le noir pur même si le mode dark est activé par le navigateur */
-  .dark {
-    --background: 0 0% 0%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3%;
-    --border: 0 0% 12%;
+  html[data-theme="dark"],
+  html.dark {
+    --bg: 0 0% 4%;
+    --surface: 0 0% 7%;
+    --surface-2: 0 0% 10%;
+    --border: 0 0% 14%;
+    --text: 0 0% 96%;
+    --text-muted: 0 0% 65%;
+    --primary: 24 95% 53%;
+    --primary-contrast: 0 0% 9%;
+    --success: 142 70% 50%;
+    --warning: 38 92% 60%;
+    --danger: 0 70% 60%;
+    --shadow: 0 0% 0%;
+
+    --background: var(--bg);
+    --foreground: var(--text);
+    --card: var(--surface);
+    --card-foreground: var(--text);
+    --popover: var(--surface);
+    --popover-foreground: var(--text);
+    --primary-foreground: var(--primary-contrast);
+    --secondary: 0 0% 12%;
+    --secondary-foreground: var(--text);
+    --muted: 0 0% 12%;
+    --muted-foreground: var(--text-muted);
+    --accent: 0 0% 14%;
+    --accent-foreground: var(--text);
+    --destructive: var(--danger);
+    --destructive-foreground: 0 0% 98%;
+    --input: var(--border);
+    --ring: 24 95% 60%;
   }
 }
 
@@ -55,13 +79,46 @@
     @apply border-border;
   }
   body {
-    /* Le fond sera maintenant noir total grâce à --background */
     @apply bg-background text-foreground;
     margin: 0;
     font-family: 'Inter', sans-serif;
-    background-color: #000000 !important; /* Double sécurité */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer base {
+  html[data-theme="light"] .bg-black,
+  html[data-theme="light"] .bg-black\/80,
+  html[data-theme="light"] .bg-black\/60,
+  html[data-theme="light"] .bg-black\/40,
+  html[data-theme="light"] .bg-black\/20 {
+    background-color: hsl(var(--surface)) !important;
+  }
+
+  html[data-theme="light"] .bg-zinc-950,
+  html[data-theme="light"] .bg-zinc-900,
+  html[data-theme="light"] .bg-zinc-800 {
+    background-color: hsl(var(--surface-2)) !important;
+  }
+
+  html[data-theme="light"] .bg-\[\#080808\],
+  html[data-theme="light"] .bg-\[\#0A0A0A\] {
+    background-color: hsl(var(--surface)) !important;
+  }
+
+  html[data-theme="light"] .border-white\/5,
+  html[data-theme="light"] .border-white\/10 {
+    border-color: hsl(var(--border)) !important;
+  }
+
+  html[data-theme="light"] .text-white\/20,
+  html[data-theme="light"] .text-white\/30,
+  html[data-theme="light"] .text-white\/40,
+  html[data-theme="light"] .text-white\/60,
+  html[data-theme="light"] .text-white\/70,
+  html[data-theme="light"] .text-white\/80 {
+    color: hsl(var(--text-muted)) !important;
   }
 }
 
@@ -74,7 +131,7 @@
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(249, 115, 22, 0.4) transparent;
+  scrollbar-color: hsl(var(--primary) / 0.5) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -82,14 +139,55 @@
 }
 
 *::-webkit-scrollbar-track {
-  background: #000000;
+  background: hsl(var(--bg));
 }
 
 *::-webkit-scrollbar-thumb {
-  background-color: rgba(249, 115, 22, 0.4);
+  background-color: hsl(var(--primary) / 0.5);
   border-radius: 20px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(249, 115, 22, 0.6);
+  background-color: hsl(var(--primary) / 0.7);
+}
+
+@layer utilities {
+  .dp-bg {
+    background-color: hsl(var(--bg));
+    color: hsl(var(--text));
+  }
+  .dp-surface {
+    background-color: hsl(var(--surface));
+    border: 1px solid hsl(var(--border));
+    color: hsl(var(--text));
+  }
+  .dp-surface-2 {
+    background-color: hsl(var(--surface-2));
+    border: 1px solid hsl(var(--border));
+    color: hsl(var(--text));
+  }
+  .dp-muted {
+    color: hsl(var(--text-muted));
+  }
+  .dp-input {
+    background-color: hsl(var(--surface-2));
+    border: 1px solid hsl(var(--border));
+    color: hsl(var(--text));
+  }
+  .dp-input::placeholder {
+    color: hsl(var(--text-muted));
+  }
+  .dp-button-primary {
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-contrast));
+  }
+  .dp-ring {
+    outline: none;
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.25);
+  }
+  .dp-header {
+    background: linear-gradient(180deg, hsl(var(--surface)) 0%, hsl(var(--bg)) 100%);
+    border-bottom: 1px solid hsl(var(--border));
+    color: hsl(var(--text));
+  }
 }

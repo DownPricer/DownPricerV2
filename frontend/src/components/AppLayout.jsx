@@ -24,7 +24,7 @@ export const AppLayout = ({ children }) => {
   const showHeader = !isAdminRoute && !isProRoute && !isAuthRoute && !isMinisiteRoute;
   
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen dp-bg">
       {showHeader && <Header />}
       <main>
         {children}

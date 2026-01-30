@@ -13,16 +13,21 @@ import {
   Star,
   ShoppingBag,
   ClipboardList,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "./ui/dropdown-menu";
 import { getUser, logout, hasRole, hasSTier, refreshUser, getToken } from "../utils/auth";
 import api from "../utils/api";
 import { resolveMinisiteEntry } from "../utils/minisiteAccess";
+import { useTheme } from "@/hooks/useTheme";
 
 export const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { resolvedTheme, toggleTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
 
   const [user, setUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -102,14 +107,14 @@ export const Header = () => {
 
   return (
     <header
-      className="sticky top-0 z-50 w-full border-b border-white/5 bg-gradient-to-t from-black to-zinc-900/95 backdrop-blur-sm"
+      className="sticky top-0 z-50 w-full dp-header backdrop-blur-sm"
       data-testid="main-header"
     >
       <div className="container mx-auto px-6">
         <div className="flex h-16 items-center justify-between gap-8">
           {/* LOGO */}
           <Link to="/" className="flex items-center space-x-2 shrink-0" data-testid="header-logo" onClick={closeMobile}>
-            <div className="text-xl font-black tracking-tighter text-white uppercase italic">
+            <div className="text-xl font-black tracking-tighter text-[hsl(var(--text))] uppercase italic">
               Down<span className="text-orange-500">Pricer</span>
             </div>
           </Link>
@@ -117,13 +122,13 @@ export const Header = () => {
           {/* DESKTOP SEARCH */}
           <div className="hidden md:flex flex-1 max-w-md">
             <form onSubmit={handleSearch} className="w-full relative group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20 group-focus-within:text-orange-500 transition-colors" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--text-muted))] group-focus-within:text-orange-500 transition-colors" />
               <input
                 type="text"
                 placeholder="Rechercher un article..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 w-full bg-[#0A0A0A] border-white/5 text-white placeholder:text-white/20 focus:ring-orange-500/20 focus:border-orange-500/50 rounded-full transition-all h-10 border text-sm outline-none"
+                className="pl-10 w-full dp-input focus:ring-orange-500/20 focus:border-orange-500/50 rounded-full transition-all h-10 text-sm outline-none"
               />
             </form>
           </div>
@@ -135,10 +140,10 @@ export const Header = () => {
                 <NavLink onClick={() => navigate("/faire-demande")}>Demande</NavLink>
                 <NavLink onClick={handleMinisiteClick}>Mon Site</NavLink>
                 <NavLink onClick={() => navigate("/devenir-vendeur")}>Vendre</NavLink>
-                <div className="h-4 w-[1px] bg-white/10 mx-2" />
+                <div className="h-4 w-[1px] bg-[hsl(var(--border))] mx-2" />
                 <Button
                   onClick={() => navigate("/login")}
-                  className="bg-white hover:bg-white/90 text-black font-extrabold rounded-full px-5 h-8 text-[11px] uppercase tracking-wider transition-all active:scale-95"
+                  className="dp-button-primary hover:opacity-90 font-extrabold rounded-full px-5 h-8 text-[11px] uppercase tracking-wider transition-all active:scale-95"
                 >
                   Connexion
                 </Button>
@@ -180,19 +185,19 @@ export const Header = () => {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="ml-2 text-white/40 hover:text-white hover:bg-white/5 rounded-full transition-colors h-9 w-9"
+                      className="ml-2 text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text))] hover:bg-[hsl(var(--surface-2))] rounded-full transition-colors h-9 w-9"
                     >
                       <User className="h-5 w-5" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-[#0A0A0A] border-white/10 text-white min-w-[180px] p-2 shadow-2xl">
+                  <DropdownMenuContent align="end" className="bg-[hsl(var(--surface))] border-[hsl(var(--border))] text-[hsl(var(--text))] min-w-[180px] p-2 shadow-2xl">
                     <DropdownMenuItem
                       onClick={() => navigate("/mon-compte")}
-                      className="rounded-md focus:bg-white/10 cursor-pointer text-xs uppercase font-black tracking-widest p-3"
+                      className="rounded-md focus:bg-[hsl(var(--surface-2))] cursor-pointer text-xs uppercase font-black tracking-widest p-3"
                     >
                       Mon compte
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator className="bg-white/5" />
+                    <DropdownMenuSeparator className="bg-[hsl(var(--border))]" />
                     <DropdownMenuItem
                       onClick={handleLogout}
                       className="rounded-md text-red-500 focus:bg-red-500/10 cursor-pointer text-xs uppercase font-black tracking-widest p-3"
@@ -203,11 +208,16 @@ export const Header = () => {
                 </DropdownMenu>
               </div>
             )}
+            <ThemeToggleButton
+              isDark={isDark}
+              onClick={toggleTheme}
+              className="ml-2"
+            />
           </nav>
 
           {/* MOBILE TOGGLE */}
           <button
-            className="md:hidden p-2 text-white/70 hover:text-white bg-white/5 rounded-2xl border border-white/10 transition active:scale-[0.98]"
+            className="md:hidden p-2 text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text))] bg-[hsl(var(--surface-2))] rounded-2xl border border-[hsl(var(--border))] transition active:scale-[0.98]"
             onClick={() => setMobileMenuOpen((v) => !v)}
             aria-label={mobileMenuOpen ? "Fermer le menu" : "Ouvrir le menu"}
             aria-expanded={mobileMenuOpen}
@@ -229,19 +239,29 @@ export const Header = () => {
 
           {/* Panel */}
           <div className="fixed left-0 right-0 top-16 z-50 md:hidden">
-            <div className="mx-3 mt-3 rounded-3xl border border-white/10 bg-[#0A0A0A] shadow-2xl shadow-black/60 overflow-hidden animate-in slide-in-from-top-4 fade-in duration-200">
+            <div className="mx-3 mt-3 rounded-3xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] shadow-2xl shadow-black/60 overflow-hidden animate-in slide-in-from-top-4 fade-in duration-200">
               {/* Search */}
-              <div className="p-4 border-b border-white/5">
+              <div className="p-4 border-b border-[hsl(var(--border))]">
                 <form onSubmit={handleSearch} className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--text-muted))]" />
                   <input
                     type="text"
                     placeholder="Rechercher un article..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 w-full bg-black/40 border border-white/10 text-white placeholder:text-white/30 focus:border-orange-500/50 rounded-2xl h-11 text-sm outline-none"
+                    className="pl-10 w-full dp-input focus:border-orange-500/50 rounded-2xl h-11 text-sm outline-none"
                   />
                 </form>
+              </div>
+
+              {/* Theme toggle */}
+              <div className="px-4 pt-3">
+                <div className="flex items-center justify-between rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-4 py-2">
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[hsl(var(--text-muted))]">
+                    Mode
+                  </span>
+                  <ThemeToggleButton isDark={isDark} onClick={toggleTheme} />
+                </div>
               </div>
 
               {/* Links */}
@@ -264,7 +284,7 @@ export const Header = () => {
 
                 {user ? (
                   <>
-                    <div className="my-2 h-px bg-white/5" />
+                    <div className="my-2 h-px bg-[hsl(var(--border))]" />
 
                     {hasRole("CLIENT") && (
                       <MobileNavLink icon={ClipboardList} onClick={() => { navigate("/mes-demandes"); closeMobile(); }}>
@@ -330,7 +350,7 @@ export const Header = () => {
               </div>
 
               {/* Tiny footer hint */}
-              <div className="px-4 pb-4 pt-2 text-[10px] uppercase tracking-[0.22em] text-white/30">
+              <div className="px-4 pb-4 pt-2 text-[10px] uppercase tracking-[0.22em] text-[hsl(var(--text-muted))]">
                 <span className="opacity-80">Down</span>
                 <span className="text-orange-500">Pricer</span>
               </div>
@@ -344,11 +364,32 @@ export const Header = () => {
 
 // --------- Internal components ---------
 
+const ThemeToggleButton = ({ isDark, onClick, className = "" }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-label={isDark ? "Activer le mode clair" : "Activer le mode sombre"}
+    title={isDark ? "Mode clair" : "Mode sombre"}
+    className={[
+      "inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors",
+      "border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]",
+      "text-[hsl(var(--text))] hover:bg-[hsl(var(--surface))]",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40",
+      "focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--bg))]",
+      className,
+    ].join(" ")}
+  >
+    {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+  </button>
+);
+
 const NavLink = ({ children, onClick, active, className = "" }) => (
   <button
     onClick={onClick}
     className={`px-4 py-2 text-[11px] font-black uppercase tracking-[0.1em] transition-all rounded-full ${
-      active ? "text-orange-500 bg-white/5" : "text-white/40 hover:text-white hover:bg-white/5"
+      active
+        ? "text-orange-500 bg-[hsl(var(--surface-2))]"
+        : "text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text))] hover:bg-[hsl(var(--surface-2))]"
     } ${className}`}
   >
     {children}
@@ -361,17 +402,17 @@ const MobileNavLink = ({ children, onClick, className = "", icon: Icon }) => (
     className={[
       "flex items-center justify-between w-full px-4 py-4",
       "rounded-2xl transition-all",
-      "bg-white/[0.03] hover:bg-white/[0.06]",
-      "border border-white/5 hover:border-white/10",
-      "text-[11px] font-black uppercase tracking-[0.18em] text-white/80",
+      "bg-[hsl(var(--surface-2))] hover:bg-[hsl(var(--surface))]",
+      "border border-[hsl(var(--border))]",
+      "text-[11px] font-black uppercase tracking-[0.18em] text-[hsl(var(--text))]",
       "active:scale-[0.99]",
       className,
     ].join(" ")}
   >
     <span className="flex items-center gap-3">
-      {Icon ? <Icon className="h-4 w-4 text-white/45" /> : null}
+      {Icon ? <Icon className="h-4 w-4 text-[hsl(var(--text-muted))]" /> : null}
       {children}
     </span>
-    <ChevronRight className="h-4 w-4 text-white/20" />
+    <ChevronRight className="h-4 w-4 text-[hsl(var(--text-muted))]" />
   </button>
 );

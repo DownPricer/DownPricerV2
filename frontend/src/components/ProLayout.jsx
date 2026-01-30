@@ -9,9 +9,12 @@ import {
   LogOut, 
   User, 
   TrendingUp,
-  ArrowLeft
+  ArrowLeft,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { getUser, logout, hasRole } from '../utils/auth';
+import { useTheme } from '@/hooks/useTheme';
 
 /**
  * Layout Pro avec Navigation OLED Black
@@ -21,6 +24,8 @@ export const ProLayout = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const user = getUser();
+  const { resolvedTheme, toggleTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
 
   const navItems = [
     { path: '/pro/dashboard', icon: Home, label: 'Dashboard' },
@@ -40,10 +45,10 @@ export const ProLayout = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white font-sans selection:bg-orange-500/30">
+    <div className="min-h-screen dp-bg font-sans selection:bg-orange-500/30">
       
       {/* Navigation OLED */}
-      <div className="bg-black border-b border-white/5 sticky top-0 z-50">
+      <div className="bg-[hsl(var(--bg))] border-b border-[hsl(var(--border))] sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex justify-between items-center h-20">
             
@@ -72,8 +77,8 @@ export const ProLayout = ({ children }) => {
                     to={item.path}
                     className={`flex items-center px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-widest transition-all ${
                       isActive
-                        ? 'bg-white/5 text-orange-500'
-                        : 'text-white/40 hover:text-white hover:bg-white/5'
+                        ? 'bg-[hsl(var(--surface-2))] text-orange-500'
+                        : 'text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text))] hover:bg-[hsl(var(--surface-2))]'
                     }`}
                   >
                     <item.icon className={`h-3.5 w-3.5 mr-2 ${isActive ? 'text-orange-500' : ''}`} />
@@ -86,16 +91,18 @@ export const ProLayout = ({ children }) => {
             {/* Actions Utilisateur */}
             <div className="flex items-center gap-3">
               <div className="hidden xl:flex flex-col items-end mr-2">
-                <span className="text-[10px] font-bold text-white/70">{user?.email}</span>
-                <span className="text-[9px] text-white/30 uppercase tracking-tighter italic">Compte Professionnel</span>
+                <span className="text-[10px] font-bold text-[hsl(var(--text))]">{user?.email}</span>
+                <span className="text-[9px] text-[hsl(var(--text-muted))] uppercase tracking-tighter italic">Compte Professionnel</span>
               </div>
               
               <button
                 onClick={() => navigate('/')}
-                className="hidden sm:flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-white transition-colors px-3 py-2"
+                className="hidden sm:flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text))] transition-colors px-3 py-2"
               >
                 <ArrowLeft className="h-3 w-3" /> Site
               </button>
+
+              <ThemeToggleButton isDark={isDark} onClick={toggleTheme} />
               
               <button
                 onClick={handleLogout}
@@ -109,7 +116,7 @@ export const ProLayout = ({ children }) => {
         </div>
         
         {/* Navigation Mobile (Défilement horizontal) */}
-        <div className="lg:hidden border-t border-white/5 overflow-x-auto no-scrollbar">
+        <div className="lg:hidden border-t border-[hsl(var(--border))] overflow-x-auto no-scrollbar">
           <div className="flex px-4 py-3 gap-2">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;
@@ -120,7 +127,7 @@ export const ProLayout = ({ children }) => {
                   className={`flex items-center px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest whitespace-nowrap transition-all ${
                     isActive
                       ? 'bg-orange-500 text-white shadow-lg shadow-orange-900/20'
-                      : 'bg-white/5 text-white/40'
+                      : 'bg-[hsl(var(--surface-2))] text-[hsl(var(--text-muted))]'
                   }`}
                 >
                   <item.icon className="h-3 w-3 mr-2" />
@@ -144,6 +151,25 @@ export const ProLayout = ({ children }) => {
     </div>
   );
 };
+
+const ThemeToggleButton = ({ isDark, onClick, className = "" }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-label={isDark ? "Activer le mode clair" : "Activer le mode sombre"}
+    title={isDark ? "Mode clair" : "Mode sombre"}
+    className={[
+      "inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors",
+      "border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))]",
+      "text-[hsl(var(--text))] hover:bg-[hsl(var(--surface))]",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40",
+      "focus-visible:ring-offset-2 focus-visible:ring-offset-[hsl(var(--bg))]",
+      className,
+    ].join(" ")}
+  >
+    {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+  </button>
+);
 
 
 
