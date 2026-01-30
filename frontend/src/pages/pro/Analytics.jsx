@@ -41,23 +41,45 @@ export const ProAnalytics = () => {
     );
   }
 
-  // --- LOGIQUE DE CALCUL (Conservée) ---
-  const soldArticles = data.articles.filter(a => a.status === 'Vendu');
+  const now = new Date();
+  const cutoff = new Date(now);
+  cutoff.setDate(now.getDate() - interval);
+
+  const inRange = (dateValue) => {
+    if (!dateValue) return false;
+    const parsed = new Date(dateValue);
+    if (Number.isNaN(parsed.getTime())) return false;
+    return parsed >= cutoff;
+  };
+
+  const articlesInRange = data.articles.filter((article) =>
+    inRange(article.updated_at || article.purchase_date || article.created_at)
+  );
+  const transactionsInRange = data.transactions.filter((tx) =>
+    inRange(tx.updated_at || tx.created_at)
+  );
+
+  // --- LOGIQUE DE CALCUL (Période sélectionnée) ---
+  const soldArticles = articlesInRange.filter(a => a.status === 'Vendu');
   const totalRevenue = soldArticles.reduce((sum, a) => sum + (a.actual_sale_price || 0), 0);
-  const totalInvestment = soldArticles.reduce((sum, a) => sum + a.purchase_price, 0);
+  const totalInvestment = soldArticles.reduce((sum, a) => sum + (a.purchase_price || 0), 0);
   const totalMargin = totalRevenue - totalInvestment;
-  const conversionRate = data.articles.length > 0 ? (soldArticles.length / data.articles.length * 100) : 0;
+  const conversionRate = articlesInRange.length > 0 ? (soldArticles.length / articlesInRange.length * 100) : 0;
   const avgMargin = soldArticles.length > 0 ? totalMargin / soldArticles.length : 0;
-  const avgDaysToSell = soldArticles.length > 0 ? 
-    soldArticles.reduce((sum, a) => {
-      const pDate = new Date(a.purchase_date);
-      const sDate = new Date(a.updated_at);
-      return sum + Math.floor((sDate - pDate) / (1000 * 60 * 60 * 24));
-    }, 0) / soldArticles.length : 0;
+  const avgDaysToSell = soldArticles.length > 0
+    ? soldArticles.reduce((sum, a) => {
+        const pDate = a.purchase_date ? new Date(a.purchase_date) : null;
+        const sDate = a.updated_at ? new Date(a.updated_at) : null;
+        if (!pDate || !sDate || Number.isNaN(pDate.getTime()) || Number.isNaN(sDate.getTime())) {
+          return sum;
+        }
+        return sum + Math.max(0, Math.floor((sDate - pDate) / (1000 * 60 * 60 * 24)));
+      }, 0) / soldArticles.length
+    : 0;
 
   const marginData = soldArticles.map(article => ({
-    name: article.name,
-    margin: (article.actual_sale_price || 0) - article.purchase_price
+    name: article.name || 'Article',
+    margin: (article.actual_sale_price || 0) - (article.purchase_price || 0)
   })).sort((a, b) => b.margin - a.margin).slice(0, 8);
 
   const salePlatformStats = soldArticles.reduce((acc, article) => {
@@ -77,6 +99,9 @@ export const ProAnalytics = () => {
               Advanced <span className="text-orange-500">Analytics</span>
             </h1>
             <p className="mt-2 text-zinc-500 text-[10px] sm:text-sm font-medium uppercase tracking-wider">Analyse de performance et rentabilité</p>
+            <p className="mt-1 text-[10px] font-black uppercase tracking-[0.25em] text-zinc-700">
+              Période : {interval === 1 ? '24H' : `${interval} jours`} • {soldArticles.length} ventes • {articlesInRange.length} articles • {transactionsInRange.length} transactions
+            </p>
           </div>
 
           {/* Interval Selector : Full width on small mobile if needed */}
@@ -127,7 +152,10 @@ export const ProAnalytics = () => {
                   <span className="text-[10px] sm:text-xs font-bold text-zinc-400 group-hover:text-white transition-colors truncate flex-1 min-w-0">{item.name}</span>
                   <div className="flex items-center gap-3 sm:gap-4 flex-1">
                      <div className="h-1 bg-white/5 flex-1 rounded-full overflow-hidden hidden sm:block">
-                        <div className="h-full bg-orange-500" style={{ width: `${(item.margin / marginData[0].margin) * 100}%` }} />
+                        <div
+                          className="h-full bg-orange-500"
+                          style={{ width: `${marginData[0]?.margin ? (item.margin / marginData[0].margin) * 100 : 0}%` }}
+                        />
                      </div>
                      <span className={`text-[10px] sm:text-xs font-black min-w-[45px] text-right shrink-0 ${item.margin >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                       +{item.margin.toFixed(0)}€
@@ -135,7 +163,7 @@ export const ProAnalytics = () => {
                   </div>
                 </div>
               )) : (
-                <p className="text-center text-zinc-600 text-xs py-20 italic">Aucune donnée disponible</p>
+                <p className="text-center text-zinc-600 text-xs py-20 italic">Aucune donnée sur la période sélectionnée</p>
               )}
             </div>
           </div>
@@ -148,20 +176,24 @@ export const ProAnalytics = () => {
           <div className="bg-[#080808] border border-white/5 rounded-2xl sm:rounded-[2rem] p-6 sm:p-8">
             <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-zinc-500 mb-6 sm:mb-8">Répartition Plateformes</h3>
             <div className="space-y-5 sm:space-y-6">
-              {Object.entries(salePlatformStats).map(([platform, count]) => (
-                <div key={platform} className="space-y-2">
-                  <div className="flex justify-between text-[9px] sm:text-[10px] font-black uppercase tracking-widest">
-                    <span>{platform}</span>
-                    <span className="text-zinc-500">{count} ventes</span>
+              {soldArticles.length === 0 ? (
+                <p className="text-center text-zinc-600 text-xs py-16 italic">Aucune vente sur la période</p>
+              ) : (
+                Object.entries(salePlatformStats).map(([platform, count]) => (
+                  <div key={platform} className="space-y-2">
+                    <div className="flex justify-between text-[9px] sm:text-[10px] font-black uppercase tracking-widest">
+                      <span>{platform}</span>
+                      <span className="text-zinc-500">{count} ventes</span>
+                    </div>
+                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-orange-500 h-full rounded-full" 
+                        style={{ width: `${(count / soldArticles.length) * 100}%` }} 
+                      />
+                    </div>
                   </div>
-                  <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-orange-500 h-full rounded-full" 
-                      style={{ width: `${(count / soldArticles.length) * 100}%` }} 
-                    />
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
