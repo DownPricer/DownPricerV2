@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { resolveImageUrl } from '../utils/images';
 
 // Placeholder SVG encodé en base64 - image grise avec texte "Pas d'image"
@@ -17,6 +17,11 @@ export const SafeImage = ({
 
   // Résoudre l'URL de l'image
   const resolvedUrl = resolveImageUrl(src);
+
+  useEffect(() => {
+    setError(false);
+    setLoading(Boolean(resolvedUrl));
+  }, [resolvedUrl]);
 
   const handleError = () => {
     console.warn('Image failed to load:', src);

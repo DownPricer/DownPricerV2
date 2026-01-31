@@ -104,6 +104,11 @@ export const ImageUpload = ({
     // Résoudre l'URL de l'image
     const resolvedUrl = resolveImageUrl(url);
 
+    React.useEffect(() => {
+      setImgError(false);
+      setImgLoading(Boolean(resolvedUrl));
+    }, [resolvedUrl]);
+
     if (!resolvedUrl || imgError) {
       return (
         <div className="w-full h-24 flex items-center justify-center bg-red-900/30 rounded-lg border border-red-600">

@@ -17,15 +17,25 @@ export const UserReviews = () => {
   }, [userId]);
 
   const fetchReviews = async () => {
+    let ratingData = { avg: 0, count: 0 };
     try {
       const ratingRes = await api.get(`/ratings/user/${userId}`);
-      setRating(ratingRes.data || { avg: 0, count: 0 });
+      ratingData = ratingRes.data || ratingData;
+    } catch (error) {
+      if (error.response?.status !== 404) {
+        console.warn('Erreur rating user:', error);
+      }
+    }
+    setRating(ratingData);
+
+    try {
       const reviewsRes = await api.get(`/reviews/user/${userId}`);
       setReviews(reviewsRes.data?.items || []);
     } catch (error) {
       setReviews([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (loading) {

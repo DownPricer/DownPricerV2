@@ -60,6 +60,11 @@ def serialize_cell(value: Any) -> Any:
         return ""
     if isinstance(value, (list, dict)):
         return json.dumps(value, ensure_ascii=True)
+    if isinstance(value, str):
+        trimmed = value.strip()
+        if trimmed.startswith(("=", "+", "-", "@")):
+            # Neutraliser l'injection de formules (CSV/Excel)
+            return f"'{value}"
     return value
 
 

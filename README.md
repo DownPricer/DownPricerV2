@@ -122,8 +122,21 @@ Voir `backend/.env.example` pour la liste complète. Principales variables :
 - `MONGO_URL` : URL de connexion MongoDB
 - `DB_NAME` : Nom de la base de données
 - `JWT_SECRET_KEY` : Clé secrète pour les tokens JWT
+- `UPLOAD_MAX_MB` : Taille max d'upload en MB (min 24, défaut 24)
 - `CORS_ORIGINS` : Origines autorisées (séparées par des virgules)
 - `BACKEND_PUBLIC_URL` : URL publique du backend (pour les images)
+
+### Sécurité prod (JWT)
+
+En production (`ENV=production` ou `APP_ENV=production`), le backend refuse de démarrer si :
+- `JWT_SECRET_KEY` est absent
+- `JWT_SECRET_KEY` vaut `change-me` / `change-me-in-production`
+- `JWT_SECRET_KEY` fait moins de 32 caractères
+
+Rotation recommandée :
+1. Déployer avec une nouvelle valeur de `JWT_SECRET_KEY`.
+2. Redémarrer le backend.
+3. Forcer les utilisateurs à se reconnecter (tokens existants invalides).
 
 ### Variables d'environnement Frontend
 

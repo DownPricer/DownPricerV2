@@ -52,6 +52,24 @@ from utils.exports import (
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
+# Validation stricte du secret JWT en production
+def _is_production_env() -> bool:
+    env = (os.environ.get("APP_ENV") or os.environ.get("ENV") or "").strip().lower()
+    return env == "production"
+
+def _validate_jwt_secret_in_production() -> None:
+    if not _is_production_env():
+        return
+    secret = os.environ.get("JWT_SECRET_KEY", "").strip()
+    weak_values = {"change-me", "change-me-in-production"}
+    if not secret or secret in weak_values or len(secret) < 32:
+        raise ValueError(
+            "❌ JWT_SECRET_KEY invalide en production. "
+            "Définissez une clé >= 32 caractères (non 'change-me')."
+        )
+
+_validate_jwt_secret_in_production()
+
 # Vérification des variables d'environnement obligatoires
 mongo_url = os.environ.get('MONGO_URL')
 if not mongo_url:
@@ -223,22 +241,44 @@ async def get_me(current_user = Depends(get_current_user)):
     
     return User(**user_doc)
 
+ALLOWED_IMAGE_FORMATS = {
+    "JPEG": "jpg",
+    "PNG": "png",
+    "WEBP": "webp",
+    "GIF": "gif",
+    "HEIF": "heif",
+    "HEIC": "heic",
+}
+
+def _detect_image_format(contents: bytes) -> Optional[str]:
+    try:
+        image = Image.open(io.BytesIO(contents))
+        image.verify()
+        return (image.format or "").upper()
+    except Exception:
+        return None
+
+
 @api_router.post("/upload/image")
 async def upload_image(
     file: UploadFile = File(...), 
     current_user = Depends(get_current_user), 
-    no_restrictions: bool = Query(False, description="Si True, accepte tous les formats image sans limite de taille"),
+    no_restrictions: bool = Query(False, description="Si True, accepte les formats image autorisés sans compression"),
     payment_proof: bool = Query(False, description="Si True, utilise la limite très haute pour preuves de paiement")
 ):
     """
     Upload d'image avec ou sans restrictions selon le paramètre no_restrictions.
-    Si no_restrictions=True : accepte tous les formats image, n'importe quelle taille.
+    Si no_restrictions=True : accepte les formats image autorisés sans compression.
     Sinon : restrictions par défaut (12MB max, formats jpg/jpeg/png/webp/gif).
     """
-    MAX_FILE_SIZE_GLOBAL = 24 * 1024 * 1024  # 24MB limite globale sur tout le site
-    MAX_FILE_SIZE_DEFAULT = 12 * 1024 * 1024  # 12MB max par défaut (pour compatibilité)
-    # Pour paiements-en-attente : limite très haute configurable (désactivable)
-    MAX_FILE_SIZE_PAYMENT_PROOF = int(os.environ.get('MAX_FILE_SIZE_PAYMENT_PROOF', 100 * 1024 * 1024))  # 100MB par défaut, configurable via env
+    upload_max_mb_env = os.environ.get("UPLOAD_MAX_MB", "24")
+    try:
+        upload_max_mb = int(upload_max_mb_env)
+    except ValueError:
+        upload_max_mb = 24
+    # Toujours au moins 24MB
+    upload_max_mb = max(upload_max_mb, 24)
+    MAX_FILE_SIZE = upload_max_mb * 1024 * 1024
     COMPRESSION_THRESHOLD = 1 * 1024 * 1024  # 1MB - déclenche compression
     TARGET_SIZE = 400 * 1024  # 400KB cible après compression
     
@@ -269,30 +309,30 @@ async def upload_image(
         contents = await file.read()
         file_size = len(contents)
         
-        # Déterminer la limite de taille à appliquer
-        if payment_proof:
-            # Pour les preuves de paiement : limite très haute configurable
-            max_size = MAX_FILE_SIZE_PAYMENT_PROOF
-        elif no_restrictions:
-            # Si no_restrictions=True : limite globale de 24MB
-            max_size = MAX_FILE_SIZE_GLOBAL
-        else:
-            # Par défaut : limite standard
-            max_size = MAX_FILE_SIZE_DEFAULT
-        
         # Vérifier la taille maximale (toujours appliquer une limite de sécurité)
-        if file_size > max_size:
+        if file_size > MAX_FILE_SIZE:
             raise HTTPException(
                 status_code=413, 
                 detail={
                     "error": "file_too_large",
-                    "detail": f"Le fichier est trop volumineux. Taille maximale autorisée : {max_size / (1024*1024):.0f}MB (fichier reçu : {file_size / (1024*1024):.2f}MB)"
+                    "detail": f"Le fichier est trop volumineux. Taille maximale autorisée : {upload_max_mb}MB (fichier reçu : {file_size / (1024*1024):.2f}MB)"
                 }
             )
         
+        # Validation stricte par magic bytes (anti-spoofing)
+        detected_format = _detect_image_format(contents)
+        if not detected_format or detected_format not in ALLOWED_IMAGE_FORMATS:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_image",
+                    "detail": "Format d'image non supporté ou fichier invalide. Formats acceptés: jpg, png, webp, gif"
+                }
+            )
+
         # Si no_restrictions=True, on sauvegarde le fichier tel quel sans compression
         if no_restrictions:
-            file_ext = file.filename.split(".")[-1].lower() if "." in file.filename else "jpg"
+            file_ext = ALLOWED_IMAGE_FORMATS.get(detected_format, "jpg")
             unique_filename = f"{uuid.uuid4()}.{file_ext}"
             file_path = UPLOAD_DIR / unique_filename
             
@@ -2182,6 +2222,12 @@ async def create_minisite(
     
     # Utiliser site_plan de l'utilisateur comme source de vérité unique si disponible
     user_site_plan = user_doc.get("site_plan")
+    billing_mode = await get_billing_mode()
+    is_admin = UserRole.ADMIN in user_doc.get("roles", [])
+
+    if billing_mode == BillingMode.STRIPE_PROD and not is_admin and not user_site_plan:
+        raise HTTPException(status_code=403, detail="Aucun plan actif. Veuillez activer un abonnement avant de créer un mini-site.")
+
     final_plan_id = user_site_plan if user_site_plan else site_data.plan_id
     
     # Valider que le plan est valide
@@ -2222,8 +2268,8 @@ async def create_minisite(
     
     # Ajouter le rôle correspondant à l'utilisateur
     roles = user_doc.get("roles", [])
-    if site_data.plan_id not in roles:
-        roles.append(site_data.plan_id)
+    if final_plan_id not in roles:
+        roles.append(final_plan_id)
         await db.users.update_one({"id": user_doc["id"]}, {"$set": {"roles": roles}})
     
     # Notification admin : nouveau mini-site
@@ -4025,13 +4071,35 @@ async def health_check():
     """Route de health check pour le déploiement"""
     return {"status": "ok"}
 
+cors_origins_env = os.environ.get('CORS_ORIGINS', '')
+cors_origins = [origin.strip() for origin in cors_origins_env.split(',') if origin.strip()]
+allow_credentials = True
+if "*" in cors_origins:
+    # RFC CORS: wildcard incompatible with credentials
+    allow_credentials = False
+
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_credentials=allow_credentials,
+    allow_origins=cors_origins or [],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+    content_type = response.headers.get("content-type", "")
+    if content_type.startswith("text/html"):
+        response.headers.setdefault("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+    proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    if proto == "https":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+    return response
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
