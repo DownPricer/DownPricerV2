@@ -649,7 +649,7 @@ import {
   Globe, Eye, Share2, Settings, Plus, Check, Trash2, Mail, 
   AlertTriangle, Zap, Crown, Grid, List, LayoutGrid, Columns, 
   ArrowUpRight, Loader2, ExternalLink, BarChart3, Palette, Box, CheckCircle2,
-  Users, Star
+  Users, Star, Sun, Moon
 } from 'lucide-react';
 import { ImageUpload } from '../components/ImageUpload';
 import { SafeImage } from '../components/SafeImage';
@@ -715,6 +715,7 @@ export const MinisiteDashboard = () => {
   const [reviewTx, setReviewTx] = useState(null);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
+  const [minisiteTheme, setMinisiteTheme] = useState("dark");
   
   const [articleForm, setArticleForm] = useState({
     name: '',
@@ -771,6 +772,17 @@ export const MinisiteDashboard = () => {
       pollTimeoutsRef.current = [];
     };
   }, []);
+
+  useEffect(() => {
+    if (!minisite?.slug) return;
+    const storageKey = `minisite-theme:${minisite.slug}`;
+    const stored = window.localStorage.getItem(storageKey);
+    if (stored === "light" || stored === "dark") {
+      setMinisiteTheme(stored);
+    } else {
+      setMinisiteTheme("dark");
+    }
+  }, [minisite?.slug]);
   
   const pollSubscriptionActivation = (maxAttempts = 20) => {
     let attempts = 0;
@@ -1116,6 +1128,12 @@ export const MinisiteDashboard = () => {
 
   const handleUpgrade = () => navigate('/minisite/upgrade');
 
+  const handleMinisiteThemeChange = (nextTheme) => {
+    if (!minisite?.slug) return;
+    setMinisiteTheme(nextTheme);
+    window.localStorage.setItem(`minisite-theme:${minisite.slug}`, nextTheme);
+  };
+
   if (loading) return <div className="min-h-screen bg-zinc-950 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-orange-500" /></div>;
   
   // Si pas de minisite mais l'utilisateur a un rôle plan => afficher CTA pour créer
@@ -1441,6 +1459,40 @@ export const MinisiteDashboard = () => {
                 <CardDescription>Choisissez l'apparence qui correspond le mieux à votre marque.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-8">
+                
+                {/* Theme minisite */}
+                <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-white">Thème du mini-site</p>
+                    <p className="text-xs text-zinc-400">Choisissez clair ou sombre pour votre mini-site.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleMinisiteThemeChange("light")}
+                      className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors ${
+                        minisiteTheme === "light"
+                          ? "bg-orange-500 text-white border-orange-500"
+                          : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                      }`}
+                      aria-pressed={minisiteTheme === "light"}
+                    >
+                      <Sun className="h-3.5 w-3.5" /> Clair
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMinisiteThemeChange("dark")}
+                      className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors ${
+                        minisiteTheme === "dark"
+                          ? "bg-orange-500 text-white border-orange-500"
+                          : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                      }`}
+                      aria-pressed={minisiteTheme === "dark"}
+                    >
+                      <Moon className="h-3.5 w-3.5" /> Sombre
+                    </button>
+                  </div>
+                </div>
                 
                 {/* Templates Grid */}
                 <div>
