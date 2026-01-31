@@ -91,10 +91,10 @@ export const Home = () => {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white font-sans selection:bg-orange-500/30">
+    <div className="min-h-screen dp-bg font-sans selection:bg-orange-500/30">
       
       {/* --- HERO SECTION: COMPACTE & SOBRE --- */}
-      <div className={`overflow-hidden transition-all duration-500 ease-in-out border-b border-white/5 bg-black ${
+      <div className={`overflow-hidden transition-all duration-500 ease-in-out border-b border-[hsl(var(--border))] bg-[hsl(var(--bg))] ${
         heroCollapsed ? 'max-h-0 opacity-0 border-none' : 'max-h-[250px] opacity-100'
       }`}>
         <div className="container mx-auto px-4 py-6 relative">
@@ -102,15 +102,15 @@ export const Home = () => {
             <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.2em] text-orange-500 mb-2">
               <Zap size={10} className="fill-orange-500" /> Offres du jour
             </div>
-            <h1 className="text-2xl md:text-3xl font-black tracking-tighter text-white uppercase italic mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            <h1 className="text-2xl md:text-3xl font-black tracking-tighter text-[hsl(var(--text))] uppercase italic mb-2" style={{ fontFamily: 'Outfit, sans-serif' }}>
               Les Bons Plans <span className="text-orange-500">DownPricer</span>
             </h1>
-            <p className="text-zinc-500 text-xs max-w-lg mx-auto font-medium">
+            <p className="dp-muted text-xs max-w-lg mx-auto font-medium">
               Achetez malin, négociez directement. Le marketplace S-Tier.
             </p>
             <button 
               onClick={() => setHeroCollapsed(true)}
-              className="absolute top-4 right-4 p-1 text-zinc-700 hover:text-white transition-colors"
+              className="absolute top-4 right-4 p-1 text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text))] transition-colors"
             >
               <X size={16} />
             </button>
@@ -121,26 +121,26 @@ export const Home = () => {
       <main className="container mx-auto px-2 md:px-4 py-4 pb-24">
         
         {/* --- FILTRES --- */}
-        <div className="sticky top-2 z-30 mb-4 flex flex-col md:flex-row gap-2 items-center justify-between bg-black/90 backdrop-blur-md p-2 border border-white/10 rounded-lg shadow-xl">
+        <div className="sticky top-2 z-30 mb-4 flex flex-col md:flex-row gap-2 items-center justify-between bg-[hsl(var(--surface))] backdrop-blur-md p-2 border border-[hsl(var(--border))] rounded-lg shadow-xl">
           <div className="relative w-full md:w-80 group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-600 group-focus-within:text-orange-500 transition-colors" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[hsl(var(--text-muted))] group-focus-within:text-orange-500 transition-colors" />
             <Input
               placeholder="Chercher un produit..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 bg-[#0A0A0A] border-white/10 text-white placeholder:text-zinc-700 focus:border-orange-500/50 focus:ring-0 h-9 rounded-md text-xs font-medium"
+              className="pl-9 dp-input focus:border-orange-500/50 focus:ring-0 h-9 rounded-md text-xs font-medium"
             />
           </div>
 
           <div className="flex gap-2 w-full md:w-auto overflow-x-auto no-scrollbar">
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-[130px] bg-[#0A0A0A] border-white/10 h-9 rounded-md text-[10px] font-bold uppercase tracking-wide text-zinc-400 focus:ring-0">
+            <SelectTrigger className="w-[130px] dp-input h-9 rounded-md text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--text-muted))] focus:ring-0">
                 <div className="flex items-center gap-2 truncate">
-                  <Filter className="h-3 w-3 text-zinc-600" />
+                <Filter className="h-3 w-3 text-[hsl(var(--text-muted))]" />
                   <SelectValue placeholder="Catégorie" />
                 </div>
               </SelectTrigger>
-              <SelectContent className="bg-[#0A0A0A] border-white/10 text-white">
+            <SelectContent className="bg-[hsl(var(--surface))] border-[hsl(var(--border))] text-[hsl(var(--text))]">
                 <SelectItem value="all">Toutes</SelectItem>
                 {categories.map((cat) => (
                   <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
@@ -149,13 +149,13 @@ export const Home = () => {
             </Select>
 
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-[130px] bg-[#0A0A0A] border-white/10 h-9 rounded-md text-[10px] font-bold uppercase tracking-wide text-zinc-400 focus:ring-0">
+            <SelectTrigger className="w-[130px] dp-input h-9 rounded-md text-[10px] font-bold uppercase tracking-wide text-[hsl(var(--text-muted))] focus:ring-0">
                 <div className="flex items-center gap-2">
-                  <ArrowUpDown className="h-3 w-3 text-zinc-600" />
+                <ArrowUpDown className="h-3 w-3 text-[hsl(var(--text-muted))]" />
                   <SelectValue />
                 </div>
               </SelectTrigger>
-              <SelectContent className="bg-[#0A0A0A] border-white/10 text-white">
+            <SelectContent className="bg-[hsl(var(--surface))] border-[hsl(var(--border))] text-[hsl(var(--text))]">
                 <SelectItem value="recent">Plus récents</SelectItem>
                 <SelectItem value="price_low">Prix croissant</SelectItem>
                 <SelectItem value="views">Populaires</SelectItem>
@@ -180,11 +180,11 @@ export const Home = () => {
               return (
                 <Card
                   key={article.id}
-                  className="group bg-[#050505] border border-white/5 rounded-lg overflow-hidden hover:border-orange-500/40 transition-all duration-200 cursor-pointer flex flex-col h-full"
+                  className="group dp-surface rounded-lg overflow-hidden hover:border-orange-500/40 transition-all duration-200 cursor-pointer flex flex-col h-full"
                   onClick={() => navigate(`/article/${article.id}`)}
                 >
                   {/* Image Zone */}
-                  <div className="relative aspect-square bg-[#0a0a0a] overflow-hidden">
+                  <div className="relative aspect-square bg-[hsl(var(--surface-2))] overflow-hidden">
                     {imageUrl ? (
                       <img
                         src={imageUrl}
@@ -194,16 +194,16 @@ export const Home = () => {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <ShoppingBag className="h-6 w-6 text-zinc-800" />
+                        <ShoppingBag className="h-6 w-6 text-[hsl(var(--text-muted))]" />
                       </div>
                     )}
                     
                     {/* Badge Vendeur Tiers (Modifié) */}
                     {(article.is_third_party || article.source === 'minisite') && (
-                      <div className="absolute top-0 left-0 bg-black/90 backdrop-blur-sm px-1.5 py-0.5 rounded-br-lg border-r border-b border-white/10">
+                      <div className="absolute top-0 left-0 bg-[hsl(var(--surface))] backdrop-blur-sm px-1.5 py-0.5 rounded-br-lg border-r border-b border-[hsl(var(--border))]">
                         <div className="flex items-center gap-1">
                           <Store size={8} className="text-orange-500" />
-                          <span className="text-[7px] font-black uppercase text-white tracking-wider">Vendeur tiers</span>
+                          <span className="text-[7px] font-black uppercase text-[hsl(var(--text))] tracking-wider">Vendeur tiers</span>
                         </div>
                       </div>
                     )}
@@ -228,7 +228,7 @@ export const Home = () => {
                       {article.is_third_party && vendor ? (
                         <div className="flex flex-col gap-0.5 mb-2" onClick={(e) => e.stopPropagation()}>
                           <button 
-                            className="text-[9px] text-zinc-400 hover:text-white transition-colors flex items-center gap-1 w-fit"
+                            className="text-[9px] text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text))] transition-colors flex items-center gap-1 w-fit"
                             onClick={() => navigate(`/s/${vendor.minisite_slug}`)}
                           >
                             <span className="truncate max-w-[80px]">Par {vendorName}</span>
@@ -237,13 +237,13 @@ export const Home = () => {
                           {vendor.rating_avg > 0 && renderStars(vendor.rating_avg)}
                         </div>
                       ) : (
-                        <div className="h-6 mb-1" /> // Spacer
+                      <div className="h-6 mb-1" /> // Spacer
                       )}
                     </div>
 
                     {/* Prix */}
-                    <div className="flex items-end gap-1 mt-1 pt-1 border-t border-white/5">
-                      <div className="flex items-start text-white">
+                    <div className="flex items-end gap-1 mt-1 pt-1 border-t border-[hsl(var(--border))]">
+                      <div className="flex items-start text-[hsl(var(--text))]">
                         <span className="text-[10px] font-bold mt-[2px]">€</span>
                         <span className="text-lg md:text-xl font-black tracking-tighter leading-none">
                           {Math.floor(article.price)}
@@ -254,7 +254,7 @@ export const Home = () => {
                       </div>
 
                       {discount > 0 && (
-                        <span className="text-[9px] text-zinc-600 line-through mb-[2px] ml-1">
+                        <span className="text-[9px] text-[hsl(var(--text-muted))] line-through mb-[2px] ml-1">
                           {article.reference_price}€
                         </span>
                       )}
@@ -272,20 +272,20 @@ export const Home = () => {
 
 const EmptyState = () => (
   <div className="flex flex-col items-center justify-center py-20 text-center">
-    <Search className="h-8 w-8 text-zinc-800 mb-2" />
-    <p className="text-zinc-600 text-xs font-bold uppercase tracking-widest">Aucun résultat</p>
+    <Search className="h-8 w-8 text-[hsl(var(--text-muted))] mb-2" />
+    <p className="text-[hsl(var(--text-muted))] text-xs font-bold uppercase tracking-widest">Aucun résultat</p>
   </div>
 );
 
 const ArticlesSkeleton = () => (
   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-3">
     {[...Array(12)].map((_, i) => (
-      <div key={i} className="bg-[#050505] rounded-lg overflow-hidden border border-white/5 flex flex-col h-64">
-        <div className="aspect-square bg-white/5 animate-pulse" />
+      <div key={i} className="bg-[hsl(var(--surface))] rounded-lg overflow-hidden border border-[hsl(var(--border))] flex flex-col h-64">
+        <div className="aspect-square bg-[hsl(var(--surface-2))] animate-pulse" />
         <div className="p-2 space-y-2 flex-1">
-          <div className="h-3 bg-white/5 rounded w-3/4 animate-pulse" />
-          <div className="h-2 bg-white/5 rounded w-1/2 animate-pulse" />
-          <div className="mt-auto h-5 bg-white/5 rounded w-12 animate-pulse" />
+          <div className="h-3 bg-[hsl(var(--surface-2))] rounded w-3/4 animate-pulse" />
+          <div className="h-2 bg-[hsl(var(--surface-2))] rounded w-1/2 animate-pulse" />
+          <div className="mt-auto h-5 bg-[hsl(var(--surface-2))] rounded w-12 animate-pulse" />
         </div>
       </div>
     ))}
