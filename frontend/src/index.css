@@ -120,6 +120,27 @@
   html[data-theme="light"] .text-white\/80 {
     color: hsl(var(--text-muted)) !important;
   }
+
+  html[data-theme="light"] .text-white {
+    color: hsl(var(--text)) !important;
+  }
+
+  html[data-theme="light"] .bg-orange-500,
+  html[data-theme="light"] .bg-orange-600,
+  html[data-theme="light"] .bg-orange-700,
+  html[data-theme="light"] .bg-red-500,
+  html[data-theme="light"] .bg-red-600,
+  html[data-theme="light"] .bg-emerald-500,
+  html[data-theme="light"] .bg-green-500,
+  html[data-theme="light"] .bg-indigo-600,
+  html[data-theme="light"] .bg-purple-600 {
+    color: hsl(var(--primary-contrast)) !important;
+  }
+
+  html[data-theme="light"] .bg-gradient-to-r,
+  html[data-theme="light"] .bg-gradient-to-t {
+    color: hsl(var(--primary-contrast)) !important;
+  }
 }
 
 /* --- Styles Debug & Scrollbar --- */
