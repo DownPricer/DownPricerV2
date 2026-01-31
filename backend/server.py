@@ -9,7 +9,10 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import hashlib
+import secrets
+import time
 import shutil
 import json
 import zipfile
@@ -28,6 +31,8 @@ from dependencies import get_current_user, require_roles
 from billing_provider import get_billing_provider
 from pro_router import pro_router
 from notifications import EventType, notify_admin, notify_user, get_base_url
+from utils.mailer import send_email_sync
+from pydantic import BaseModel, EmailStr
 from stripe_billing import (
     create_checkout_session,
     create_portal_session,
@@ -108,6 +113,23 @@ else:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+PASSWORD_RESET_TOKEN_TTL_MINUTES = 60
+PASSWORD_RESET_RATE_LIMIT_WINDOW_SECONDS = 60
+PASSWORD_RESET_RATE_LIMIT_MAX = 5
+PASSWORD_RESET_RATE_LIMIT_EMAIL_MAX = 5
+
+_password_reset_rate_limit = {
+    "ip": {},
+    "email": {}
+}
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
 try:
     client = AsyncIOMotorClient(mongo_url)
     db = client[db_name]
@@ -136,6 +158,132 @@ async def get_deposit_percentage() -> float:
     if setting:
         return float(setting.get("value", 40))
     return 40.0
+
+def _hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+def _rate_limit_check(bucket: dict, key: str, window_seconds: int, max_hits: int) -> bool:
+    now_ts = time.time()
+    entries = bucket.get(key, [])
+    entries = [ts for ts in entries if now_ts - ts < window_seconds]
+    if len(entries) >= max_hits:
+        bucket[key] = entries
+        return True
+    entries.append(now_ts)
+    bucket[key] = entries
+    return False
+
+def _password_meets_policy(password: str) -> bool:
+    return isinstance(password, str) and len(password) >= 8
+
+def _get_frontend_public_url() -> str:
+    frontend_url = os.environ.get("FRONTEND_PUBLIC_URL", "https://downpricer.com").strip()
+    if frontend_url.endswith("/"):
+        frontend_url = frontend_url[:-1]
+    return frontend_url
+
+def _build_reset_email(reset_link: str, expires_minutes: int) -> Dict[str, str]:
+    subject = "Réinitialisation de votre mot de passe"
+    html_body = (
+        "<p>Bonjour,</p>"
+        "<p>Vous avez demandé la réinitialisation de votre mot de passe.</p>"
+        f"<p><a href=\"{reset_link}\">Réinitialiser mon mot de passe</a></p>"
+        f"<p>Ce lien est valable {expires_minutes} minutes.</p>"
+        "<p>Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.</p>"
+    )
+    text_body = (
+        "Bonjour,\n\n"
+        "Vous avez demandé la réinitialisation de votre mot de passe.\n"
+        f"Réinitialiser mon mot de passe : {reset_link}\n\n"
+        f"Ce lien est valable {expires_minutes} minutes.\n"
+        "Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.\n"
+    )
+    return {"subject": subject, "html": html_body, "text": text_body}
+
+def _queue_password_reset_email(
+    background_tasks: BackgroundTasks,
+    user_email: str,
+    token: str
+) -> None:
+    frontend_url = _get_frontend_public_url()
+    reset_link = f"{frontend_url}/reset-password?token={token}"
+    email_content = _build_reset_email(reset_link, PASSWORD_RESET_TOKEN_TTL_MINUTES)
+
+    smtp_host = os.environ.get("SMTP_HOST", "").strip()
+    smtp_user = os.environ.get("SMTP_USER", "").strip()
+    smtp_pass = os.environ.get("SMTP_PASS", "").strip()
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_from = os.environ.get("SMTP_FROM", "").strip()
+    smtp_tls_mode = os.environ.get("SMTP_TLS_MODE", "starttls")
+
+    smtp_configured = bool(smtp_host and smtp_user and smtp_pass)
+    email_config = {
+        "enabled": smtp_configured,
+        "smtp_host": smtp_host,
+        "smtp_port": smtp_port,
+        "smtp_user": smtp_user,
+        "smtp_pass": smtp_pass,
+        "smtp_from": smtp_from,
+        "smtp_tls_mode": smtp_tls_mode
+    }
+
+    if not smtp_configured:
+        if not _is_production_env():
+            logger.info(f"[DEV] Lien de réinitialisation pour {user_email}: {reset_link}")
+        else:
+            logger.warning("SMTP non configuré en production, email de reset non envoyé")
+        return
+
+    background_tasks.add_task(
+        send_email_sync,
+        email_config,
+        user_email,
+        email_content["subject"],
+        email_content["html"],
+        email_content["text"]
+    )
+
+def _is_reset_token_expired(reset_doc: dict, now: datetime) -> bool:
+    expires_at = reset_doc.get("expires_at")
+    if isinstance(expires_at, str):
+        try:
+            expires_at = datetime.fromisoformat(expires_at)
+        except ValueError:
+            return True
+    if not isinstance(expires_at, datetime):
+        return True
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return expires_at <= now
+
+async def _create_password_reset_record(
+    user_doc: dict,
+    user_email: str,
+    request: Request,
+    background_tasks: BackgroundTasks
+) -> None:
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(minutes=PASSWORD_RESET_TOKEN_TTL_MINUTES)
+    token = secrets.token_urlsafe(32)
+    token_hash = _hash_reset_token(token)
+
+    await db.password_resets.update_many(
+        {"user_id": user_doc["id"], "used_at": None},
+        {"$set": {"used_at": now}}
+    )
+
+    reset_doc = {
+        "user_id": user_doc["id"],
+        "token_hash": token_hash,
+        "created_at": now,
+        "expires_at": expires_at,
+        "used_at": None,
+        "ip": (request.client.host if request.client else None),
+        "user_agent": request.headers.get("user-agent")
+    }
+
+    await db.password_resets.insert_one(reset_doc)
+    _queue_password_reset_email(background_tasks, user_email, token)
 
 def _compute_new_avg(current_avg: float, current_count: int, new_rating: int) -> float:
     if current_count <= 0:
@@ -240,6 +388,81 @@ async def get_me(current_user = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
     
     return User(**user_doc)
+
+@api_router.post("/auth/forgot-password")
+async def forgot_password(
+    payload: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    request: Request
+):
+    email = payload.email.strip().lower()
+    ip = request.client.host if request.client else "unknown"
+
+    if _rate_limit_check(_password_reset_rate_limit["ip"], ip, PASSWORD_RESET_RATE_LIMIT_WINDOW_SECONDS, PASSWORD_RESET_RATE_LIMIT_MAX):
+        return {"ok": True}
+
+    if _rate_limit_check(_password_reset_rate_limit["email"], email, PASSWORD_RESET_RATE_LIMIT_WINDOW_SECONDS, PASSWORD_RESET_RATE_LIMIT_EMAIL_MAX):
+        return {"ok": True}
+
+    user_doc = await db.users.find_one({"email": email}, {"_id": 0})
+    if not user_doc:
+        return {"ok": True}
+
+    await _create_password_reset_record(user_doc, email, request, background_tasks)
+    return {"ok": True}
+
+@api_router.post("/auth/request-password-reset")
+async def request_password_reset(
+    background_tasks: BackgroundTasks,
+    request: Request,
+    current_user = Depends(get_current_user)
+):
+    user_doc = await db.users.find_one({"email": current_user.email}, {"_id": 0})
+    if not user_doc:
+        return {"ok": True}
+
+    email = user_doc.get("email", "").strip().lower()
+    ip = request.client.host if request.client else "unknown"
+
+    if _rate_limit_check(_password_reset_rate_limit["ip"], ip, PASSWORD_RESET_RATE_LIMIT_WINDOW_SECONDS, PASSWORD_RESET_RATE_LIMIT_MAX):
+        return {"ok": True}
+
+    if _rate_limit_check(_password_reset_rate_limit["email"], email, PASSWORD_RESET_RATE_LIMIT_WINDOW_SECONDS, PASSWORD_RESET_RATE_LIMIT_EMAIL_MAX):
+        return {"ok": True}
+
+    await _create_password_reset_record(user_doc, email, request, background_tasks)
+    return {"ok": True}
+
+@api_router.post("/auth/reset-password")
+async def reset_password(payload: ResetPasswordRequest):
+    if not payload.token or not _password_meets_policy(payload.new_password):
+        raise HTTPException(status_code=400, detail="Token invalide ou mot de passe trop court")
+
+    token_hash = _hash_reset_token(payload.token)
+    now = datetime.now(timezone.utc)
+
+    reset_doc = await db.password_resets.find_one({"token_hash": token_hash}, {"_id": 0})
+    if not reset_doc:
+        raise HTTPException(status_code=400, detail="Token invalide ou expiré")
+
+    if reset_doc.get("used_at") or _is_reset_token_expired(reset_doc, now):
+        raise HTTPException(status_code=400, detail="Token invalide ou expiré")
+
+    user_id = reset_doc.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="Token invalide ou expiré")
+
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"password_hash": get_password_hash(payload.new_password)}}
+    )
+
+    await db.password_resets.update_many(
+        {"user_id": user_id, "used_at": None},
+        {"$set": {"used_at": now}}
+    )
+
+    return {"ok": True}
 
 ALLOWED_IMAGE_FORMATS = {
     "JPEG": "jpg",
@@ -4127,3 +4350,10 @@ async def initialize_default_settings():
         existing = await db.settings.find_one({"key": setting["key"]})
         if not existing:
             await db.settings.insert_one(setting)
+
+    try:
+        await db.password_resets.create_index("token_hash", unique=True)
+        await db.password_resets.create_index("expires_at", expireAfterSeconds=0)
+        await db.password_resets.create_index("user_id")
+    except Exception as e:
+        logger.warning(f"Index password_resets non créé: {str(e)}")

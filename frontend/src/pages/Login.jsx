@@ -81,6 +81,11 @@ export const Login = () => {
                     className="bg-zinc-800 border-zinc-700 text-white"
                     data-testid="login-password-input"
                   />
+                  <div className="text-right">
+                    <Link to="/forgot-password" className="text-sm text-orange-500 hover:text-orange-400">
+                      Mot de passe oublié ?
+                    </Link>
+                  </div>
                 </div>
                 <Button
                   type="submit"

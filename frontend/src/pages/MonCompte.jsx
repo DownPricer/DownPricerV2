@@ -18,6 +18,7 @@ export const MonCompte = () => {
   const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState({ avg: 0, count: 0 });
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const fileInputRef = useRef(null);
 
   const fetchRating = async (targetId) => {
@@ -82,6 +83,18 @@ export const MonCompte = () => {
   };
 
   const profileTargetId = routeUserId || user?.id;
+
+  const handlePasswordReset = async () => {
+    setResetLoading(true);
+    try {
+      await api.post('/auth/request-password-reset');
+      toast.success('Si un compte existe, un email de réinitialisation a été envoyé.');
+    } catch (error) {
+      toast.error('Erreur lors de la demande. Réessayez plus tard.');
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white" data-testid="mon-compte-page">
@@ -216,10 +229,14 @@ export const MonCompte = () => {
               </CardHeader>
               <CardContent>
                 <p className="text-zinc-400 text-sm mb-4">
-                  Fonctionnalité à venir : modification du mot de passe
+                  Recevez un email avec un lien sécurisé pour réinitialiser votre mot de passe.
                 </p>
-                <Button disabled className="bg-zinc-800 text-zinc-500">
-                  Bientôt disponible
+                <Button
+                  onClick={handlePasswordReset}
+                  className="bg-orange-500 hover:bg-orange-600 text-white"
+                  disabled={resetLoading}
+                >
+                  {resetLoading ? 'Envoi...' : 'Réinitialiser mon mot de passe'}
                 </Button>
               </CardContent>
             </Card>
