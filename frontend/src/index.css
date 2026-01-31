@@ -125,6 +125,17 @@
     color: hsl(var(--text)) !important;
   }
 
+  html[data-theme="light"] .text-zinc-300,
+  html[data-theme="light"] .text-zinc-400,
+  html[data-theme="light"] .text-zinc-500,
+  html[data-theme="light"] .text-zinc-600 {
+    color: hsl(var(--text-muted)) !important;
+  }
+
+  html[data-theme="light"] .text-zinc-700 {
+    color: hsl(var(--text)) !important;
+  }
+
   html[data-theme="light"] .bg-orange-500,
   html[data-theme="light"] .bg-orange-600,
   html[data-theme="light"] .bg-orange-700,
@@ -140,6 +151,68 @@
   html[data-theme="light"] .bg-gradient-to-r,
   html[data-theme="light"] .bg-gradient-to-t {
     color: hsl(var(--primary-contrast)) !important;
+  }
+}
+
+@layer base {
+  [data-minisite-theme="light"] {
+    color: hsl(var(--text));
+    background-color: hsl(var(--bg));
+  }
+
+  [data-minisite-theme="light"] .bg-black,
+  [data-minisite-theme="light"] .bg-black\/80,
+  [data-minisite-theme="light"] .bg-black\/60,
+  [data-minisite-theme="light"] .bg-black\/40,
+  [data-minisite-theme="light"] .bg-black\/20 {
+    background-color: hsl(var(--surface)) !important;
+  }
+
+  [data-minisite-theme="light"] .bg-zinc-950,
+  [data-minisite-theme="light"] .bg-zinc-900,
+  [data-minisite-theme="light"] .bg-zinc-800,
+  [data-minisite-theme="light"] .bg-zinc-900\/80,
+  [data-minisite-theme="light"] .bg-zinc-900\/50,
+  [data-minisite-theme="light"] .bg-zinc-900\/40,
+  [data-minisite-theme="light"] .bg-zinc-800\/50,
+  [data-minisite-theme="light"] .bg-zinc-950\/50 {
+    background-color: hsl(var(--surface-2)) !important;
+  }
+
+  [data-minisite-theme="light"] .bg-\[\#080808\],
+  [data-minisite-theme="light"] .bg-\[\#0A0A0A\] {
+    background-color: hsl(var(--surface)) !important;
+  }
+
+  [data-minisite-theme="light"] .border-white\/5,
+  [data-minisite-theme="light"] .border-white\/10,
+  [data-minisite-theme="light"] .border-zinc-800,
+  [data-minisite-theme="light"] .border-zinc-700 {
+    border-color: hsl(var(--border)) !important;
+  }
+
+  [data-minisite-theme="light"] .text-white\/20,
+  [data-minisite-theme="light"] .text-white\/30,
+  [data-minisite-theme="light"] .text-white\/40,
+  [data-minisite-theme="light"] .text-white\/60,
+  [data-minisite-theme="light"] .text-white\/70,
+  [data-minisite-theme="light"] .text-white\/80 {
+    color: hsl(var(--text-muted)) !important;
+  }
+
+  [data-minisite-theme="light"] .text-white {
+    color: hsl(var(--text)) !important;
+  }
+
+  [data-minisite-theme="light"] .text-zinc-300,
+  [data-minisite-theme="light"] .text-zinc-400,
+  [data-minisite-theme="light"] .text-zinc-500,
+  [data-minisite-theme="light"] .text-zinc-600 {
+    color: hsl(var(--text-muted)) !important;
+  }
+
+  [data-minisite-theme="light"] .text-zinc-700 {
+    color: hsl(var(--text)) !important;
   }
 }
 

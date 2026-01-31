@@ -206,14 +206,14 @@ export const MinisiteLanding = () => {
 
   if (checkingMinisite) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+      <div className="min-h-screen dp-bg flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className="min-h-screen dp-bg">
       
       <main className="container mx-auto px-4 py-12">
         {/* Hero */}
@@ -222,7 +222,7 @@ export const MinisiteLanding = () => {
           <h1 className="text-4xl sm:text-5xl font-bold mb-4" style={{fontFamily: 'Outfit, sans-serif'}}>
             Créez votre <span className="text-orange-500">page web</span>
           </h1>
-          <p className="text-lg text-zinc-400 max-w-2xl mx-auto mb-8">
+          <p className="text-lg text-[hsl(var(--text-muted))] max-w-2xl mx-auto mb-8">
             Vendez vos articles en ligne avec votre propre boutique. Simple, rapide et optimisé.
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
@@ -235,7 +235,7 @@ export const MinisiteLanding = () => {
             </Button>
             <Button
               variant="outline"
-              className="border-zinc-700 text-white hover:bg-zinc-800 text-lg px-8 py-6"
+              className="border-[hsl(var(--border))] text-[hsl(var(--text))] hover:bg-[hsl(var(--surface-2))] text-lg px-8 py-6"
               onClick={() => window.open('https://discord.gg/downpricer', '_blank')}
             >
               <MessageCircle className="h-5 w-5 mr-2" />
@@ -246,31 +246,31 @@ export const MinisiteLanding = () => {
 
         {/* Avantages */}
         <div className="grid md:grid-cols-3 gap-6 mb-16">
-          <Card className="bg-zinc-900 border-zinc-800">
+          <Card className="dp-surface">
             <CardContent className="p-6 text-center">
               <Zap className="h-12 w-12 text-orange-500 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2 text-white">Ultra rapide</h3>
-              <p className="text-zinc-400 text-sm">
+              <h3 className="text-xl font-semibold mb-2 text-[hsl(var(--text))]">Ultra rapide</h3>
+              <p className="text-[hsl(var(--text-muted))] text-sm">
                 Page optimisée mobile-first. Images compressées, chargement instantané.
               </p>
             </CardContent>
           </Card>
 
-          <Card className="bg-zinc-900 border-zinc-800">
+          <Card className="dp-surface">
             <CardContent className="p-6 text-center">
               <TrendingUp className="h-12 w-12 text-green-500 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2 text-white">Visibilité boostée</h3>
-              <p className="text-zinc-400 text-sm">
+              <h3 className="text-xl font-semibold mb-2 text-[hsl(var(--text))]">Visibilité boostée</h3>
+              <p className="text-[hsl(var(--text-muted))] text-sm">
                 Vos articles apparaissent dans le catalogue public DownPricer.
               </p>
             </CardContent>
           </Card>
 
-          <Card className="bg-zinc-900 border-zinc-800">
+          <Card className="dp-surface">
             <CardContent className="p-6 text-center">
               <Users className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2 text-white">Catalogue revendeurs</h3>
-              <p className="text-zinc-400 text-sm">
+              <h3 className="text-xl font-semibold mb-2 text-[hsl(var(--text))]">Catalogue revendeurs</h3>
+              <p className="text-[hsl(var(--text-muted))] text-sm">
                 Plans Standard/Premium : affichez vos articles aux autres revendeurs.
               </p>
             </CardContent>
@@ -285,8 +285,8 @@ export const MinisiteLanding = () => {
             {plans.map((plan) => (
               <Card 
                 key={plan.planKey}
-                className={`bg-zinc-900 border-2 relative ${
-                  plan.popular ? 'border-blue-500' : 'border-zinc-800'
+                className={`dp-surface border-2 relative ${
+                  plan.popular ? 'border-blue-500' : 'border-[hsl(var(--border))]'
                 }`}
               >
                 {plan.popular && (
@@ -297,12 +297,12 @@ export const MinisiteLanding = () => {
                 
                 <CardHeader className="text-center pb-4">
                   <CardTitle className="text-xl mb-2">
-                    <span className="text-zinc-400">Plan</span>{' '}
+                    <span className="text-[hsl(var(--text-muted))]">Plan</span>{' '}
                     <span className={plan.colorClass}>{plan.name}</span>
                   </CardTitle>
                   <div className="flex items-baseline justify-center gap-1">
                     <span className={`text-5xl font-bold ${plan.colorClass}`}>{plan.price}</span>
-                    <span className="text-zinc-400">{plan.period}</span>
+                    <span className="text-[hsl(var(--text-muted))]">{plan.period}</span>
                   </div>
                 </CardHeader>
                 
@@ -311,7 +311,7 @@ export const MinisiteLanding = () => {
                     {plan.features.map((feature, index) => (
                       <li key={index} className="flex items-start gap-2">
                         <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span className="text-sm text-zinc-300">{feature}</span>
+                        <span className="text-sm text-[hsl(var(--text))]">{feature}</span>
                       </li>
                     ))}
                   </ul>
@@ -344,7 +344,7 @@ export const MinisiteLanding = () => {
         <Card className="bg-gradient-to-r from-orange-900/20 to-red-900/20 border-orange-500/50">
           <CardContent className="p-8 text-center">
             <h3 className="text-2xl font-bold mb-2">Vous voulez gagner plus d'argent ?</h3>
-            <p className="text-zinc-300 mb-6">
+            <p className="text-[hsl(var(--text-muted))] mb-6">
               Rejoignez notre Discord pour des astuces, conseils et opportunités exclusives.
             </p>
             <Button

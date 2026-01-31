@@ -447,7 +447,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { ExternalLink, Loader2, AlertCircle, ShoppingBag, ChevronRight, ChevronLeft, X, ZoomIn } from 'lucide-react';
+import { ExternalLink, Loader2, AlertCircle, ShoppingBag, ChevronRight, ChevronLeft, X, ZoomIn, Sun, Moon } from 'lucide-react';
 import { SafeImage } from '../components/SafeImage';
 import { Header } from '../components/Header';
 import api from '../utils/api';
@@ -871,9 +871,20 @@ export const MinisitePublic = () => {
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsHidden, setReviewsHidden] = useState(false);
+  const [minisiteTheme, setMinisiteTheme] = useState("dark");
 
   useEffect(() => {
     fetchMinisite();
+  }, [slug]);
+
+  useEffect(() => {
+    const storageKey = `minisite-theme:${slug}`;
+    const stored = window.localStorage.getItem(storageKey);
+    if (stored === "light" || stored === "dark") {
+      setMinisiteTheme(stored);
+    } else {
+      setMinisiteTheme("dark");
+    }
   }, [slug]);
 
   const fetchMinisite = async () => {
@@ -909,6 +920,12 @@ export const MinisitePublic = () => {
   const handleArticleClick = (article) => {
     // Rediriger vers la page détail au lieu d'ouvrir une modal
     window.location.href = `/s/${slug}/article/${article.id}`;
+  };
+
+  const toggleMinisiteTheme = () => {
+    const nextTheme = minisiteTheme === "dark" ? "light" : "dark";
+    setMinisiteTheme(nextTheme);
+    window.localStorage.setItem(`minisite-theme:${slug}`, nextTheme);
   };
 
   const closeModal = () => {
@@ -955,7 +972,11 @@ export const MinisitePublic = () => {
   const TemplateComponent = TEMPLATES[minisite.template] || TemplateModernGrid;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white" style={{ fontFamily: minisite.font_family || 'system-ui' }}>
+    <div
+      className="min-h-screen bg-zinc-950 text-white"
+      data-minisite-theme={minisiteTheme}
+      style={{ fontFamily: minisite.font_family || 'system-ui', colorScheme: minisiteTheme }}
+    >
       {/* Header global DownPricer - uniquement pour plan 1 */}
       {minisite.plan_id === 'SITE_PLAN_1' && <Header />}
       
@@ -978,6 +999,15 @@ export const MinisitePublic = () => {
               <p className="text-xs text-zinc-500">{minisite.sales_count || 0} vente(s)</p>
             </div>
             <Badge className="bg-zinc-800 text-zinc-300">{articles.length} articles</Badge>
+            <button
+              type="button"
+              onClick={toggleMinisiteTheme}
+              aria-label={minisiteTheme === "dark" ? "Activer le mode clair" : "Activer le mode sombre"}
+              title={minisiteTheme === "dark" ? "Mode clair" : "Mode sombre"}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-white hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950"
+            >
+              {minisiteTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
           </div>
         </div>
       </header>
